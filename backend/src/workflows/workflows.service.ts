@@ -147,6 +147,10 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     return this.workflowRunService.getCompiledWorkflowContext(workflowId, request, auth);
   }
 
+  async getWorkflowVersion(workflowId: string, versionId: string, auth?: AuthContext | null) {
+    return this.workflowVersionService.getWorkflowVersion(workflowId, versionId, auth);
+  }
+
   private ensureOrganizationAdmin(auth?: AuthContext | null): void {
     this.logger.debug(
       `[WORKFLOWS] Checking org admin - Auth: ${auth ? 'present' : 'null'}, Roles: ${auth?.roles ? JSON.stringify(auth.roles) : 'none'}, User: ${auth?.userId || 'none'}, Org: ${auth?.organizationId || 'none'}`,

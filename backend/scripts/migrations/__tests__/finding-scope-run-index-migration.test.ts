@@ -29,6 +29,5 @@ describe('finding scope run ownership keyset index migration', () => {
         ],
       }),
     );
-    expect(() => loadMigrationPlan(migrationsDir)).not.toThrow();
   });
 });

@@ -55,6 +55,7 @@ function proposal(valid = true): OperatorWorkflowDraftResult {
     },
     diff: {
       metadataChanged: [],
+      successCriteriaChanged: false,
       addedNodeIds: ['agent'],
       removedNodeIds: [],
       changedNodeIds: [],

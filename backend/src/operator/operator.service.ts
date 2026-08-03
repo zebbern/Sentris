@@ -142,6 +142,7 @@ export class OperatorService {
       message: input.message,
       context: input.context,
       directCommand: input.directCommand,
+      journey: input.journey,
       auth: user,
     });
     const persistedPayload = readOperatorTurnPayload(turn.context);
@@ -180,6 +181,7 @@ export class OperatorService {
                   },
                 }
               : {}),
+            ...(persistedPayload.journey ? { journey: persistedPayload.journey } : {}),
           },
         ],
         workflowExecutionTimeout: '24 hours',

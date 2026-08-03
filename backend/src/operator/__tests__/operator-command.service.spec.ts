@@ -42,6 +42,11 @@ describe('OperatorCommandService', () => {
         temporalRunId: 'temporal-1',
         status: 'RUNNING',
       }),
+      getWorkflowVersion: vi
+        .fn()
+        .mockImplementation((_workflowId: string, versionId: string) =>
+          Promise.resolve({ id: versionId, graph: { successCriteria: [] } }),
+        ),
     };
     findings = {
       listFindings: vi.fn().mockResolvedValue({
@@ -588,6 +593,219 @@ describe('OperatorCommandService', () => {
     expect(workflows.getRunResult).not.toHaveBeenCalled();
     expect(trace.summarizeRun).not.toHaveBeenCalled();
     expect(findings.listFindings).not.toHaveBeenCalled();
+  });
+
+  it('compares an improved run with its source using terminal and exact diagnostic evidence', async () => {
+    const sourceRunId = 'sentris-run-source';
+    const candidateRunId = 'sentris-run-candidate';
+    workflows.getRun = vi.fn().mockImplementation((runId: string) =>
+      Promise.resolve({
+        id: runId,
+        workflowId: WORKFLOW_ID,
+        workflowVersionId:
+          runId === sourceRunId
+            ? '77777777-7777-4777-8777-777777777777'
+            : '88888888-8888-4888-8888-888888888888',
+        status: runId === sourceRunId ? 'FAILED' : 'COMPLETED',
+        duration: runId === sourceRunId ? 10_000 : 8_000,
+        scopeId: '55555555-5555-4555-8555-555555555555',
+      }),
+    );
+    workflows.getRunConfig = vi.fn().mockImplementation((runId: string) =>
+      Promise.resolve({
+        runId,
+        workflowId: WORKFLOW_ID,
+        workflowVersionId:
+          runId === sourceRunId
+            ? '77777777-7777-4777-8777-777777777777'
+            : '88888888-8888-4888-8888-888888888888',
+        workflowVersion: runId === sourceRunId ? 1 : 2,
+        inputs: { target: 'example.com' },
+      }),
+    );
+    trace.summarizeRun.mockImplementation((runId: string) =>
+      Promise.resolve({
+        totalEvents: 4,
+        failedEventCount: runId === sourceRunId ? 2 : 0,
+        failed: [],
+        recent: [],
+      }),
+    );
+    findings.listFindings.mockImplementation((_auth: AuthContext, query: { runId: string }) =>
+      Promise.resolve({
+        items: [],
+        total: query.runId === sourceRunId ? 1 : 2,
+        page: 1,
+        pageSize: 10,
+        availability: 'available',
+        paginationMode: 'offset',
+        currentCursor: null,
+        nextCursor: null,
+        schemaCoverage: { canonical: 1, legacy: 0, invalid: 0 },
+        degradedReasons: [],
+      }),
+    );
+
+    const response = await service.execute({
+      commandName: 'compare_runs',
+      arguments: { sourceRunId, candidateRunId },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(response.result).toEqual(
+      expect.objectContaining({
+        kind: 'run-comparison',
+        assessment: 'improved',
+        comparable: true,
+        source: expect.objectContaining({
+          runId: sourceRunId,
+          status: 'FAILED',
+          trace: { availability: 'available', failedEventCount: 2 },
+          findings: { availability: 'available', total: 1 },
+        }),
+        candidate: expect.objectContaining({
+          runId: candidateRunId,
+          status: 'COMPLETED',
+          trace: { availability: 'available', failedEventCount: 0 },
+          findings: { availability: 'available', total: 2 },
+        }),
+        changes: {
+          statusChanged: true,
+          failedEventCountDelta: -2,
+          findingTotalDelta: 1,
+          durationDeltaMs: -2_000,
+        },
+      }),
+    );
+  });
+
+  it('marks runs with different inputs as inconclusive instead of claiming improvement', async () => {
+    const sourceRunId = 'sentris-run-source';
+    const candidateRunId = 'sentris-run-candidate';
+    workflows.getRun = vi.fn().mockImplementation((runId: string) =>
+      Promise.resolve({
+        id: runId,
+        workflowId: WORKFLOW_ID,
+        workflowVersionId: WORKFLOW_VERSION_ID,
+        status: runId === sourceRunId ? 'FAILED' : 'COMPLETED',
+        duration: 1_000,
+        scopeId: null,
+      }),
+    );
+    workflows.getRunConfig = vi.fn().mockImplementation((runId: string) =>
+      Promise.resolve({
+        runId,
+        workflowId: WORKFLOW_ID,
+        workflowVersionId: WORKFLOW_VERSION_ID,
+        workflowVersion: 1,
+        inputs: { target: runId },
+      }),
+    );
+
+    const response = await service.execute({
+      commandName: 'compare_runs',
+      arguments: { sourceRunId, candidateRunId },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(response.result).toEqual(
+      expect.objectContaining({
+        assessment: 'inconclusive',
+        comparable: false,
+        caveats: expect.arrayContaining([expect.stringContaining('different stored inputs')]),
+      }),
+    );
+  });
+
+  it('uses candidate-version success criteria to compare semantic run outputs', async () => {
+    const sourceRunId = 'sentris-run-source';
+    const candidateRunId = 'sentris-run-candidate';
+    const candidateVersionId = '88888888-8888-4888-8888-888888888888';
+    workflows.getRun = vi.fn().mockImplementation((runId: string) =>
+      Promise.resolve({
+        id: runId,
+        workflowId: WORKFLOW_ID,
+        workflowVersionId:
+          runId === sourceRunId ? '77777777-7777-4777-8777-777777777777' : candidateVersionId,
+        temporalRunId: `temporal-${runId}`,
+        status: 'COMPLETED',
+        duration: 1_000,
+        scopeId: null,
+      }),
+    );
+    workflows.getRunConfig = vi.fn().mockImplementation((runId: string) =>
+      Promise.resolve({
+        runId,
+        workflowId: WORKFLOW_ID,
+        workflowVersionId:
+          runId === sourceRunId ? '77777777-7777-4777-8777-777777777777' : candidateVersionId,
+        workflowVersion: runId === sourceRunId ? 1 : 2,
+        inputs: { target: 'example.com' },
+      }),
+    );
+    workflows.getWorkflowVersion.mockResolvedValue({
+      id: candidateVersionId,
+      graph: {
+        successCriteria: [
+          {
+            id: 'report',
+            title: 'Produces an investigation report',
+            kind: 'output_assertion',
+            nodeRef: 'agent',
+            path: '/report',
+            operator: 'not_empty',
+          },
+        ],
+      },
+    });
+    workflows.getRunResult = vi.fn().mockImplementation((runId: string) =>
+      Promise.resolve({
+        success: true,
+        outputs: { agent: { report: runId === sourceRunId ? '' : 'actionable report' } },
+      }),
+    );
+
+    const response = await service.execute({
+      commandName: 'compare_runs',
+      arguments: { sourceRunId, candidateRunId },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(response.result).toEqual(
+      expect.objectContaining({
+        assessment: 'improved',
+        successCriteria: {
+          benchmarkVersionId: candidateVersionId,
+          criteria: [
+            expect.objectContaining({
+              assessment: 'improved',
+              source: expect.objectContaining({ outcome: 'failed' }),
+              candidate: expect.objectContaining({ outcome: 'passed' }),
+            }),
+          ],
+        },
+      }),
+    );
+    expect(workflows.getWorkflowVersion).toHaveBeenCalledWith(
+      WORKFLOW_ID,
+      candidateVersionId,
+      auth,
+    );
   });
 
   it('uses the canonical findings query with bounded Operator filters', async () => {

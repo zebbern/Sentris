@@ -17,6 +17,7 @@ import type { AuthContext } from '../../auth/types';
 import type { ExecutionInputPreview, ExecutionTriggerType } from '@sentris/shared';
 
 const TEST_ORG = 'test-org';
+const VALID_RUNTIME_INPUTS = { fileId: '11111111-1111-4111-8111-111111111111' };
 const authContext: AuthContext = {
   userId: 'service-user',
   organizationId: TEST_ORG,
@@ -595,7 +596,7 @@ describe('WorkflowsService', () => {
       mutationIdempotencyKey: null,
     });
 
-    const run = await service.run('workflow-id', { inputs: { message: 'hi' } }, authContext);
+    const run = await service.run('workflow-id', { inputs: VALID_RUNTIME_INPUTS }, authContext);
 
     expect(run.runId).toMatch(/^sentris-run-/);
     expect(run.workflowId).toBe('workflow-id');
@@ -606,7 +607,7 @@ describe('WorkflowsService', () => {
     expect(startCalls[0].args?.[0]).toMatchObject({
       runId: run.runId,
       workflowId: 'workflow-id',
-      inputs: { message: 'hi' },
+      inputs: VALID_RUNTIME_INPUTS,
       organizationId: TEST_ORG,
     });
     expect(storedRunMeta).toMatchObject({
@@ -649,7 +650,7 @@ describe('WorkflowsService', () => {
       mutationIdempotencyKey: null,
     });
 
-    const run = await service.run('workflow-id', { inputs: { foo: 'bar' } }, authContext);
+    const run = await service.run('workflow-id', { inputs: VALID_RUNTIME_INPUTS }, authContext);
     const summary = await service.getRun(run.runId, authContext);
 
     expect(summary.id).toBe(run.runId);
@@ -686,13 +687,13 @@ describe('WorkflowsService', () => {
 
     const first = await service.prepareRunPayload(
       'workflow-id',
-      { inputs: { domain: 'acme.com' } },
+      { inputs: VALID_RUNTIME_INPUTS },
       authContext,
       { trigger, idempotencyKey: 'phase-8-key' },
     );
 
     expect(first.triggerMetadata).toEqual(trigger);
-    expect(first.inputPreview.runtimeInputs).toEqual({ domain: 'acme.com' });
+    expect(first.inputPreview.runtimeInputs).toEqual(VALID_RUNTIME_INPUTS);
     expect(storedRunMeta).toMatchObject({
       triggerType: 'schedule',
       triggerSource: 'schedule-123',
@@ -701,7 +702,7 @@ describe('WorkflowsService', () => {
 
     const second = await service.prepareRunPayload(
       'workflow-id',
-      { inputs: { domain: 'acme.com' } },
+      { inputs: VALID_RUNTIME_INPUTS },
       authContext,
       { trigger, idempotencyKey: 'phase-8-key' },
     );
@@ -711,7 +712,7 @@ describe('WorkflowsService', () => {
 
   it('delegates status, result, and cancel operations to the Temporal service', async () => {
     await service.create(sampleGraph, authContext);
-    const run = await service.run('workflow-id', {}, authContext);
+    const run = await service.run('workflow-id', { inputs: VALID_RUNTIME_INPUTS }, authContext);
     completedCount = 1;
     const status = await service.getRunStatus(run.runId, run.temporalRunId, authContext);
     const result = await service.getRunResult(run.runId, run.temporalRunId, authContext);
@@ -736,14 +737,14 @@ describe('WorkflowsService', () => {
 
   it('returns stored inputs and version metadata via getRunConfig', async () => {
     await service.create(sampleGraph, authContext);
-    const run = await service.run('workflow-id', { inputs: { answer: 42 } }, authContext);
+    const run = await service.run('workflow-id', { inputs: VALID_RUNTIME_INPUTS }, authContext);
     const config = await service.getRunConfig(run.runId, authContext);
     expect(config).toMatchObject({
       runId: run.runId,
       workflowId: run.workflowId,
       workflowVersionId: run.workflowVersionId,
       workflowVersion: run.workflowVersion,
-      inputs: { answer: 42 },
+      inputs: VALID_RUNTIME_INPUTS,
     });
   });
 
@@ -1047,7 +1048,7 @@ describe('WorkflowsService', () => {
     repositoryMock.findById = async () =>
       makeWorkflowRecord({ compiledDefinition: definition }) as any;
 
-    const run = await service.run('workflow-id', { inputs: {} }, authContext);
+    const run = await service.run('workflow-id', { inputs: VALID_RUNTIME_INPUTS }, authContext);
 
     const { runs } = await service.listRuns(authContext, { workflowId: 'workflow-id' });
     expect(runs.length).toBeGreaterThanOrEqual(1);

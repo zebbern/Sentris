@@ -3458,6 +3458,24 @@ export interface components {
                 y: number;
                 zoom: number;
             };
+            successCriteria?: ({
+                id: string;
+                title: string;
+                /** @enum {string} */
+                kind: "output_assertion";
+                nodeRef: string;
+                path: string;
+                /** @enum {string} */
+                operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
+                expected?: (string | null) | (number | null) | (boolean | null);
+            } | {
+                id: string;
+                title: string;
+                /** @enum {string} */
+                kind: "finding_count";
+                minimum?: number;
+                maximum?: number;
+            })[];
         };
         WorkflowResponseDto: {
             id: string;
@@ -3537,6 +3555,24 @@ export interface components {
                     y: number;
                     zoom: number;
                 };
+                successCriteria?: ({
+                    id: string;
+                    title: string;
+                    /** @enum {string} */
+                    kind: "output_assertion";
+                    nodeRef: string;
+                    path: string;
+                    /** @enum {string} */
+                    operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
+                    expected?: (string | null) | (number | null) | (boolean | null);
+                } | {
+                    id: string;
+                    title: string;
+                    /** @enum {string} */
+                    kind: "finding_count";
+                    minimum?: number;
+                    maximum?: number;
+                })[];
             };
             compiledDefinition: unknown;
             lastRun: string | null;
@@ -3621,6 +3657,24 @@ export interface components {
                 y: number;
                 zoom: number;
             };
+            successCriteria?: ({
+                id: string;
+                title: string;
+                /** @enum {string} */
+                kind: "output_assertion";
+                nodeRef: string;
+                path: string;
+                /** @enum {string} */
+                operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
+                expected?: (string | null) | (number | null) | (boolean | null);
+            } | {
+                id: string;
+                title: string;
+                /** @enum {string} */
+                kind: "finding_count";
+                minimum?: number;
+                maximum?: number;
+            })[];
             /** Format: uuid */
             expectedVersionId?: string;
         };
@@ -3735,6 +3789,24 @@ export interface components {
                     y: number;
                     zoom: number;
                 };
+                successCriteria?: ({
+                    id: string;
+                    title: string;
+                    /** @enum {string} */
+                    kind: "output_assertion";
+                    nodeRef: string;
+                    path: string;
+                    /** @enum {string} */
+                    operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
+                    expected?: (string | null) | (number | null) | (boolean | null);
+                } | {
+                    id: string;
+                    title: string;
+                    /** @enum {string} */
+                    kind: "finding_count";
+                    minimum?: number;
+                    maximum?: number;
+                })[];
             };
             createdAt: string;
         };
@@ -5643,6 +5715,8 @@ export interface components {
             };
             diff: {
                 metadataChanged: ("name" | "description")[];
+                /** @default false */
+                successCriteriaChanged: boolean;
                 addedNodeIds: string[];
                 removedNodeIds: string[];
                 changedNodeIds: string[];
@@ -5728,6 +5802,24 @@ export interface components {
                     y: number;
                     zoom: number;
                 };
+                successCriteria?: ({
+                    id: string;
+                    title: string;
+                    /** @enum {string} */
+                    kind: "output_assertion";
+                    nodeRef: string;
+                    path: string;
+                    /** @enum {string} */
+                    operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
+                    expected?: (string | null) | (number | null) | (boolean | null);
+                } | {
+                    id: string;
+                    title: string;
+                    /** @enum {string} */
+                    kind: "finding_count";
+                    minimum?: number;
+                    maximum?: number;
+                })[];
             };
             baseGraph: {
                 id?: string;
@@ -5803,6 +5895,24 @@ export interface components {
                     y: number;
                     zoom: number;
                 };
+                successCriteria?: ({
+                    id: string;
+                    title: string;
+                    /** @enum {string} */
+                    kind: "output_assertion";
+                    nodeRef: string;
+                    path: string;
+                    /** @enum {string} */
+                    operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
+                    expected?: (string | null) | (number | null) | (boolean | null);
+                } | {
+                    id: string;
+                    title: string;
+                    /** @enum {string} */
+                    kind: "finding_count";
+                    minimum?: number;
+                    maximum?: number;
+                })[];
             } | null;
         };
         UpdateOperatorSessionDto: {
@@ -5844,6 +5954,13 @@ export interface components {
                 };
             } | {
                 /** @enum {string} */
+                commandName: "compare_runs";
+                arguments: {
+                    sourceRunId: string;
+                    candidateRunId: string;
+                };
+            } | {
+                /** @enum {string} */
                 commandName: "run_workflow";
                 arguments: {
                     /** Format: uuid */
@@ -5870,6 +5987,11 @@ export interface components {
                 arguments: {
                     runId: string;
                 };
+            };
+            journey?: {
+                /** @enum {string} */
+                kind: "improve_run";
+                sourceRunId: string;
             };
         };
         OperatorActionDecisionDto: {

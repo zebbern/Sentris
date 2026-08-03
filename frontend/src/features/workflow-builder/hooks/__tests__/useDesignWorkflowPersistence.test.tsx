@@ -10,6 +10,7 @@ const update = mock(async () => ({
   description: '',
   currentVersionId: '22222222-2222-4222-8222-222222222222',
   currentVersion: 2,
+  graph: { successCriteria: [] },
 }));
 const updateMetadata = mock(async () => ({ id: 'workflow-1' }));
 
@@ -86,6 +87,7 @@ describe('useDesignWorkflowPersistence Operator version fence', () => {
             description: '',
             currentVersionId: BASE_VERSION_ID,
             currentVersion: 1,
+            successCriteria: [],
           },
         }),
       { initialProps: { name: 'Base workflow', isDirty: false } },
@@ -106,5 +108,59 @@ describe('useDesignWorkflowPersistence Operator version fence', () => {
       { expectedVersionId: BASE_VERSION_ID },
     );
     expect(onExpectedVersionSaveSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists success criteria by creating a workflow version', async () => {
+    const common = {
+      canManageWorkflows: true,
+      isNewWorkflow: false,
+      designNodes: [node],
+      designEdges: [],
+      designNodesRef: { current: [node] },
+      designEdgesRef: { current: [] },
+      designSavedSnapshotRef: { current: null },
+      markDirty: mock(() => {}),
+      markClean: mock(() => {}),
+      setWorkflowId: mock(() => {}),
+      setMetadata: mock(() => {}),
+      navigate: mock(() => {}),
+      toast: mock(() => {}),
+      computeGraphSignature: () => 'unchanged-graph',
+    };
+    const criterion = {
+      id: 'findings',
+      title: 'Produces findings',
+      kind: 'finding_count' as const,
+      minimum: 1,
+    };
+    const { result, rerender } = renderHook(
+      ({ successCriteria, isDirty }) =>
+        useDesignWorkflowPersistence({
+          ...common,
+          isDirty,
+          metadata: {
+            id: 'workflow-1',
+            name: 'Base workflow',
+            description: '',
+            currentVersionId: BASE_VERSION_ID,
+            currentVersion: 1,
+            successCriteria,
+          },
+        }),
+      { initialProps: { successCriteria: [] as (typeof criterion)[], isDirty: false } },
+    );
+
+    await waitFor(() => expect(result.current.lastSavedMetadata?.successCriteria).toEqual([]));
+    rerender({ successCriteria: [criterion], isDirty: true });
+    await act(async () => {
+      await result.current.handleSave(false);
+    });
+
+    expect(updateMetadata).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith(
+      'workflow-1',
+      expect.objectContaining({ successCriteria: [criterion] }),
+      { expectedVersionId: undefined },
+    );
   });
 });

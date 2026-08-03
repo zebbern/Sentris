@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TERMINAL_STATUSES, type OperatorCreateTurn } from '@sentris/shared';
-import { ExternalLink, Loader2, RefreshCw, Search, Square } from 'lucide-react';
+import { ExternalLink, GitCompareArrows, Loader2, RefreshCw, Search, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { AgentRunCard } from '@/components/timeline/agent-trace/AgentRunCard';
@@ -17,14 +17,17 @@ import { cn } from '@/lib/utils';
 const TERMINAL_RUN_STATUSES = new Set<string>(TERMINAL_STATUSES);
 
 type DirectCommand = NonNullable<OperatorCreateTurn['directCommand']>;
+type Journey = NonNullable<OperatorCreateTurn['journey']>;
 
 export interface OperatorRunCommandRequest {
   message: string;
-  directCommand: DirectCommand;
+  directCommand?: DirectCommand;
+  journey?: Journey;
 }
 
 interface OperatorRunActivityProps {
   runId: string;
+  sourceRunId?: string;
   disabled: boolean;
   onCommand: (request: OperatorRunCommandRequest) => void;
 }
@@ -34,7 +37,12 @@ interface AgentEntry {
   agentRunId: string;
 }
 
-export function OperatorRunActivity({ runId, disabled, onCommand }: OperatorRunActivityProps) {
+export function OperatorRunActivity({
+  runId,
+  sourceRunId,
+  disabled,
+  onCommand,
+}: OperatorRunActivityProps) {
   const [agentActivityRequested, setAgentActivityRequested] = useState(false);
   const { statusQuery, streamState } = useOperatorRunQueryStream(runId);
   const status = readStatus(statusQuery.data);
@@ -177,6 +185,27 @@ export function OperatorRunActivity({ runId, disabled, onCommand }: OperatorRunA
         ) : null}
         {status && TERMINAL_RUN_STATUSES.has(status) ? (
           <>
+            {sourceRunId ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 px-2 text-[11px]"
+                disabled={disabled}
+                onClick={() =>
+                  onCommand({
+                    message: `Compare improved run ${runId} with source run ${sourceRunId} using recorded execution evidence`,
+                    directCommand: {
+                      commandName: 'compare_runs',
+                      arguments: { sourceRunId, candidateRunId: runId },
+                    },
+                  })
+                }
+              >
+                <GitCompareArrows className="h-3 w-3" />
+                Compare with source
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -185,13 +214,13 @@ export function OperatorRunActivity({ runId, disabled, onCommand }: OperatorRunA
               disabled={disabled}
               onClick={() =>
                 onCommand({
-                  message: `Inspect run ${runId}, diagnose failures or weak results, and propose a workflow draft revision when a concrete improvement is justified. Do not apply it yet.`,
-                  directCommand: { commandName: 'get_run', arguments: { runId } },
+                  message: `Improve run ${runId}: inspect its recorded evidence, propose the smallest justified workflow revision, save it under my approval mode, rerun the same inputs, and compare the result.`,
+                  journey: { kind: 'improve_run', sourceRunId: runId },
                 })
               }
             >
               <Search className="h-3 w-3" />
-              Review &amp; improve
+              Improve with Operator
             </Button>
             <Button
               type="button"

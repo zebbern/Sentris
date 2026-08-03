@@ -9,6 +9,7 @@ import type {
   OperatorCommandEffect,
   OperatorCommandName,
   OperatorDirectCommand,
+  OperatorJourney,
   OperatorModelConfig,
   OperatorPersistedTurnPayload,
   OperatorRouteContext,
@@ -229,11 +230,13 @@ export class OperatorRepository {
     message: string;
     context?: OperatorRouteContext;
     directCommand?: OperatorDirectCommand;
+    journey?: OperatorJourney;
     auth: AuthContext;
   }): Promise<{ turn: OperatorTurnRecord; created: boolean }> {
     const persistedPayload = buildOperatorTurnPayload({
       routeContext: input.context,
       directCommand: input.directCommand,
+      journey: input.journey,
     });
     const actorRoles = normalizeActorRoles(input.auth.roles);
     return this.db.transaction(async (tx) => {

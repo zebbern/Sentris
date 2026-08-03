@@ -3,6 +3,7 @@ import {
   OperatorPersistedTurnPayloadSchema,
   OperatorRouteContextSchema,
   type OperatorDirectCommand,
+  type OperatorJourney,
   type OperatorPersistedTurnPayload,
   type OperatorRouteContext,
   type OperatorStoredTurnContext,
@@ -11,11 +12,13 @@ import {
 export function buildOperatorTurnPayload(input: {
   routeContext?: OperatorRouteContext;
   directCommand?: OperatorDirectCommand;
+  journey?: OperatorJourney;
 }): OperatorPersistedTurnPayload {
   return {
     version: OPERATOR_PERSISTED_TURN_PAYLOAD_VERSION,
     routeContext: input.routeContext ?? null,
     directCommand: input.directCommand ?? null,
+    journey: input.journey ?? null,
   };
 }
 

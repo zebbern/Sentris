@@ -3,12 +3,17 @@ import { z } from 'zod';
 import { ExecutionStatusSchema } from './execution.js';
 import { LLM_PROVIDER_IDS } from './ai-model-catalog.js';
 import { FindingTriageStatusSchema, UpdateFindingTriageSchema } from './finding-triage.js';
-import { FindingObservationSeveritySchema } from './findings/findingObservation.js';
+import {
+  FindingDataAvailabilitySchema,
+  FindingObservationSeveritySchema,
+} from './findings/findingObservation.js';
 import type { McpOperationInvocationRequest } from './mcp-invocation.js';
 import {
   WorkflowEdgeSchema,
   WorkflowGraphObjectSchema,
   WorkflowNodeSchema,
+  WorkflowSuccessCriteriaSchema,
+  WorkflowSuccessCriterionSchema,
   type WorkflowGraph,
 } from './workflow-graph.js';
 
@@ -142,6 +147,7 @@ const OperatorWorkflowEntityIdSchema = z.string().trim().min(1).max(191);
 
 export const OPERATOR_WORKFLOW_EDIT_OPERATIONS = [
   'set_workflow_metadata',
+  'set_success_criteria',
   'patch_node',
   'add_node',
   'replace_node',
@@ -153,6 +159,7 @@ export const OPERATOR_WORKFLOW_EDIT_OPERATIONS = [
 
 const OPERATOR_WORKFLOW_EDIT_FIELDS = {
   set_workflow_metadata: ['operation', 'name', 'description'],
+  set_success_criteria: ['operation', 'successCriteria'],
   patch_node: [
     'operation',
     'nodeId',
@@ -169,16 +176,14 @@ const OPERATOR_WORKFLOW_EDIT_FIELDS = {
   add_edge: ['operation', 'edge'],
   replace_edge: ['operation', 'edgeId', 'edge'],
   remove_edge: ['operation', 'edgeId'],
-} as const satisfies Record<
-  (typeof OPERATOR_WORKFLOW_EDIT_OPERATIONS)[number],
-  readonly string[]
->;
+} as const satisfies Record<(typeof OPERATOR_WORKFLOW_EDIT_OPERATIONS)[number], readonly string[]>;
 
 export const OperatorWorkflowEditOperationSchema = z
   .object({
     operation: z.enum(OPERATOR_WORKFLOW_EDIT_OPERATIONS),
     name: z.string().trim().min(1).max(191).optional(),
     description: z.string().max(8_000).nullable().optional(),
+    successCriteria: WorkflowSuccessCriteriaSchema.optional(),
     nodeId: OperatorWorkflowEntityIdSchema.optional(),
     label: z.string().trim().min(1).max(191).optional(),
     position: z.object({ x: z.number(), y: z.number() }).strict().optional(),
@@ -210,6 +215,9 @@ export const OperatorWorkflowEditOperationSchema = z
             message: 'set_workflow_metadata requires name or description',
           });
         }
+        break;
+      case 'set_success_criteria':
+        requireField('successCriteria');
         break;
       case 'patch_node':
         requireField('nodeId');
@@ -292,9 +300,7 @@ export const OperatorWorkflowEditOperationSchema = z
       }
     }
   });
-export type OperatorWorkflowEditOperation = z.infer<
-  typeof OperatorWorkflowEditOperationSchema
->;
+export type OperatorWorkflowEditOperation = z.infer<typeof OperatorWorkflowEditOperationSchema>;
 
 export const OperatorProposeWorkflowEditsInputSchema = z
   .object({
@@ -359,6 +365,7 @@ export const OperatorWorkflowDraftValidationSchema = z
 export const OperatorWorkflowGraphDiffSchema = z
   .object({
     metadataChanged: z.array(z.enum(['name', 'description'])),
+    successCriteriaChanged: z.boolean().default(false),
     addedNodeIds: z.array(z.string()),
     removedNodeIds: z.array(z.string()),
     changedNodeIds: z.array(z.string()),
@@ -421,6 +428,107 @@ export const OperatorListRunsInputSchema = z
   .strict();
 
 export const OperatorGetRunInputSchema = z.object({ runId: RunIdSchema }).strict();
+
+export const OperatorCompareRunsInputSchema = z
+  .object({
+    sourceRunId: RunIdSchema,
+    candidateRunId: RunIdSchema,
+  })
+  .strict()
+  .refine((value) => value.sourceRunId !== value.candidateRunId, {
+    message: 'sourceRunId and candidateRunId must identify different runs',
+    path: ['candidateRunId'],
+  });
+
+export const OPERATOR_RUN_COMPARISON_ASSESSMENTS = [
+  'improved',
+  'regressed',
+  'unchanged',
+  'inconclusive',
+] as const;
+export const OperatorRunComparisonAssessmentSchema = z.enum(OPERATOR_RUN_COMPARISON_ASSESSMENTS);
+export type OperatorRunComparisonAssessment = z.infer<typeof OperatorRunComparisonAssessmentSchema>;
+
+export const OperatorRunComparisonEvidenceSchema = z
+  .object({
+    runId: RunIdSchema,
+    workflowId: WorkflowIdSchema,
+    workflowVersionId: z.string().uuid().nullable(),
+    status: ExecutionStatusSchema,
+    durationMs: z.number().nonnegative(),
+    trace: z
+      .object({
+        availability: z.enum(['available', 'unavailable']),
+        failedEventCount: z.number().int().nonnegative().nullable(),
+      })
+      .strict(),
+    findings: z
+      .object({
+        availability: FindingDataAvailabilitySchema,
+        total: z.number().int().nonnegative().nullable(),
+      })
+      .strict(),
+  })
+  .strict();
+export type OperatorRunComparisonEvidence = z.infer<typeof OperatorRunComparisonEvidenceSchema>;
+
+export const OPERATOR_SUCCESS_CRITERION_OUTCOMES = ['passed', 'failed', 'inconclusive'] as const;
+export const OperatorSuccessCriterionOutcomeSchema = z.enum(OPERATOR_SUCCESS_CRITERION_OUTCOMES);
+export type OperatorSuccessCriterionOutcome = z.infer<typeof OperatorSuccessCriterionOutcomeSchema>;
+
+export const OperatorSuccessCriterionEvaluationSchema = z
+  .object({
+    outcome: OperatorSuccessCriterionOutcomeSchema,
+    message: z.string().trim().min(1).max(500),
+    actual: z.string().max(700).optional(),
+  })
+  .strict();
+export type OperatorSuccessCriterionEvaluation = z.infer<
+  typeof OperatorSuccessCriterionEvaluationSchema
+>;
+
+export const OperatorSuccessCriterionComparisonSchema = z
+  .object({
+    criterion: WorkflowSuccessCriterionSchema,
+    source: OperatorSuccessCriterionEvaluationSchema,
+    candidate: OperatorSuccessCriterionEvaluationSchema,
+    assessment: OperatorRunComparisonAssessmentSchema,
+  })
+  .strict();
+export type OperatorSuccessCriterionComparison = z.infer<
+  typeof OperatorSuccessCriterionComparisonSchema
+>;
+
+export const OperatorRunSuccessCriteriaComparisonSchema = z
+  .object({
+    benchmarkVersionId: z.string().uuid(),
+    criteria: z.array(OperatorSuccessCriterionComparisonSchema).max(20),
+  })
+  .strict();
+export type OperatorRunSuccessCriteriaComparison = z.infer<
+  typeof OperatorRunSuccessCriteriaComparisonSchema
+>;
+
+export const OperatorRunComparisonResultSchema = z
+  .object({
+    kind: z.literal('run-comparison'),
+    assessment: OperatorRunComparisonAssessmentSchema,
+    comparable: z.boolean(),
+    source: OperatorRunComparisonEvidenceSchema,
+    candidate: OperatorRunComparisonEvidenceSchema,
+    changes: z
+      .object({
+        statusChanged: z.boolean(),
+        failedEventCountDelta: z.number().int().nullable(),
+        findingTotalDelta: z.number().int().nullable(),
+        durationDeltaMs: z.number(),
+      })
+      .strict(),
+    successCriteria: OperatorRunSuccessCriteriaComparisonSchema.nullable().optional(),
+    caveats: z.array(z.string().trim().min(1).max(500)).max(10),
+  })
+  .strict();
+export type OperatorRunComparisonResult = z.infer<typeof OperatorRunComparisonResultSchema>;
 
 export const OperatorRunWorkflowInputSchema = z
   .object({
@@ -557,8 +665,7 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
     inputSchema: OperatorProposeWorkflowDraftInputSchema,
   },
   propose_workflow_edits: {
-    description:
-      `Propose and compile-check bounded ID-based changes to an existing immutable workflow version without saving it. Use the exact workflowId, baseVersionId, node IDs, and edge IDs returned by get_workflow. Allowed operation values are: ${OPERATOR_WORKFLOW_EDIT_OPERATIONS.join(', ')}. For node configuration use patch_node with setParameters and/or setInputOverrides; structured values are recursively merged so omitted nested fields remain unchanged. For example, setInputOverrides: { chatModel: { provider: 'gemini', modelId: 'gemini-3.6-flash' } }. The backend materializes the full graph and returns the normal draft diff for review.`,
+    description: `Propose and compile-check bounded ID-based changes to an existing immutable workflow version without saving it. Use the exact workflowId, baseVersionId, node IDs, and edge IDs returned by get_workflow. Allowed operation values are: ${OPERATOR_WORKFLOW_EDIT_OPERATIONS.join(', ')}. For node configuration use patch_node with setParameters and/or setInputOverrides; structured values are recursively merged so omitted nested fields remain unchanged. For example, setInputOverrides: { chatModel: { provider: 'gemini', modelId: 'gemini-3.6-flash' } }. The backend materializes the full graph and returns the normal draft diff for review.`,
     effect: 'execute',
     inputSchema: OperatorProposeWorkflowEditsInputSchema,
   },
@@ -579,6 +686,12 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
       'Inspect one workflow run. Terminal runs include a bounded result, failed/recent trace evidence, and run-scoped findings; active runs include current status.',
     effect: 'read',
     inputSchema: OperatorGetRunInputSchema,
+  },
+  compare_runs: {
+    description:
+      'Compare one terminal improved run with its terminal source run. The verdict uses matching stored inputs/scope, terminal outcome, and exact trace failure counts. Finding totals and duration are reported only as observations because reruns can vary.',
+    effect: 'read',
+    inputSchema: OperatorCompareRunsInputSchema,
   },
   run_workflow: {
     description:
@@ -671,6 +784,7 @@ export type OperatorCommandInputMap = {
   apply_workflow_draft: z.infer<typeof OperatorApplyWorkflowDraftInputSchema>;
   list_runs: z.infer<typeof OperatorListRunsInputSchema>;
   get_run: z.infer<typeof OperatorGetRunInputSchema>;
+  compare_runs: z.infer<typeof OperatorCompareRunsInputSchema>;
   run_workflow: z.infer<typeof OperatorRunWorkflowInputSchema>;
   cancel_run: z.infer<typeof OperatorCancelRunInputSchema>;
   retry_run: z.infer<typeof OperatorRetryRunInputSchema>;
@@ -699,6 +813,12 @@ export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
     .strict(),
   z
     .object({
+      commandName: z.literal('compare_runs'),
+      arguments: OperatorCompareRunsInputSchema,
+    })
+    .strict(),
+  z
+    .object({
       commandName: z.literal('run_workflow'),
       arguments: OperatorRunWorkflowInputSchema,
     })
@@ -718,12 +838,23 @@ export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
 ]);
 export type OperatorDirectCommand = z.infer<typeof OperatorDirectCommandSchema>;
 
+export const OperatorJourneySchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('improve_run'),
+      sourceRunId: RunIdSchema,
+    })
+    .strict(),
+]);
+export type OperatorJourney = z.infer<typeof OperatorJourneySchema>;
+
 export const OPERATOR_PERSISTED_TURN_PAYLOAD_VERSION = 1 as const;
 export const OperatorPersistedTurnPayloadSchema = z
   .object({
     version: z.literal(OPERATOR_PERSISTED_TURN_PAYLOAD_VERSION),
     routeContext: OperatorRouteContextSchema.nullable(),
     directCommand: OperatorDirectCommandSchema.nullable(),
+    journey: OperatorJourneySchema.nullable().default(null),
   })
   .strict();
 export type OperatorPersistedTurnPayload = z.infer<typeof OperatorPersistedTurnPayloadSchema>;
@@ -735,7 +866,7 @@ export type OperatorPersistedTurnPayload = z.infer<typeof OperatorPersistedTurnP
 export const OperatorStoredTurnContextSchema = z
   .union([OperatorPersistedTurnPayloadSchema, OperatorRouteContextSchema])
   .nullable();
-export type OperatorStoredTurnContext = z.infer<typeof OperatorStoredTurnContextSchema>;
+export type OperatorStoredTurnContext = z.input<typeof OperatorStoredTurnContextSchema>;
 
 export const OperatorCreateSessionSchema = z
   .object({
@@ -761,8 +892,13 @@ export const OperatorCreateTurnSchema = z
     message: z.string().trim().min(1).max(20_000),
     context: OperatorRouteContextSchema.optional(),
     directCommand: OperatorDirectCommandSchema.optional(),
+    journey: OperatorJourneySchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine((value) => !(value.directCommand && value.journey), {
+    message: 'directCommand and journey cannot be used together',
+    path: ['journey'],
+  });
 export type OperatorCreateTurn = z.infer<typeof OperatorCreateTurnSchema>;
 
 export const OperatorActionDecisionSchema = z

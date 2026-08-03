@@ -1,6 +1,8 @@
 import {
   OperatorWorkflowApplyResultSchema,
   OperatorWorkflowDraftResultSchema,
+  OperatorRunComparisonResultSchema,
+  OperatorRunWorkflowInputSchema,
   type OperatorActionStatus,
   type OperatorActionView,
   type OperatorCommandName,
@@ -14,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { MarkdownView } from '@/components/ui/markdown';
 import { cn } from '@/lib/utils';
 import { OperatorRunActivity, type OperatorRunCommandRequest } from './OperatorRunActivity';
+import { OperatorRunComparisonCard } from './OperatorRunComparisonCard';
 import { OperatorWorkflowDraftCard } from './OperatorWorkflowDraftCard';
 
 const ACTION_STATUS_LABELS: Record<OperatorActionStatus, string> = {
@@ -46,6 +49,7 @@ const COMMAND_LABELS: Record<OperatorCommandName, string> = {
   apply_workflow_draft: 'Save workflow draft',
   list_runs: 'List runs',
   get_run: 'Inspect run',
+  compare_runs: 'Compare runs',
   run_workflow: 'Run workflow',
   cancel_run: 'Cancel run',
   retry_run: 'Retry run',
@@ -144,6 +148,11 @@ function ActionEvent({
   const argumentsPreview = formatPreview(action.arguments);
   const draftResult = OperatorWorkflowDraftResultSchema.safeParse(action.result);
   const applyResult = OperatorWorkflowApplyResultSchema.safeParse(action.result);
+  const runComparison = OperatorRunComparisonResultSchema.safeParse(action.result);
+  const runWorkflowInput =
+    action.commandName === 'run_workflow'
+      ? OperatorRunWorkflowInputSchema.safeParse(action.arguments)
+      : null;
   const workflowAuthoringResult = draftResult.success
     ? draftResult.data
     : applyResult.success
@@ -154,7 +163,9 @@ function ActionEvent({
       ? action.error
       : workflowAuthoringResult
         ? null
-        : formatPreview(action.result);
+        : runComparison.success
+          ? null
+          : formatPreview(action.result);
   const isActive = action.status === 'executing' || action.status === 'approved';
   const workflowDraft = draftResult.success
     ? workflowDrafts.find(
@@ -249,9 +260,18 @@ function ActionEvent({
           />
         ) : null}
 
+        {runComparison.success ? (
+          <OperatorRunComparisonCard
+            result={runComparison.data}
+            disabled={runCommandDisabled}
+            onCommand={onRunCommand}
+          />
+        ) : null}
+
         {action.runId ? (
           <OperatorRunActivity
             runId={action.runId}
+            sourceRunId={runWorkflowInput?.success ? runWorkflowInput.data.sourceRunId : undefined}
             disabled={runCommandDisabled}
             onCommand={onRunCommand}
           />

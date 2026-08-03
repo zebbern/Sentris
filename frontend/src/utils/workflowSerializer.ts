@@ -3,6 +3,7 @@ import { MarkerType } from '@xyflow/react';
 import type { NodeData, NodeConfig } from '@/schemas/node';
 import type { InputPort } from '@/schemas/component';
 import type { components } from '@sentris/backend-client';
+import type { WorkflowSuccessCriterion } from '@sentris/shared';
 
 // Backend types
 type BackendNode = components['schemas']['WorkflowResponseDto']['graph']['nodes'][number];
@@ -111,6 +112,7 @@ export function serializeWorkflowForCreate(
   description: string | undefined,
   nodes: ReactFlowNode<FrontendNodeData>[],
   edges: ReactFlowEdge[],
+  successCriteria: WorkflowSuccessCriterion[] = [],
 ): CreateWorkflowRequestDto {
   const serializedNodes = serializeNodes(nodes);
   const serializedEdges = serializeEdges(edges);
@@ -121,6 +123,7 @@ export function serializeWorkflowForCreate(
     nodes: serializedNodes,
     edges: serializedEdges,
     viewport: { x: 0, y: 0, zoom: 1 },
+    successCriteria,
   };
 }
 
@@ -134,6 +137,7 @@ export function serializeWorkflowForUpdate(
   description: string | undefined,
   nodes: ReactFlowNode<NodeData>[],
   edges: ReactFlowEdge[],
+  successCriteria: WorkflowSuccessCriterion[] = [],
 ): UpdateWorkflowRequestDto {
   return {
     id,
@@ -142,6 +146,7 @@ export function serializeWorkflowForUpdate(
     nodes: serializeNodes(nodes),
     edges: serializeEdges(edges),
     viewport: { x: 0, y: 0, zoom: 1 },
+    successCriteria,
   };
 }
 

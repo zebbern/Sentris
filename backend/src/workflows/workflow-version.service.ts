@@ -120,7 +120,17 @@ export class WorkflowVersionService {
     }));
   }
 
-  async getWorkflowVersion(workflowId: string, versionId: string, auth?: AuthContext | null) {
+  async getWorkflowVersion(
+    workflowId: string,
+    versionId: string,
+    auth?: AuthContext | null,
+  ): Promise<{
+    id: string;
+    workflowId: string;
+    version: number;
+    graph: WorkflowVersionRecord['graph'];
+    createdAt: string;
+  }> {
     const organizationId = requireOrganizationId(auth);
     const version = await this.versionRepository.findById(versionId, { organizationId });
     if (!version || version.workflowId !== workflowId) {

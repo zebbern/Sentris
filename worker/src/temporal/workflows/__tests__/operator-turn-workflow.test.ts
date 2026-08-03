@@ -9,6 +9,7 @@ const operatorPrepareActionActivity = vi.fn();
 const operatorExecuteActionActivity = vi.fn();
 const operatorSettleMcpActionActivity = vi.fn();
 const operatorObserveRunActivity = vi.fn();
+const operatorAwaitRunActivity = vi.fn();
 const operatorCompleteTurnActivity = vi.fn();
 const operatorFailTurnActivity = vi.fn();
 const prepareMcpOperationActivity = vi.fn();
@@ -22,6 +23,7 @@ const activityImplementations = {
   operatorExecuteActionActivity,
   operatorSettleMcpActionActivity,
   operatorObserveRunActivity,
+  operatorAwaitRunActivity,
   operatorCompleteTurnActivity,
   operatorFailTurnActivity,
   prepareMcpOperationActivity,
@@ -93,6 +95,12 @@ beforeEach(() => {
   operatorCompleteTurnActivity.mockResolvedValue(undefined);
   operatorFailTurnActivity.mockResolvedValue(undefined);
   operatorSettleMcpActionActivity.mockResolvedValue(undefined);
+  operatorAwaitRunActivity.mockResolvedValue({
+    runId: 'sentris-run-candidate',
+    workflowId: '55555555-5555-4555-8555-555555555555',
+    status: 'COMPLETED',
+    terminal: true,
+  });
 });
 
 describe('operatorTurnWorkflow', () => {
@@ -207,6 +215,167 @@ describe('operatorTurnWorkflow', () => {
     expect(operatorObserveRunActivity).toHaveBeenCalledWith({
       ...input,
       runId: 'sentris-run-legacy',
+    });
+  });
+
+  test('durably applies, reruns, and compares one evidence-supported improvement', async () => {
+    const workflowId = '55555555-5555-4555-8555-555555555555';
+    const baseVersionId = '66666666-6666-4666-8666-666666666666';
+    const candidateVersionId = '77777777-7777-4777-8777-777777777777';
+    const draftId = '88888888-8888-4888-8888-888888888888';
+    const sourceRunId = 'sentris-run-source';
+    const candidateRunId = 'sentris-run-candidate';
+    const getWorkflowCall = {
+      toolCallId: `${input.turnId}:0:0`,
+      commandName: 'get_workflow' as const,
+      arguments: { workflowId, versionId: baseVersionId },
+    };
+    const proposalCall = {
+      toolCallId: `${input.turnId}:1:0`,
+      commandName: 'propose_workflow_edits' as const,
+      arguments: {
+        workflowId,
+        baseVersionId,
+        sourceRunId,
+        operations: [
+          { operation: 'patch_node', nodeId: 'agent', label: 'Clarify agent instructions' },
+        ],
+      },
+    };
+    operatorModelStepActivity
+      .mockResolvedValueOnce({ text: '', finishReason: 'tool-calls', toolCalls: [getWorkflowCall] })
+      .mockResolvedValueOnce({ text: '', finishReason: 'tool-calls', toolCalls: [proposalCall] })
+      .mockResolvedValueOnce({
+        text: 'The candidate passed the recorded criteria. You can run another revision if needed.',
+        finishReason: 'stop',
+        toolCalls: [],
+      });
+    operatorPrepareActionActivity.mockImplementation(async ({ toolCallId }) => ({
+      actionId: toolCallId
+        .replace(/[^a-f0-9]/gi, '')
+        .padEnd(32, 'a')
+        .slice(0, 32),
+      actionVersion: 0,
+      disposition: 'execute',
+    }));
+    operatorExecuteActionActivity
+      .mockResolvedValueOnce({ actionId: 'inspect', result: { runId: sourceRunId } })
+      .mockResolvedValueOnce({
+        actionId: 'workflow',
+        result: { workflowId, versionId: baseVersionId },
+      })
+      .mockResolvedValueOnce({
+        actionId: 'proposal',
+        result: {
+          kind: 'workflow-draft',
+          draftId,
+          mode: 'update',
+          workflowId,
+          baseVersionId,
+          sourceRunId,
+          name: 'Improved workflow',
+          digest: 'draft-digest',
+          validation: { valid: true, errors: [] },
+          diff: {
+            metadataChanged: [],
+            addedNodeIds: [],
+            removedNodeIds: [],
+            changedNodeIds: ['agent'],
+            addedEdgeIds: [],
+            removedEdgeIds: [],
+            changedEdgeIds: [],
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        actionId: 'apply',
+        result: {
+          kind: 'workflow-applied',
+          draftId,
+          workflowId,
+          versionId: candidateVersionId,
+          version: 2,
+          created: false,
+          name: 'Improved workflow',
+          sourceRunId,
+        },
+      })
+      .mockResolvedValueOnce({
+        actionId: 'run',
+        result: { status: 'RUNNING' },
+        launchedRunId: candidateRunId,
+      })
+      .mockResolvedValueOnce({
+        actionId: 'compare',
+        result: {
+          kind: 'run-comparison',
+          assessment: 'improved',
+          comparable: true,
+          source: {
+            runId: sourceRunId,
+            workflowId,
+            workflowVersionId: baseVersionId,
+            status: 'FAILED',
+            durationMs: 1_000,
+            trace: { availability: 'available', failedEventCount: 1 },
+            findings: { availability: 'available', total: 0 },
+          },
+          candidate: {
+            runId: candidateRunId,
+            workflowId,
+            workflowVersionId: candidateVersionId,
+            status: 'COMPLETED',
+            durationMs: 900,
+            trace: { availability: 'available', failedEventCount: 0 },
+            findings: { availability: 'available', total: 1 },
+          },
+          changes: {
+            statusChanged: true,
+            failedEventCountDelta: -1,
+            findingTotalDelta: 1,
+            durationDeltaMs: -100,
+          },
+          successCriteria: null,
+          caveats: ['Finding totals and duration are observations only.'],
+        },
+      });
+    operatorAwaitRunActivity.mockResolvedValue({
+      runId: candidateRunId,
+      workflowId,
+      status: 'COMPLETED',
+      terminal: true,
+    });
+
+    await operatorTurnWorkflow({
+      ...input,
+      journey: { kind: 'improve_run', sourceRunId },
+    });
+
+    expect(operatorAwaitRunActivity).toHaveBeenCalledWith({ ...input, runId: candidateRunId });
+    expect(operatorPrepareActionActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCallId: `${input.turnId}:journey:apply`,
+        commandName: 'apply_workflow_draft',
+        arguments: { draftId },
+      }),
+    );
+    expect(operatorPrepareActionActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCallId: `${input.turnId}:journey:compare`,
+        commandName: 'compare_runs',
+        arguments: { sourceRunId, candidateRunId },
+      }),
+    );
+    expect(operatorModelStepActivity).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        mode: 'improve_run_summary',
+        sourceRunId,
+      }),
+    );
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message:
+        'The candidate passed the recorded criteria. You can run another revision if needed.',
     });
   });
 

@@ -153,6 +153,8 @@ export interface OperatorActivityInput {
 
 export interface OperatorModelStepInput extends OperatorActivityInput {
   step: number;
+  mode?: 'standard' | 'improve_run_proposal' | 'improve_run_summary';
+  sourceRunId?: string;
   observations?: OperatorRunObservation[];
   toolCallHistory?: OperatorModelToolCall[];
 }
@@ -348,8 +350,13 @@ export async function operatorModelStepActivity(
       secret.value,
       getServices().modelFactories,
     );
-    const tools = buildOperatorTools();
-    const system = buildSystemPrompt(context, input.observations ?? []);
+    const mode = input.mode ?? 'standard';
+    const commandNames =
+      mode === 'improve_run_proposal'
+        ? (['get_workflow', 'list_components', 'get_component', 'propose_workflow_edits'] as const)
+        : OPERATOR_COMMAND_NAMES;
+    const tools = mode === 'improve_run_summary' ? undefined : buildOperatorTools(commandNames);
+    const system = buildSystemPrompt(context, input.observations ?? [], mode, input.sourceRunId);
     const messages = buildModelMessages(
       context.messages,
       context.actions,
@@ -360,8 +367,7 @@ export async function operatorModelStepActivity(
       model,
       system,
       messages,
-      tools,
-      toolChoice: 'auto',
+      ...(tools ? { tools, toolChoice: 'auto' as const } : {}),
       maxOutputTokens: 2_000,
       abortSignal: activityContext.cancellationSignal,
     });
@@ -497,6 +503,22 @@ export async function operatorObserveRunActivity(
   }
 }
 
+export async function operatorAwaitRunActivity(
+  input: OperatorObserveRunInput,
+): Promise<OperatorRunObservation> {
+  const observation = await callInternalJson(
+    input,
+    `operator/internal/runs/${encodeURIComponent(input.runId)}/observation?turnId=${encodeURIComponent(input.turnId)}`,
+    'GET',
+    runObservationSchema,
+  );
+  Context.current().heartbeat({ runId: input.runId, status: observation.status });
+  if (!observation.terminal) {
+    throw new Error(`Operator run ${input.runId} is still ${observation.status}`);
+  }
+  return observation;
+}
+
 export async function operatorCompleteTurnActivity(
   input: OperatorActivityInput & { message: string },
 ): Promise<void> {
@@ -537,9 +559,9 @@ function assertContextOwnership(
   }
 }
 
-function buildOperatorTools(): ToolSet {
+function buildOperatorTools(commandNames: readonly OperatorCommandName[]): ToolSet {
   return Object.fromEntries(
-    OPERATOR_COMMAND_NAMES.map((commandName) => {
+    commandNames.map((commandName) => {
       const definition = OPERATOR_COMMAND_DEFINITIONS[commandName];
       return [
         commandName,
@@ -570,6 +592,8 @@ function toOperatorArguments(input: unknown): Record<string, unknown> {
 function buildSystemPrompt(
   context: z.infer<typeof operatorModelContextSchema>,
   observations: OperatorRunObservation[],
+  mode: NonNullable<OperatorModelStepInput['mode']>,
+  sourceRunId?: string,
 ): string {
   const route = context.turn.context
     ? `Current product route: ${JSON.stringify(context.turn.context)}`
@@ -585,6 +609,22 @@ function buildSystemPrompt(
     })),
     observations,
   }).slice(0, MAX_ACTION_LEDGER_LENGTH);
+  const modeInstructions =
+    mode === 'improve_run_proposal'
+      ? [
+          `The user explicitly started one complete improvement journey for source run ${sourceRunId ?? 'unknown'}.`,
+          'Inspect the saved workflow and exact component definitions, then propose only the smallest evidence-supported ID-based edit. Include the exact sourceRunId in propose_workflow_edits.',
+          'Do not call apply_workflow_draft, run_workflow, or compare_runs; the durable journey performs those stages after a valid proposal and normal approval.',
+          'If the run evidence does not justify a concrete workflow change, explain that and make no tool call.',
+        ]
+      : mode === 'improve_run_summary'
+        ? [
+            `The durable improvement journey for source run ${sourceRunId ?? 'unknown'} has finished its action stages.`,
+            'Use the recorded comparison and success-criteria evidence to state whether the revision improved, regressed, remained unchanged, or was inconclusive.',
+            'Do not claim semantic quality beyond the declared criteria and recorded evidence. Briefly offer another revision when the result is not clearly improved.',
+            'This is a text-only summary; do not emit tool-call syntax.',
+          ]
+        : [];
   return [
     'You are the Sentris Operator. Help the user operate their existing security workflows and inspect results.',
     'Use only the provided typed commands. Never claim a command ran unless its action ledger shows success.',
@@ -599,9 +639,12 @@ function buildSystemPrompt(
     'Only when the user explicitly asks for a fix or revision, inspect the exact saved workflow and component definitions and call propose_workflow_edits. Propose edits only for an evidence-supported graph or component-configuration defect, and make the smallest justified change.',
     'Treat wrong invocation inputs or input IDs as invocation guidance; do not weaken a valid workflow contract by adding aliases. Never set credential values in workflow edits. Include sourceRunId on an update proposal derived from a run.',
     'Do not apply a proposed workflow draft unless the normal approval policy allows it. After the improved version is saved, call run_workflow with sourceRunId only when the user explicitly requests running that saved version.',
+    'After both the source and improved runs are terminal, use compare_runs when the user requests a comparison. Treat its assessment as execution evidence only: finding totals and duration are observations, and an inconclusive result must remain inconclusive.',
+    'Workflow success criteria are optional deterministic checks stored on immutable workflow versions. Use set_success_criteria only for concrete, inspectable output or finding-count requirements. During comparison, the candidate version criteria are the benchmark; do not invent an LLM quality score or override per-criterion evidence.',
     'List MCP capabilities before using them. Capability snapshots belong only to the current turn and must never be reused across turns.',
     'Call invoke_mcp_tool only when the user explicitly asks for the operation it performs. MCP tool annotations are hints, not authority to act.',
     'Prior command calls and results with captured provider continuation metadata are supplied as native tool messages; older or direct calls are supplied as provider-neutral durable observations. Use either form instead of repeating an action. After launching a run, report its run ID and accepted status; if a terminal observation is supplied, summarize it clearly.',
+    ...modeInstructions,
     route,
     `Durable action ledger: ${ledger}`,
   ].join('\n');

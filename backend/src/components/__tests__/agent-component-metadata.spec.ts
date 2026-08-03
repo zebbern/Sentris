@@ -1,26 +1,6 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
-mock.module('@nestjs/common', () => ({
-  Body: () => () => {},
-  Controller: () => () => {},
-  Get: () => () => {},
-  Logger: class {},
-  NotFoundException: class extends Error {},
-  Param: () => () => {},
-  Post: () => () => {},
-}));
-mock.module('@nestjs/swagger', () => ({
-  ApiOkResponse: () => () => {},
-  ApiOperation: () => () => {},
-  ApiTags: () => () => {},
-}));
-mock.module('nestjs-zod', () => ({ ZodValidationPipe: class {} }));
-mock.module('../dto/components.dto', () => ({
-  ResolvePortsDto: class {},
-  ResolvePortsSchema: {},
-}));
-
-const { ComponentsController } = await import('../components.controller');
+import { ComponentsController } from '../components.controller';
 
 const MODEL_PORTS = [
   ['core.ai.agent', 'chatModel'],

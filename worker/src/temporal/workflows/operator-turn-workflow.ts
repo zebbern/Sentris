@@ -10,7 +10,14 @@ import {
   setHandler,
 } from '@temporalio/workflow';
 
-import type { OperatorCommandName } from '@sentris/shared';
+import {
+  OperatorRunComparisonResultSchema,
+  OperatorWorkflowApplyResultSchema,
+  OperatorWorkflowDraftResultSchema,
+  type OperatorCommandName,
+  type OperatorJourney,
+  type OperatorRunObservation,
+} from '@sentris/shared';
 
 import type {
   OperatorActivityInput,
@@ -30,6 +37,7 @@ import {
 } from './mcp-operation-workflow-executor';
 
 const MAX_OPERATOR_STEPS = 8;
+const MAX_IMPROVEMENT_PROPOSAL_STEPS = 6;
 const DEFAULT_COMPLETION = 'I could not produce a useful answer for this turn.';
 const APPROVAL_RECONCILE_INTERVAL = '5 seconds';
 
@@ -37,6 +45,7 @@ export interface OperatorTurnWorkflowInput {
   sessionId: string;
   turnId: string;
   organizationId: string;
+  journey?: OperatorJourney;
   directCommand?: {
     toolCallId: string;
     commandName: OperatorCommandName;
@@ -133,6 +142,20 @@ const { operatorObserveRunActivity } = proxyActivities<{
   },
 });
 
+const { operatorAwaitRunActivity } = proxyActivities<{
+  operatorAwaitRunActivity(input: OperatorObserveRunInput): Promise<OperatorRunObservation>;
+}>({
+  startToCloseTimeout: '2 minutes',
+  scheduleToCloseTimeout: '24 hours',
+  heartbeatTimeout: '20 seconds',
+  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+  retry: {
+    initialInterval: '5 seconds',
+    maximumInterval: '30 seconds',
+    backoffCoefficient: 1.5,
+  },
+});
+
 const { prepareMcpOperationActivity, reconcileMcpOperationActivity } = proxyActivities<
   Pick<
     McpOperationWorkflowActivities,
@@ -159,6 +182,222 @@ const mcpOperationActivities: McpOperationWorkflowActivities = {
   reconcileMcpOperationActivity,
 };
 
+type OperatorDecisionMap = Map<string, OperatorActionDecisionUpdate>;
+
+type OperatorActionExecutionOutcome =
+  | { disposition: 'executed'; executed: OperatorExecuteActionOutput }
+  | { disposition: 'rejected' }
+  | { disposition: 'already_completed' };
+
+async function prepareAndExecuteOperatorAction(input: {
+  base: OperatorActivityInput;
+  toolCall: OperatorModelToolCall;
+  decisions: OperatorDecisionMap;
+  userConfirmed?: boolean;
+}): Promise<OperatorActionExecutionOutcome> {
+  const prepared = await shortActivities.operatorPrepareActionActivity({
+    ...input.base,
+    ...input.toolCall,
+    ...(input.userConfirmed ? { userConfirmed: true } : {}),
+  });
+  if (prepared.disposition === 'already_completed') {
+    return { disposition: 'already_completed' };
+  }
+  if (prepared.disposition === 'rejected') return { disposition: 'rejected' };
+
+  if (prepared.disposition === 'wait_for_approval') {
+    await shortActivities.operatorSetTurnStatusActivity({
+      ...input.base,
+      status: 'awaiting_approval',
+    });
+    let approvalOutcome: 'execute' | 'rejected' | 'already_completed' | undefined;
+    while (!approvalOutcome) {
+      const updateArrived = await condition(() => {
+        const decision = input.decisions.get(prepared.actionId);
+        return decision?.expectedVersion === prepared.actionVersion;
+      }, APPROVAL_RECONCILE_INTERVAL);
+      if (updateArrived) {
+        const decision = input.decisions.get(prepared.actionId)!;
+        input.decisions.delete(prepared.actionId);
+        approvalOutcome = decision.decision === 'approved' ? 'execute' : 'rejected';
+        break;
+      }
+
+      const reconciled = await shortActivities.operatorPrepareActionActivity({
+        ...input.base,
+        ...input.toolCall,
+      });
+      if (reconciled.actionId !== prepared.actionId) {
+        throw new Error('Operator approval reconciliation returned a different action');
+      }
+      if (reconciled.disposition !== 'wait_for_approval') {
+        approvalOutcome = reconciled.disposition;
+      }
+    }
+    await shortActivities.operatorSetTurnStatusActivity({ ...input.base, status: 'running' });
+    if (approvalOutcome === 'rejected') return { disposition: 'rejected' };
+    if (approvalOutcome === 'already_completed') {
+      return { disposition: 'already_completed' };
+    }
+  }
+
+  return {
+    disposition: 'executed',
+    executed: await operatorExecuteActionActivity({
+      ...input.base,
+      actionId: prepared.actionId,
+    }),
+  };
+}
+
+async function runImproveRunJourney(input: {
+  base: OperatorActivityInput;
+  journey: Extract<OperatorJourney, { kind: 'improve_run' }>;
+  decisions: OperatorDecisionMap;
+}): Promise<void> {
+  const sourceRunId = input.journey.sourceRunId;
+  const toolCallHistory: OperatorModelToolCall[] = [];
+  let lastText = '';
+
+  const sourceInspection = await prepareAndExecuteOperatorAction({
+    base: input.base,
+    decisions: input.decisions,
+    userConfirmed: true,
+    toolCall: {
+      toolCallId: `${input.base.turnId}:journey:inspect-source`,
+      commandName: 'get_run',
+      arguments: { runId: sourceRunId },
+    },
+  });
+  if (sourceInspection.disposition !== 'executed') {
+    throw new Error('The improvement journey could not inspect its source run');
+  }
+
+  let proposal: ReturnType<typeof OperatorWorkflowDraftResultSchema.parse> | undefined;
+  for (let step = 0; step < MAX_IMPROVEMENT_PROPOSAL_STEPS && !proposal; step += 1) {
+    const modelStep = await operatorModelStepActivity({
+      ...input.base,
+      step,
+      mode: 'improve_run_proposal',
+      sourceRunId,
+      ...(toolCallHistory.length > 0 ? { toolCallHistory: toolCallHistory.slice() } : {}),
+    });
+    if (modelStep.text.trim()) lastText = modelStep.text.trim();
+    if (modelStep.toolCalls.length === 0) break;
+    toolCallHistory.push(...modelStep.toolCalls);
+
+    for (const toolCall of modelStep.toolCalls) {
+      const outcome = await prepareAndExecuteOperatorAction({
+        base: input.base,
+        toolCall,
+        decisions: input.decisions,
+      });
+      if (outcome.disposition !== 'executed') continue;
+
+      const parsed = OperatorWorkflowDraftResultSchema.safeParse(outcome.executed.result);
+      if (
+        parsed.success &&
+        parsed.data.mode === 'update' &&
+        parsed.data.sourceRunId === sourceRunId &&
+        parsed.data.validation.valid
+      ) {
+        proposal = parsed.data;
+        break;
+      }
+    }
+  }
+
+  if (!proposal) {
+    await shortActivities.operatorCompleteTurnActivity({
+      ...input.base,
+      message:
+        lastText ||
+        'The recorded run evidence did not produce a valid, evidence-supported workflow revision.',
+    });
+    return;
+  }
+
+  const appliedOutcome = await prepareAndExecuteOperatorAction({
+    base: input.base,
+    decisions: input.decisions,
+    toolCall: {
+      toolCallId: `${input.base.turnId}:journey:apply`,
+      commandName: 'apply_workflow_draft',
+      arguments: { draftId: proposal.draftId },
+    },
+  });
+  if (appliedOutcome.disposition === 'rejected') {
+    await shortActivities.operatorCompleteTurnActivity({
+      ...input.base,
+      message: 'The proposed revision was not approved, so the workflow was left unchanged.',
+    });
+    return;
+  }
+  if (appliedOutcome.disposition !== 'executed') {
+    throw new Error('The improvement journey could not resolve its saved workflow version');
+  }
+
+  const applied = OperatorWorkflowApplyResultSchema.parse(appliedOutcome.executed.result);
+  if (applied.created || applied.sourceRunId !== sourceRunId) {
+    throw new Error('The improvement journey applied a workflow version outside its source run');
+  }
+
+  const runOutcome = await prepareAndExecuteOperatorAction({
+    base: input.base,
+    decisions: input.decisions,
+    userConfirmed: true,
+    toolCall: {
+      toolCallId: `${input.base.turnId}:journey:run`,
+      commandName: 'run_workflow',
+      arguments: {
+        workflowId: applied.workflowId,
+        versionId: applied.versionId,
+        sourceRunId,
+        inputs: {},
+      },
+    },
+  });
+  if (runOutcome.disposition !== 'executed' || !runOutcome.executed.launchedRunId) {
+    throw new Error('The improvement journey could not launch its candidate run');
+  }
+
+  const candidateRunId = runOutcome.executed.launchedRunId;
+  const observation = await operatorAwaitRunActivity({
+    ...input.base,
+    runId: candidateRunId,
+  });
+
+  const comparisonOutcome = await prepareAndExecuteOperatorAction({
+    base: input.base,
+    decisions: input.decisions,
+    userConfirmed: true,
+    toolCall: {
+      toolCallId: `${input.base.turnId}:journey:compare`,
+      commandName: 'compare_runs',
+      arguments: { sourceRunId, candidateRunId },
+    },
+  });
+  if (comparisonOutcome.disposition !== 'executed') {
+    throw new Error('The improvement journey could not compare its candidate run');
+  }
+
+  const comparison = OperatorRunComparisonResultSchema.parse(comparisonOutcome.executed.result);
+  const summary = await operatorModelStepActivity({
+    ...input.base,
+    step: MAX_IMPROVEMENT_PROPOSAL_STEPS,
+    mode: 'improve_run_summary',
+    sourceRunId,
+    observations: [observation],
+    ...(toolCallHistory.length > 0 ? { toolCallHistory } : {}),
+  });
+  await shortActivities.operatorCompleteTurnActivity({
+    ...input.base,
+    message:
+      summary.text.trim() ||
+      `The candidate run ${candidateRunId} was ${comparison.assessment} against source run ${sourceRunId}.`,
+  });
+}
+
 export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Promise<void> {
   const detachedRunFollowing = patched('operator-detached-run-following-v1');
   const decisions = new Map<string, OperatorActionDecisionUpdate>();
@@ -184,6 +423,12 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
 
   try {
     await shortActivities.operatorSetTurnStatusActivity({ ...base, status: 'running' });
+
+    if (input.journey?.kind === 'improve_run' && patched('operator-improve-run-journey-v1')) {
+      await runImproveRunJourney({ base, journey: input.journey, decisions });
+      await condition(allHandlersFinished);
+      return;
+    }
 
     for (let step = 0; step < MAX_OPERATOR_STEPS; step += 1) {
       const directToolCall = step === 0 ? input.directCommand : undefined;
@@ -214,61 +459,19 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
       let executedAction = false;
       let reusedCompletedAction = false;
       for (const toolCall of modelStep.toolCalls) {
-        const prepared = await shortActivities.operatorPrepareActionActivity({
-          ...base,
-          ...toolCall,
-          ...(directToolCall ? { userConfirmed: true } : {}),
+        const outcome = await prepareAndExecuteOperatorAction({
+          base,
+          toolCall,
+          decisions,
+          userConfirmed: Boolean(directToolCall),
         });
-        if (prepared.disposition === 'already_completed') {
+        if (outcome.disposition === 'already_completed') {
           reusedCompletedAction = true;
           continue;
         }
-        if (prepared.disposition === 'rejected') continue;
+        if (outcome.disposition === 'rejected') continue;
 
-        if (prepared.disposition === 'wait_for_approval') {
-          await shortActivities.operatorSetTurnStatusActivity({
-            ...base,
-            status: 'awaiting_approval',
-          });
-          let approvalOutcome: 'execute' | 'rejected' | 'already_completed' | undefined;
-          while (!approvalOutcome) {
-            const updateArrived = await condition(() => {
-              const decision = decisions.get(prepared.actionId);
-              return decision?.expectedVersion === prepared.actionVersion;
-            }, APPROVAL_RECONCILE_INTERVAL);
-            if (updateArrived) {
-              const decision = decisions.get(prepared.actionId)!;
-              decisions.delete(prepared.actionId);
-              approvalOutcome = decision.decision === 'approved' ? 'execute' : 'rejected';
-              break;
-            }
-
-            // The user decision is committed in Postgres before the Update is sent. If Update
-            // delivery fails, replay the same idempotent prepare request to reconcile that
-            // durable state rather than leaving the turn blocked forever.
-            const reconciled = await shortActivities.operatorPrepareActionActivity({
-              ...base,
-              ...toolCall,
-            });
-            if (reconciled.actionId !== prepared.actionId) {
-              throw new Error('Operator approval reconciliation returned a different action');
-            }
-            if (reconciled.disposition !== 'wait_for_approval') {
-              approvalOutcome = reconciled.disposition;
-            }
-          }
-          await shortActivities.operatorSetTurnStatusActivity({ ...base, status: 'running' });
-          if (approvalOutcome === 'rejected') continue;
-          if (approvalOutcome === 'already_completed') {
-            reusedCompletedAction = true;
-            continue;
-          }
-        }
-
-        const executed = await operatorExecuteActionActivity({
-          ...base,
-          actionId: prepared.actionId,
-        });
+        const executed = outcome.executed;
         executedAction = true;
         if (executed.mcpOperationRequest) {
           const result = await executeDurableMcpOperation(
@@ -278,7 +481,7 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
           await CancellationScope.nonCancellable(() =>
             shortActivities.operatorSettleMcpActionActivity({
               ...base,
-              actionId: prepared.actionId,
+              actionId: executed.actionId,
               result,
             }),
           );

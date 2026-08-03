@@ -176,6 +176,13 @@ describe('Operator activities', () => {
     expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
       'call run_workflow with sourceRunId only when the user explicitly requests',
     );
+    expect(generateTextImpl.mock.calls[0]?.[0]?.tools).toHaveProperty('compare_runs');
+    expect(generateTextImpl.mock.calls[0]?.[0]?.system).toContain(
+      'the candidate version criteria are the benchmark',
+    );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'finding totals and duration are observations',
+    );
   });
 
   test('recovers a provider-declared tool generation error with a text-only diagnosis', async () => {
@@ -606,6 +613,22 @@ describe('Operator activities', () => {
       `/api/v1/operator/internal/runs/sentris-run-2/observation?turnId=${TURN_ID}`,
     );
     expect(fetchImpl.mock.calls[0]?.[1]?.method).toBe('GET');
+  });
+
+  test('uses one observation attempt for durable improve-run waiting', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        runId: 'sentris-run-active',
+        workflowId: WORKFLOW_ID,
+        status: 'RUNNING',
+        terminal: false,
+      }),
+    );
+
+    await expect(
+      activities.operatorAwaitRunActivity({ ...base, runId: 'sentris-run-active' }),
+    ).rejects.toThrow('Operator run sentris-run-active is still RUNNING');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   test('preserves a deferred MCP request and posts its terminal result to settlement', async () => {

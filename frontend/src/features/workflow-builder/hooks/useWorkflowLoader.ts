@@ -20,7 +20,7 @@ import type { FrontendNodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';
 import type { ToastContextValue } from '@/components/ui/toast-context';
 import { logger } from '@/lib/logger';
-import type { OperatorWorkflowDraftDetail } from '@sentris/shared';
+import type { OperatorWorkflowDraftDetail, WorkflowSuccessCriterion } from '@sentris/shared';
 import { materializeOperatorDraftGraph } from '../operatorDraftHydration';
 
 interface WorkflowMetadataShape {
@@ -29,6 +29,7 @@ interface WorkflowMetadataShape {
   description: string;
   currentVersionId: string | null;
   currentVersion: number | null;
+  successCriteria: WorkflowSuccessCriterion[];
 }
 
 interface UseWorkflowLoaderParams {
@@ -62,7 +63,11 @@ interface UseWorkflowLoaderParams {
   executionLoadedSnapshotRef: React.MutableRefObject<GraphSnapshot | null>;
   // Persistence
   setLastSavedGraphSignature: (sig: string) => void;
-  setLastSavedMetadata: (meta: { name: string; description: string }) => void;
+  setLastSavedMetadata: (meta: {
+    name: string;
+    description: string;
+    successCriteria: WorkflowSuccessCriterion[];
+  }) => void;
   // History
   initializeHistory: (nodes: ReactFlowNode<FrontendNodeData>[], edges: ReactFlowEdge[]) => void;
   // Execution lifecycle
@@ -271,6 +276,7 @@ export function useWorkflowLoader({
           setLastSavedMetadata({
             name: baseMetadata.name,
             description: baseMetadata.description ?? '',
+            successCriteria: baseMetadata.successCriteria,
           });
 
           // Initialize undo/redo history with the initial state
@@ -283,6 +289,7 @@ export function useWorkflowLoader({
               description: operatorDraft.proposedGraph.description ?? '',
               currentVersionId: null,
               currentVersion: null,
+              successCriteria: operatorDraft.proposedGraph.successCriteria ?? [],
             });
             markDirty();
           }
@@ -326,6 +333,8 @@ export function useWorkflowLoader({
           description: operatorDraft?.proposedGraph.description ?? workflow.description ?? '',
           currentVersionId: workflow.currentVersionId ?? null,
           currentVersion: workflow.currentVersion ?? null,
+          successCriteria:
+            operatorDraft?.proposedGraph.successCriteria ?? workflow.graph.successCriteria ?? [],
         });
 
         const hasRunContext = Boolean(routeRunId || selectedRunId);
@@ -367,6 +376,7 @@ export function useWorkflowLoader({
         setLastSavedMetadata({
           name: workflow.name,
           description: workflow.description ?? '',
+          successCriteria: workflow.graph.successCriteria ?? [],
         });
 
         // Initialize undo/redo history with the loaded workflow

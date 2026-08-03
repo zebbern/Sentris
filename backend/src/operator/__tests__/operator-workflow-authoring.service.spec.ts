@@ -396,6 +396,7 @@ describe('OperatorWorkflowAuthoringService', () => {
     ]);
     expect(result.diff).toEqual({
       metadataChanged: [],
+      successCriteriaChanged: false,
       addedNodeIds: [],
       removedNodeIds: [],
       changedNodeIds: [],

@@ -1,7 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-import type { OperatorDirectCommand, OperatorRouteContext } from '@sentris/shared';
+import type { OperatorDirectCommand, OperatorJourney, OperatorRouteContext } from '@sentris/shared';
 
 import type { AuthContext } from '../../auth/types';
 import type {
@@ -112,6 +112,7 @@ describe('OperatorService', () => {
           async (input: {
             context?: OperatorRouteContext;
             directCommand?: OperatorDirectCommand;
+            journey?: OperatorJourney;
           }) => ({
             turn: turnRecord({
               status: 'queued',
@@ -121,6 +122,7 @@ describe('OperatorService', () => {
                 version: 1,
                 routeContext: input.context ?? null,
                 directCommand: input.directCommand ?? null,
+                journey: input.journey ?? null,
               },
               startedAt: null,
             }),
@@ -255,6 +257,29 @@ describe('OperatorService', () => {
           commandName: 'cancel_run',
           arguments: { runId: 'sentris-run-1' },
         },
+      }),
+    );
+  });
+
+  it('places an improve-run journey in the durable turn input', async () => {
+    await service.createTurn(auth, SESSION_ID, {
+      clientTurnId: TURN_ID,
+      message: 'Improve this run and compare the candidate',
+      journey: { kind: 'improve_run', sourceRunId: 'sentris-run-source' },
+    });
+
+    expect(repository.createTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        journey: { kind: 'improve_run', sourceRunId: 'sentris-run-source' },
+      }),
+    );
+    expect(temporal.startWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: [
+          expect.objectContaining({
+            journey: { kind: 'improve_run', sourceRunId: 'sentris-run-source' },
+          }),
+        ],
       }),
     );
   });

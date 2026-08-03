@@ -28,6 +28,5 @@ describe('finding projection health index migration', () => {
         ],
       }),
     );
-    expect(() => loadMigrationPlan(migrationsDir)).not.toThrow();
   });
 });

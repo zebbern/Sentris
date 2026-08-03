@@ -35,6 +35,7 @@ function describeDiff(result: OperatorWorkflowDraftResult): string[] {
   if (diff.metadataChanged.length > 0) {
     descriptions.push(`Updated ${diff.metadataChanged.join(' and ')}`);
   }
+  if (diff.successCriteriaChanged) descriptions.push('Updated success criteria');
   if (diff.addedNodeIds.length > 0) descriptions.push(`Added ${diff.addedNodeIds.length} nodes`);
   if (diff.removedNodeIds.length > 0) {
     descriptions.push(`Removed ${diff.removedNodeIds.length} nodes`);

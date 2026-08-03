@@ -39,6 +39,7 @@ interface VersionHistoryPanelProps {
     nodes: WorkflowGraph['nodes'];
     edges: WorkflowGraph['edges'];
     viewport?: WorkflowGraph['viewport'];
+    successCriteria?: WorkflowGraph['successCriteria'];
   }) => void;
 }
 

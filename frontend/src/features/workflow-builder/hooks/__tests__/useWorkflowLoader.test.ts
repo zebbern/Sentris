@@ -39,6 +39,7 @@ function draft(overrides: Partial<OperatorWorkflowDraftDetail> = {}): OperatorWo
     validation: { valid: true, errors: [] },
     diff: {
       metadataChanged: [],
+      successCriteriaChanged: false,
       addedNodeIds: [],
       removedNodeIds: [],
       changedNodeIds: [],

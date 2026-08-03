@@ -19,12 +19,14 @@ import { queryKeys } from '@/lib/queryKeys';
 import { getComponentFromCache } from '@/hooks/queries/useComponentQueries';
 import type { SecretSummary } from '@/schemas/secret';
 import { logger } from '@/lib/logger';
+import type { WorkflowSuccessCriterion } from '@sentris/shared';
 interface WorkflowMetadataShape {
   id: string | null;
   name: string;
   description: string;
   currentVersionId: string | null;
   currentVersion: number | null;
+  successCriteria: WorkflowSuccessCriterion[];
 }
 
 interface UseWorkflowImportExportOptions {
@@ -198,6 +200,8 @@ export function useWorkflowImportExport({
         description: parsed.description ?? '',
         currentVersion: null,
         currentVersionId: null,
+        successCriteria:
+          'graph' in parsed ? (parsed.graph.successCriteria ?? []) : (parsed.successCriteria ?? []),
       });
       markDirty();
       setMode('design');
@@ -266,6 +270,7 @@ export function useWorkflowImportExport({
             nodes: exportedNodes,
             edges: exportedEdges,
             viewport: DEFAULT_WORKFLOW_VIEWPORT,
+            successCriteria: metadata.successCriteria,
           },
           metadata: {
             workflowId: metadata.id ?? null,

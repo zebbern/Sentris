@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { components } from '@sentris/backend-client';
 import { NodeSchema } from './node';
 import { EdgeSchema } from './edge';
+import { WorkflowSuccessCriteriaSchema } from '@sentris/shared';
 
 /**
  * Workflow types from backend API client
@@ -62,6 +63,7 @@ export const WorkflowGraphSchema = z.object({
   nodes: z.array(NodeSchema).default([]),
   edges: z.array(EdgeSchema).default([]),
   viewport: WorkflowViewportSchema.optional(),
+  successCriteria: WorkflowSuccessCriteriaSchema.optional(),
 });
 
 type WorkflowGraph = z.infer<typeof WorkflowGraphSchema>;
@@ -99,6 +101,7 @@ const coerceGraph = (workflow: BackendWorkflow): WorkflowGraph => {
     nodes: Array.isArray(source.nodes) ? source.nodes : [],
     edges: Array.isArray(source.edges) ? source.edges : [],
     viewport: source.viewport,
+    successCriteria: source.successCriteria,
   };
 };
 
@@ -141,6 +144,7 @@ export const WorkflowDraftSchema = z.object({
   nodes: z.array(NodeSchema).min(1, 'Workflow must include at least one node'),
   edges: z.array(EdgeSchema),
   viewport: WorkflowViewportSchema.optional(),
+  successCriteria: WorkflowSuccessCriteriaSchema.optional(),
 });
 
 export type WorkflowDraft = z.infer<typeof WorkflowDraftSchema>;
@@ -161,6 +165,7 @@ export const WorkflowImportSchema = z.union([
     nodes: z.array(NodeSchema).min(1, 'Workflow must include at least one node'),
     edges: z.array(EdgeSchema),
     viewport: WorkflowViewportSchema.optional(),
+    successCriteria: WorkflowSuccessCriteriaSchema.optional(),
   }),
   z.object({
     name: z.string().min(1, 'Workflow name is required'),

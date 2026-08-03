@@ -9,7 +9,7 @@ import {
   TemporalService,
   type WorkflowRunStatus as TemporalWorkflowRunStatus,
 } from '../temporal/temporal.service';
-import { WorkflowRepository } from './repository/workflow.repository';
+import { WorkflowRepository, type WorkflowRecord } from './repository/workflow.repository';
 import { WorkflowRunRepository } from './repository/workflow-run.repository';
 import { WorkflowVersionRepository } from './repository/workflow-version.repository';
 import { WorkflowVersionService } from './workflow-version.service';
@@ -33,7 +33,7 @@ import {
 } from '@sentris/shared';
 import { requireOrganizationId } from '../common/auth/require-organization-id';
 import type { AuthContext } from '../auth/types';
-import type { WorkflowRunRecord } from '../database/schema';
+import type { WorkflowRunRecord, WorkflowVersionRecord } from '../database/schema';
 import type { FinalizeRunRequestDto, ReportableTerminalStatus } from './dto/run-finalization.dto';
 
 export interface WorkflowRunRequest {
@@ -183,7 +183,12 @@ export class WorkflowRunService {
     workflowId: string,
     request: WorkflowRunRequest = {},
     auth?: AuthContext | null,
-  ) {
+  ): Promise<{
+    workflow: WorkflowRecord;
+    version: WorkflowVersionRecord;
+    definition: WorkflowDefinition;
+    organizationId: string;
+  }> {
     const organizationId = requireOrganizationId(auth);
     const workflow = await this.repository.findById(workflowId, { organizationId });
     if (!workflow) throw new NotFoundException(`Workflow ${workflowId} not found`);

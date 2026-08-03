@@ -36,6 +36,7 @@ function renderRun(
   status: string,
   options: {
     seedTrace?: boolean;
+    sourceRunId?: string;
     statusData?: Record<string, unknown>;
     traceEvents?: Record<string, unknown>[];
   } = {},
@@ -62,7 +63,12 @@ function renderRun(
   vi.spyOn(api.executions, 'stream').mockResolvedValue(source as unknown as EventSource);
   const onCommand = vi.fn();
   renderWithProviders(
-    <OperatorRunActivity runId="sentris-run-1" disabled={false} onCommand={onCommand} />,
+    <OperatorRunActivity
+      runId="sentris-run-1"
+      sourceRunId={options.sourceRunId}
+      disabled={false}
+      onCommand={onCommand}
+    />,
     { initialEntries: ['/operator/session-1'], queryClient },
   );
   return { onCommand, queryClient, source };
@@ -90,14 +96,11 @@ describe('OperatorRunActivity', () => {
     });
 
     expect(screen.getByText('The scanner exited unexpectedly.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Review & improve' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Improve with Operator' }));
     expect(onCommand).toHaveBeenCalledWith({
       message:
-        'Inspect run sentris-run-1, diagnose failures or weak results, and propose a workflow draft revision when a concrete improvement is justified. Do not apply it yet.',
-      directCommand: {
-        commandName: 'get_run',
-        arguments: { runId: 'sentris-run-1' },
-      },
+        'Improve run sentris-run-1: inspect its recorded evidence, propose the smallest justified workflow revision, save it under my approval mode, rerun the same inputs, and compare the result.',
+      journey: { kind: 'improve_run', sourceRunId: 'sentris-run-1' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onCommand).toHaveBeenCalledWith({
@@ -105,6 +108,25 @@ describe('OperatorRunActivity', () => {
       directCommand: {
         commandName: 'retry_run',
         arguments: { runId: 'sentris-run-1' },
+      },
+    });
+  });
+
+  it('offers an evidence comparison after an improved run is terminal', () => {
+    const { onCommand } = renderRun('COMPLETED', {
+      sourceRunId: 'sentris-run-source',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compare with source' }));
+    expect(onCommand).toHaveBeenCalledWith({
+      message:
+        'Compare improved run sentris-run-1 with source run sentris-run-source using recorded execution evidence',
+      directCommand: {
+        commandName: 'compare_runs',
+        arguments: {
+          sourceRunId: 'sentris-run-source',
+          candidateRunId: 'sentris-run-1',
+        },
       },
     });
   });

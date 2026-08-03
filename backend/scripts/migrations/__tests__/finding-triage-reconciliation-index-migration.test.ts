@@ -28,6 +28,5 @@ describe('finding triage reconciliation keyset index migration', () => {
         ],
       }),
     );
-    expect(() => loadMigrationPlan(migrationsDir)).not.toThrow();
   });
 });

@@ -90,10 +90,10 @@ old binaries before enforcing the generic identity `NOT NULL` contract.
 
 The in-app Operator now owns each user turn in a Temporal Workflow. Model steps, typed
 Sentris commands, approval waits, and MCP dispatch are separate activities or durable
-Workflow state rather than one retryable model/tool activity. New turn histories release
-the composer after launching a workflow and follow that run through the ordinary run trace
-and Agent SSE projections; the patch-gated blocking run observer remains only for replaying
-older histories. Explicit run-card inspect, cancel, and retry controls enter the same durable
+Workflow state rather than one retryable model/tool activity. Ordinary new turn histories
+release the composer after launching a workflow and follow that run through the ordinary run
+trace and Agent SSE projections; the patch-gated blocking run observer remains only for
+replaying older histories. Explicit run-card inspect, cancel, and retry controls enter the same durable
 turn path as user-confirmed structured commands. Retry starts one new run from the original
 stored version, inputs, and scope using the Operator action identity for idempotency; it does
 not mutate or reset a completed Agent child.
@@ -103,13 +103,32 @@ reads only as a connection fallback; the stream is not a second event store and 
 query Temporal from the browser. Launched run cards continue to use the existing run SSE for
 status and trace updates rather than multiplexing run data into the Operator stream. Terminal
 `get_run` results include separately bounded failure/recent trace evidence and run-scoped
-finding summaries, so the explicit Review action can diagnose a result and propose a new
-workflow draft without making the original turn block on the run.
+finding summaries. Ordinary run commands remain detached. An explicit `improve_run` journey
+instead keeps one bounded turn durable while it diagnoses a terminal source run, proposes the
+smallest valid edit, applies it through the existing Ask/Auto policy, reruns the exact stored
+inputs and scope, and compares the terminal candidate. Candidate waiting uses one observation
+attempt per retrying Activity attempt rather than a long in-Activity polling loop.
 Run-derived update proposals persist the reviewed run identity only after organization and
 workflow validation. Applying a valid proposal carries that lineage onto the new immutable
-version, and a separate user-confirmed `run_workflow` turn may select that version while
-reusing the reviewed run's stored inputs and scope. This does not change Retry: Retry still
+version. The improvement journey selects that version and reuses the reviewed run's stored
+inputs and scope; the manual cards may still perform the same stages as separate explicit
+turns. This does not change Retry: Retry still
 replays the original version, inputs, and scope.
+After that improved run becomes terminal, the journey invokes the same read-only `compare_runs`
+action that remains available from run cards. The backend requires both runs to belong to the same workflow and
+checks their stored inputs and scope before issuing a verdict. The deterministic assessment
+uses terminal outcome first. A candidate version may declare bounded success criteria in its
+immutable graph: scalar output assertions address a node output with RFC 6901 JSON Pointer,
+and finding-count checks declare an allowed minimum/maximum. The candidate version is the
+fixed benchmark and the backend evaluates those same criteria against both runs. Only
+non-conflicting passed/failed transitions produce an improved or regressed verdict;
+unavailable evidence, conflicting transitions, or input/scope mismatches remain
+inconclusive. Criteria are deterministic and do not use an LLM judge. When the candidate
+declares no criteria, exact recorded trace-failure counts remain the fallback. Raw finding
+totals and duration remain observations because target state, network behavior, and
+model-provider responses can vary between runs. The comparison is stored in the normal
+Operator action ledger and does not automatically promote, roll back, or mutate a workflow
+version.
 Before a new launch, `get_workflow` exposes the selected compiled version's sanitized
 runtime-input descriptors so the model can map user intent to exact input IDs. The same
 shared contract is enforced in `WorkflowRunService` for every launch path before persistence
@@ -119,8 +138,9 @@ Workflow authoring uses that same typed command ledger rather than a second agen
 The Operator discovers components from the canonical registry and receives an editable
 graph whose inline and component-declared credentials are opaque placeholders. Creating a
 workflow stores one bounded complete graph in its proposal action. Updating an existing
-workflow instead stores bounded domain operations keyed by stable node and edge IDs; the
-backend materializes them against the exact immutable base graph. Structured node patches
+workflow instead stores bounded domain operations keyed by stable node and edge IDs, including
+one canonical `set_success_criteria` operation for the versioned benchmark. The backend
+materializes them against the exact immutable base graph. Structured node patches
 merge recursively so an update to one nested value retains unrelated credential placeholders;
 explicit remove operations remain top-level and full-graph proposals retain replacement
 semantics. Both proposal forms use

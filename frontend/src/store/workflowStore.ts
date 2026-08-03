@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { WorkflowSuccessCriterion } from '@sentris/shared';
 
 export interface WorkflowMetadata {
   id: string | null;
@@ -6,6 +7,7 @@ export interface WorkflowMetadata {
   description: string;
   currentVersionId: string | null;
   currentVersion: number | null;
+  successCriteria: WorkflowSuccessCriterion[];
 }
 
 interface WorkflowStore {
@@ -17,6 +19,7 @@ interface WorkflowStore {
   setWorkflowId: (id: string) => void;
   setWorkflowName: (name: string) => void;
   setWorkflowDescription: (description: string) => void;
+  setSuccessCriteria: (criteria: WorkflowSuccessCriterion[]) => void;
   setMetadata: (metadata: Partial<WorkflowMetadata>) => void;
   markDirty: () => void;
   markClean: () => void;
@@ -29,6 +32,7 @@ const initialMetadata: WorkflowMetadata = {
   description: '',
   currentVersionId: null,
   currentVersion: null,
+  successCriteria: [],
 };
 
 /**
@@ -63,6 +67,12 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
   setWorkflowDescription: (description: string) => {
     set((state) => ({
       metadata: { ...state.metadata, description },
+    }));
+  },
+
+  setSuccessCriteria: (successCriteria: WorkflowSuccessCriterion[]) => {
+    set((state) => ({
+      metadata: { ...state.metadata, successCriteria: [...successCriteria] },
     }));
   },
 

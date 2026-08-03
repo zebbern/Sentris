@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'bun:test';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, INestApplication } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -165,6 +165,10 @@ describe('MCP Internal API (Integration)', () => {
     reconcileDispatchFailure: vi.fn(async () => completedResult),
     reconcileRunInvocations: vi.fn(async () => undefined),
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   beforeAll(async () => {
     process.env.INTERNAL_SERVICE_TOKEN = INTERNAL_TOKEN;

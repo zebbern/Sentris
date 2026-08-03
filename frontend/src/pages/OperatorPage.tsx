@@ -3,6 +3,7 @@ import {
   type OperatorActionView,
   type OperatorApprovalMode,
   type OperatorDirectCommand,
+  type OperatorJourney,
   type OperatorSessionDetail,
 } from '@sentris/shared';
 import { formatDistanceToNowStrict } from 'date-fns';
@@ -319,7 +320,11 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
   }, [session.messages.length, session.actions.length, isActive]);
 
-  const sendTurn = async (content: string, directCommand?: OperatorDirectCommand) => {
+  const sendTurn = async (
+    content: string,
+    directCommand?: OperatorDirectCommand,
+    journey?: OperatorJourney,
+  ) => {
     if (!content || isActive || createTurn.isPending) return;
 
     try {
@@ -330,6 +335,7 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
           message: content,
           context: { path: location.pathname },
           ...(directCommand ? { directCommand } : {}),
+          ...(journey ? { journey } : {}),
         },
       });
       setMessage('');
@@ -383,7 +389,9 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
             pendingDecisionActionId={decideAction.variables?.actionId}
             runCommandDisabled={isActive || createTurn.isPending}
             onDecision={(action, decision) => void decide(action, decision)}
-            onRunCommand={(request) => void sendTurn(request.message, request.directCommand)}
+            onRunCommand={(request) =>
+              void sendTurn(request.message, request.directCommand, request.journey)
+            }
           />
           {latestTurnError ? <ErrorBanner message={latestTurnError} className="ml-9 mt-3" /> : null}
         </div>

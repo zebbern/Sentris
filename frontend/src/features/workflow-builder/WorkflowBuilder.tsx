@@ -53,6 +53,10 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
       onToggleVersionHistory={() =>
         state.setVersionHistoryPanelOpen(!state.versionHistoryPanelOpen)
       }
+      successCriteriaNodes={state.designNodes.map((node) => ({
+        id: node.id,
+        label: node.data.label || node.id,
+      }))}
     />
   );
 

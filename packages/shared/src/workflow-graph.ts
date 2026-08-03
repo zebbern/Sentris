@@ -50,6 +50,121 @@ export const WorkflowEdgeSchema = z.object({
   type: z.enum(['default', 'smoothstep', 'step', 'straight', 'bezier']).optional(),
 });
 
+const WorkflowSuccessCriterionIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'Use letters, numbers, dots, dashes, or underscores');
+
+const WorkflowSuccessCriterionBaseSchema = z.object({
+  id: WorkflowSuccessCriterionIdSchema,
+  title: z.string().trim().min(1).max(191),
+});
+
+export const WorkflowOutputSuccessCriterionSchema = WorkflowSuccessCriterionBaseSchema.extend({
+  kind: z.literal('output_assertion'),
+  nodeRef: z.string().trim().min(1).max(191),
+  path: z
+    .string()
+    .max(1_024)
+    .refine(
+      (value) => value === '' || value.startsWith('/'),
+      'Output path must be an RFC 6901 JSON Pointer or empty for the node output itself',
+    ),
+  operator: z.enum(['exists', 'not_empty', 'equals', 'contains', 'gte', 'lte']),
+  expected: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
+})
+  .strict()
+  .superRefine((criterion, context) => {
+    const hasExpected = Object.hasOwn(criterion, 'expected');
+    if (criterion.operator === 'exists' || criterion.operator === 'not_empty') {
+      if (hasExpected) {
+        context.addIssue({
+          code: 'custom',
+          message: `${criterion.operator} does not accept an expected value`,
+          path: ['expected'],
+        });
+      }
+      return;
+    }
+    if (!hasExpected) {
+      context.addIssue({
+        code: 'custom',
+        message: `${criterion.operator} requires an expected value`,
+        path: ['expected'],
+      });
+      return;
+    }
+    if (criterion.operator === 'contains' && typeof criterion.expected !== 'string') {
+      context.addIssue({
+        code: 'custom',
+        message: 'contains requires a string expected value',
+        path: ['expected'],
+      });
+    }
+    if (
+      (criterion.operator === 'gte' || criterion.operator === 'lte') &&
+      typeof criterion.expected !== 'number'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: `${criterion.operator} requires a numeric expected value`,
+        path: ['expected'],
+      });
+    }
+  });
+
+export const WorkflowFindingCountSuccessCriterionSchema = WorkflowSuccessCriterionBaseSchema.extend(
+  {
+    kind: z.literal('finding_count'),
+    minimum: z.number().int().nonnegative().optional(),
+    maximum: z.number().int().nonnegative().optional(),
+  },
+)
+  .strict()
+  .superRefine((criterion, context) => {
+    if (criterion.minimum === undefined && criterion.maximum === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'finding_count requires a minimum or maximum',
+      });
+    }
+    if (
+      criterion.minimum !== undefined &&
+      criterion.maximum !== undefined &&
+      criterion.minimum > criterion.maximum
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'minimum cannot exceed maximum',
+        path: ['minimum'],
+      });
+    }
+  });
+
+export const WorkflowSuccessCriterionSchema = z.union([
+  WorkflowOutputSuccessCriterionSchema,
+  WorkflowFindingCountSuccessCriterionSchema,
+]);
+
+export const WorkflowSuccessCriteriaSchema = z
+  .array(WorkflowSuccessCriterionSchema)
+  .max(20)
+  .superRefine((criteria, context) => {
+    const ids = new Set<string>();
+    for (const [index, criterion] of criteria.entries()) {
+      if (ids.has(criterion.id)) {
+        context.addIssue({
+          code: 'custom',
+          message: `Duplicate success criterion id: ${criterion.id}`,
+          path: [index, 'id'],
+        });
+      }
+      ids.add(criterion.id);
+    }
+  });
+
 export const WorkflowGraphObjectSchema = z.object({
   id: z.string().optional(),
   name: z.string(),
@@ -57,6 +172,7 @@ export const WorkflowGraphObjectSchema = z.object({
   nodes: z.array(WorkflowNodeSchema).min(1),
   edges: z.array(WorkflowEdgeSchema),
   viewport: WorkflowViewportSchema.default({ x: 0, y: 0, zoom: 1 }),
+  successCriteria: WorkflowSuccessCriteriaSchema.optional(),
 });
 
 export const WorkflowGraphSchema = WorkflowGraphObjectSchema.refine(
@@ -82,4 +198,5 @@ export const WorkflowGraphSchema = WorkflowGraphObjectSchema.refine(
 export type WorkflowViewport = z.infer<typeof WorkflowViewportSchema>;
 export type WorkflowNode = z.infer<typeof WorkflowNodeSchema>;
 export type WorkflowEdge = z.infer<typeof WorkflowEdgeSchema>;
+export type WorkflowSuccessCriterion = z.infer<typeof WorkflowSuccessCriterionSchema>;
 export type WorkflowGraph = z.infer<typeof WorkflowGraphSchema>;

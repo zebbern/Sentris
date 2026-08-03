@@ -399,6 +399,10 @@ function buildGraphDiff(base: WorkflowGraph | null, proposed: WorkflowGraph) {
       ...(previous.name !== next.name ? (['name'] as const) : []),
       ...(previous.description !== next.description ? (['description'] as const) : []),
     ],
+    successCriteriaChanged: !isDeepStrictEqual(
+      previous.successCriteria ?? [],
+      next.successCriteria ?? [],
+    ),
     addedNodeIds: nodes.added,
     removedNodeIds: nodes.removed,
     changedNodeIds: nodes.changed,
@@ -411,6 +415,7 @@ function buildGraphDiff(base: WorkflowGraph | null, proposed: WorkflowGraph) {
 function graphDiffHasChanges(diff: ReturnType<typeof buildGraphDiff>): boolean {
   return (
     diff.metadataChanged.length > 0 ||
+    diff.successCriteriaChanged ||
     diff.addedNodeIds.length > 0 ||
     diff.removedNodeIds.length > 0 ||
     diff.changedNodeIds.length > 0 ||
@@ -451,6 +456,13 @@ function applyWorkflowEdit(
       if (edit.description !== undefined) {
         candidate.description = edit.description ?? undefined;
       }
+      return candidate;
+    case 'set_success_criteria':
+      candidate.successCriteria = requireWorkflowEditField(
+        edit.successCriteria,
+        edit.operation,
+        'successCriteria',
+      );
       return candidate;
     case 'patch_node': {
       const nodeId = requireWorkflowEditField(edit.nodeId, edit.operation, 'nodeId');
@@ -584,7 +596,7 @@ function validationErrors(error: unknown): string[] {
   return message
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean)
+    .filter((line) => line.length > 0 && line !== 'Workflow validation failed:')
     .slice(0, 50);
 }
 

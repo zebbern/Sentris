@@ -23,6 +23,7 @@ import {
   Save,
   Check,
   StopCircle,
+  ListChecks,
 } from 'lucide-react';
 import { useWorkflowExecution } from '@/hooks/useWorkflowExecution';
 import {
@@ -52,6 +53,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
+import { WorkflowSuccessCriteriaDialog } from '@/features/workflow-builder/components/WorkflowSuccessCriteriaDialog';
 const TOOLBAR_BUTTON_CLASS = 'h-8 shrink-0 px-3 text-xs';
 // Solid buttons need a 1px border too, or they look taller than outline (Save).
 const TOOLBAR_SOLID_BUTTON_CLASS = cn(TOOLBAR_BUTTON_CLASS, 'border border-transparent');
@@ -75,6 +77,7 @@ interface TopBarProps {
   isInWorkflowBuilder?: boolean;
   hasAnalyticsSink?: boolean;
   onToggleVersionHistory?: () => void;
+  successCriteriaNodes?: { id: string; label: string }[];
 }
 
 const DEFAULT_WORKFLOW_NAME = 'Untitled Workflow';
@@ -97,6 +100,7 @@ export function TopBar({
   canRedo,
   hasAnalyticsSink = false,
   onToggleVersionHistory,
+  successCriteriaNodes = [],
 }: TopBarProps) {
   const navigate = useNavigate();
   const isMac = useIsMac();
@@ -109,6 +113,7 @@ export function TopBar({
   const [tempWorkflowName, setTempWorkflowName] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [showPencil, setShowPencil] = useState(false);
+  const [successCriteriaOpen, setSuccessCriteriaOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const saveFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,6 +121,7 @@ export function TopBar({
   const metadata = useWorkflowStore((s) => s.metadata);
   const isDirty = useWorkflowStore((s) => s.isDirty);
   const setWorkflowName = useWorkflowStore((s) => s.setWorkflowName);
+  const setSuccessCriteria = useWorkflowStore((s) => s.setSuccessCriteria);
   const mode = useWorkflowUiStore((state) => state.mode);
   const organizationId = useAuthStore((s) => s.organizationId);
   const authProvider = useAuthStore((s) => s.provider);
@@ -536,6 +542,23 @@ export function TopBar({
                         </DropdownMenuItem>
                       </>
                     )}
+                    {mode === 'design' && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setSuccessCriteriaOpen(true)}
+                          disabled={!canEdit}
+                        >
+                          <ListChecks className="mr-2 h-4 w-4" />
+                          <span>Success Criteria</span>
+                          {metadata.successCriteria.length > 0 ? (
+                            <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                              {metadata.successCriteria.length}
+                            </span>
+                          ) : null}
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
@@ -588,6 +611,14 @@ export function TopBar({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <WorkflowSuccessCriteriaDialog
+        open={successCriteriaOpen}
+        onOpenChange={setSuccessCriteriaOpen}
+        criteria={metadata.successCriteria}
+        nodes={successCriteriaNodes}
+        disabled={!canEdit}
+        onSave={setSuccessCriteria}
+      />
     </>
   );
 }

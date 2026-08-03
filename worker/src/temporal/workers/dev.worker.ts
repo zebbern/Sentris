@@ -86,6 +86,7 @@ import {
 import { drainAllRequiredPublications } from '../utils/required-publication-tracker';
 import {
   initializeOperatorActivities,
+  operatorAwaitRunActivity,
   operatorCompleteTurnActivity,
   operatorExecuteActionActivity,
   operatorFailTurnActivity,
@@ -283,6 +284,7 @@ async function main() {
       reconcileMcpOperationActivity,
       reconcileRunToolInvocationsActivity,
       operatorSetTurnStatusActivity,
+      operatorAwaitRunActivity,
       operatorModelStepActivity,
       operatorPrepareActionActivity,
       operatorExecuteActionActivity,

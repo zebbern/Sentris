@@ -269,7 +269,12 @@ describe('OperatorRepository.createTurn', () => {
       commandName: 'get_run' as const,
       arguments: { runId: 'sentris-run-1' },
     };
-    const persistedPayload = { version: 1 as const, routeContext: context, directCommand };
+    const persistedPayload = {
+      version: 1 as const,
+      routeContext: context,
+      directCommand,
+      journey: null,
+    };
     const created = turnRecord({ context: persistedPayload });
     const { repository, calls } = repositoryWithSelects(
       [[{ id: SESSION_ID }], [], []],

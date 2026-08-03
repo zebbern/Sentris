@@ -1,7 +1,9 @@
+import { isDeepStrictEqual } from 'node:util';
 import { ConflictException, Injectable } from '@nestjs/common';
 
 import {
   OPERATOR_COMMAND_DEFINITIONS,
+  OperatorRunComparisonResultSchema,
   MCP_CAPABILITY_CONTRACT_VERSION,
   McpOperationSchema,
   TERMINAL_STATUSES,
@@ -11,7 +13,11 @@ import {
   type McpOperationInvocationRequest,
   type OperatorCommandInputMap,
   type OperatorCommandName,
+  type OperatorRunComparisonAssessment,
+  type OperatorRunComparisonEvidence,
   type TraceEventPayload,
+  type WorkflowSuccessCriterion,
+  type WorkflowGraph,
 } from '@sentris/shared';
 
 import type { AuthContext } from '../auth/types';
@@ -25,6 +31,7 @@ import {
   OPERATOR_PRESERVE_CREDENTIAL,
   OperatorWorkflowAuthoringService,
 } from './operator-workflow-authoring.service';
+import { compareWorkflowSuccessCriteria } from './operator-run-success-criteria';
 
 const MAX_COMMAND_RESULT_CHARS = 60_000;
 const MAX_RUN_FAILED_TRACE_EVENTS = 8;
@@ -34,6 +41,25 @@ const MAX_RUN_RESULT_CHARS = 10_000;
 const MAX_RUN_FINDING_CHARS = 1_000;
 const MAX_EVIDENCE_TEXT_CHARS = 400;
 const MAX_EVIDENCE_VALUE_CHARS = 600;
+
+type RunTraceEvidence =
+  | {
+      availability: 'available';
+      totalEvents: number;
+      failedEventCount: number;
+      failed: Record<string, unknown>[];
+      recent: Record<string, unknown>[];
+    }
+  | { availability: 'unavailable'; error: string };
+
+type RunFindingEvidence =
+  | {
+      availability: 'available' | 'degraded' | 'unavailable';
+      total: number;
+      degradedReasons: string[];
+      items: unknown[];
+    }
+  | { availability: 'unavailable'; total: null; items: []; error: string };
 
 function toBoundedJson(value: unknown, maxCharacters = MAX_COMMAND_RESULT_CHARS): unknown {
   const serialized = JSON.stringify(value);
@@ -110,6 +136,47 @@ function errorMessage(error: unknown): string {
   );
 }
 
+function nullableDelta(source: number | null, candidate: number | null): number | null {
+  return source === null || candidate === null ? null : candidate - source;
+}
+
+function assessRunComparison(
+  source: OperatorRunComparisonEvidence,
+  candidate: OperatorRunComparisonEvidence,
+  comparable: boolean,
+  successCriteriaAssessment?: OperatorRunComparisonAssessment,
+): OperatorRunComparisonAssessment {
+  if (!comparable) return 'inconclusive';
+  if (source.status !== candidate.status) {
+    if (candidate.status === 'COMPLETED') return 'improved';
+    if (source.status === 'COMPLETED') return 'regressed';
+    return 'inconclusive';
+  }
+  if (successCriteriaAssessment) return successCriteriaAssessment;
+  const failureDelta = nullableDelta(
+    source.trace.failedEventCount,
+    candidate.trace.failedEventCount,
+  );
+  if (failureDelta === null) return 'inconclusive';
+  if (failureDelta < 0) return 'improved';
+  if (failureDelta > 0) return 'regressed';
+  return 'unchanged';
+}
+
+function extractSuccessfulOutputs(result: unknown): Record<string, unknown> | null {
+  if (
+    result === null ||
+    typeof result !== 'object' ||
+    (result as { success?: unknown }).success !== true
+  ) {
+    return null;
+  }
+  const outputs = (result as { outputs?: unknown }).outputs;
+  return outputs !== null && typeof outputs === 'object' && !Array.isArray(outputs)
+    ? (outputs as Record<string, unknown>)
+    : null;
+}
+
 function assertNever(value: never): never {
   throw new Error(`Unsupported Operator command: ${String(value)}`);
 }
@@ -184,6 +251,11 @@ export class OperatorCommandService {
       case 'get_run':
         return this.getRun(
           OPERATOR_COMMAND_DEFINITIONS.get_run.inputSchema.parse(input.arguments),
+          input.auth,
+        );
+      case 'compare_runs':
+        return this.compareRuns(
+          OPERATOR_COMMAND_DEFINITIONS.compare_runs.inputSchema.parse(input.arguments),
           input.auth,
         );
       case 'run_workflow':
@@ -309,7 +381,7 @@ export class OperatorCommandService {
         editableGraph,
         credentialPlaceholder: OPERATOR_PRESERVE_CREDENTIAL,
         ...(authoringUnavailable ? { authoringUnavailable } : {}),
-        nodes: graph.nodes.slice(0, 50).map((node) => ({
+        nodes: graph.nodes.slice(0, 50).map((node: WorkflowGraph['nodes'][number]) => ({
           id: node.id,
           type: node.type,
           label:
@@ -414,7 +486,7 @@ export class OperatorCommandService {
     };
   }
 
-  private async getRunTraceEvidence(runId: string, auth: AuthContext): Promise<unknown> {
+  private async getRunTraceEvidence(runId: string, auth: AuthContext): Promise<RunTraceEvidence> {
     try {
       const summary = await this.traceService.summarizeRun(
         runId,
@@ -439,7 +511,10 @@ export class OperatorCommandService {
     }
   }
 
-  private async getRunFindingEvidence(runId: string, auth: AuthContext): Promise<unknown> {
+  private async getRunFindingEvidence(
+    runId: string,
+    auth: AuthContext,
+  ): Promise<RunFindingEvidence> {
     try {
       const page = await this.findingsQueryService.listFindings(
         auth,
@@ -467,6 +542,177 @@ export class OperatorCommandService {
         error: errorMessage(error),
       };
     }
+  }
+
+  private async compareRuns(
+    input: OperatorCommandInputMap['compare_runs'],
+    auth: AuthContext,
+  ): Promise<{ result: unknown }> {
+    const [sourceRun, candidateRun, sourceConfig, candidateConfig] = await Promise.all([
+      this.workflowsService.getRun(input.sourceRunId, auth),
+      this.workflowsService.getRun(input.candidateRunId, auth),
+      this.workflowsService.getRunConfig(input.sourceRunId, auth),
+      this.workflowsService.getRunConfig(input.candidateRunId, auth),
+    ]);
+    if (
+      sourceRun.workflowId !== candidateRun.workflowId ||
+      sourceConfig.workflowId !== sourceRun.workflowId ||
+      candidateConfig.workflowId !== candidateRun.workflowId
+    ) {
+      throw new ConflictException('Run comparison requires two runs from the same workflow');
+    }
+    for (const run of [sourceRun, candidateRun]) {
+      if (!(TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
+        throw new ConflictException(
+          `Workflow run ${run.id} is still ${run.status}; wait for both runs to finish before comparing them`,
+        );
+      }
+    }
+
+    const comparable =
+      sourceRun.scopeId === candidateRun.scopeId &&
+      isDeepStrictEqual(sourceConfig.inputs, candidateConfig.inputs);
+    let benchmarkVersionId: string | null = null;
+    let declaredCriteria: WorkflowSuccessCriterion[] = [];
+    if (candidateConfig.workflowVersionId) {
+      const benchmarkVersion = await this.workflowsService.getWorkflowVersion(
+        candidateRun.workflowId,
+        candidateConfig.workflowVersionId,
+        auth,
+      );
+      benchmarkVersionId = benchmarkVersion.id;
+      declaredCriteria = benchmarkVersion.graph.successCriteria ?? [];
+    }
+    const [source, candidate] = await Promise.all([
+      this.buildRunComparisonEvidence(sourceRun, auth),
+      this.buildRunComparisonEvidence(candidateRun, auth),
+    ]);
+    let successCriteriaComparison: ReturnType<typeof compareWorkflowSuccessCriteria> | null = null;
+    if (benchmarkVersionId && declaredCriteria.length > 0) {
+      const needsOutputs = declaredCriteria.some(
+        (criterion) => criterion.kind === 'output_assertion',
+      );
+      const [sourceResult, candidateResult] = needsOutputs
+        ? await Promise.all([
+            this.workflowsService.getRunResult(input.sourceRunId, sourceRun.temporalRunId, auth),
+            this.workflowsService.getRunResult(
+              input.candidateRunId,
+              candidateRun.temporalRunId,
+              auth,
+            ),
+          ])
+        : [null, null];
+      successCriteriaComparison = compareWorkflowSuccessCriteria({
+        criteria: declaredCriteria,
+        comparable,
+        source: {
+          outputs: extractSuccessfulOutputs(sourceResult),
+          findings: source.findings,
+        },
+        candidate: {
+          outputs: extractSuccessfulOutputs(candidateResult),
+          findings: candidate.findings,
+        },
+      });
+    }
+    const failedEventCountDelta = nullableDelta(
+      source.trace.failedEventCount,
+      candidate.trace.failedEventCount,
+    );
+    const findingTotalDelta = nullableDelta(source.findings.total, candidate.findings.total);
+    const assessment = assessRunComparison(
+      source,
+      candidate,
+      comparable,
+      successCriteriaComparison?.assessment,
+    );
+    const caveats = [
+      'Finding and duration changes are observations, not proof of workflow quality.',
+      'External targets and model or provider responses can change between repeated runs.',
+    ];
+    if (!comparable) {
+      caveats.unshift(
+        'The runs used different stored inputs or scopes, so this is not an apples-to-apples comparison.',
+      );
+    }
+    if (benchmarkVersionId && declaredCriteria.length === 0) {
+      caveats.push(
+        'The candidate version declares no success criteria, so assessment uses run completion and failure events.',
+      );
+    }
+    if (successCriteriaComparison) {
+      caveats.unshift(
+        'Success criteria from the immutable candidate workflow version were evaluated against both runs.',
+      );
+    }
+    if (
+      source.trace.availability === 'unavailable' ||
+      candidate.trace.availability === 'unavailable'
+    ) {
+      caveats.push('Trace evidence was unavailable for at least one run.');
+    }
+    if (
+      source.findings.availability !== 'available' ||
+      candidate.findings.availability !== 'available'
+    ) {
+      caveats.push('Finding data was degraded or unavailable for at least one run.');
+    }
+
+    return {
+      result: OperatorRunComparisonResultSchema.parse({
+        kind: 'run-comparison',
+        assessment,
+        comparable,
+        source,
+        candidate,
+        changes: {
+          statusChanged: source.status !== candidate.status,
+          failedEventCountDelta,
+          findingTotalDelta,
+          durationDeltaMs: candidate.durationMs - source.durationMs,
+        },
+        successCriteria:
+          benchmarkVersionId && successCriteriaComparison
+            ? {
+                benchmarkVersionId,
+                criteria: successCriteriaComparison.criteria,
+              }
+            : null,
+        caveats,
+      }),
+    };
+  }
+
+  private async buildRunComparisonEvidence(
+    run: {
+      id: string;
+      workflowId: string;
+      workflowVersionId: string | null;
+      temporalRunId?: string | null;
+      status: OperatorRunComparisonEvidence['status'];
+      duration: number;
+    },
+    auth: AuthContext,
+  ): Promise<OperatorRunComparisonEvidence> {
+    const [trace, findings] = await Promise.all([
+      this.getRunTraceEvidence(run.id, auth),
+      this.getRunFindingEvidence(run.id, auth),
+    ]);
+    return {
+      runId: run.id,
+      workflowId: run.workflowId,
+      workflowVersionId: run.workflowVersionId,
+      status: run.status,
+      durationMs: run.duration,
+      trace: {
+        availability: trace.availability,
+        failedEventCount: trace.availability === 'available' ? trace.failedEventCount : null,
+      },
+      findings: {
+        availability: findings.availability,
+        total: findings.total,
+      },
+    };
   }
 
   private async runWorkflow(

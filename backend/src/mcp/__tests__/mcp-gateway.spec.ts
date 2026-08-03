@@ -905,8 +905,12 @@ describe('McpGatewayService', () => {
     expect(mcpRuntimeRepository.getAuthority).toHaveBeenCalledWith({
       capabilityGrantId: RUN_CONTEXT.capabilityGrantId,
       capabilitySnapshotId: SNAPSHOT_ID,
-      runId: 'run-1',
-      organizationId: 'org-1',
+      scope: {
+        kind: 'run',
+        capabilityGrantId: RUN_CONTEXT.capabilityGrantId,
+        organizationId: 'org-1',
+        runId: 'run-1',
+      },
     });
     expect(registerTool).not.toHaveBeenCalled();
     expect(toolRegistry.getToolsForRun).not.toHaveBeenCalled();

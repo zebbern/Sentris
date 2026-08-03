@@ -597,7 +597,7 @@ describe('WorkflowsController', () => {
     expect(definition.actions).toHaveLength(2);
 
     const run = await controller.run(authContext, created.id, {
-      inputs: { payload: { note: 'hello' } },
+      inputs: { fileId: '11111111-1111-4111-8111-111111111111' },
     });
     expect(run.runId).toMatch(/^sentris-run-/);
     expect(run.temporalRunId).toBe('temporal-run-controller');
@@ -647,7 +647,7 @@ describe('WorkflowsController', () => {
     const created = await controller.create(authContext, baseGraph);
     await controller.commit(created.id, authContext);
     const run = await controller.run(authContext, created.id, {
-      inputs: { payload: { value: 'ping' } },
+      inputs: { fileId: '11111111-1111-4111-8111-111111111111' },
     });
 
     const summary = await runsController.getRun(authContext, run.runId);

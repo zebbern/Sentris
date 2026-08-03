@@ -327,10 +327,13 @@ the full fence. Do not add another backend/worker MCP client or bypass this runt
 boundary.
 
 The in-app Operator now runs each user turn as a Temporal Workflow with durable typed
-actions, ask-or-auto approvals, and turn-scoped immutable MCP authority. New histories
+actions, ask-or-auto approvals, and turn-scoped immutable MCP authority. Ordinary new histories
 release the turn after launching a workflow and follow its run and Agent children through
 the canonical run trace/Agent SSE pipeline; a patch-gated blocking observer exists only for
-old-history replay. Explicit run-card inspect, cancel, and retry controls are structured,
+old-history replay. The explicit `improve_run` journey is the deliberate exception: one turn
+proposes a bounded edit, applies it through the same Ask/Auto policy, reruns the source inputs,
+waits durably through retrying observations, compares recorded evidence, and summarizes the
+result. Explicit run-card inspect, cancel, and retry controls are structured,
 user-confirmed Operator turns. Retry creates one new run from the original stored version,
 inputs, and scope with action-ID idempotency; it never mutates a completed Agent child. Its
 tool, resource, and prompt calls dispatch through the same canonical runtime and durable
@@ -344,9 +347,18 @@ credential placeholders from the freshly fetched persisted graph. Turn records s
 initiating actor roles so delayed authoring keeps the user's workflow authority. Provider-native
 tool-call continuation metadata lives in the Temporal turn history; Postgres action rows remain
 provider-neutral audit records. Run-derived update proposals carry their validated source-run
-identity through apply, and a separate explicit `run_workflow` turn may run the newly saved
-version with that source run's stored inputs and scope. Keep this distinct from Retry, which
-continues to select the original immutable version.
+identity through apply. The improvement journey runs the newly saved version with that source
+run's stored inputs and scope; manual authoring controls may still perform these stages in
+separate turns. Keep this distinct from Retry, which continues to select the original immutable
+version. Once both runs are terminal, the read-only `compare_runs` command verifies
+same-workflow lineage and stored input/scope comparability,
+then assesses terminal outcome. Optional deterministic success criteria live in the immutable
+workflow graph and use the candidate version as the fixed benchmark for both runs. Supported
+v1 criteria are scalar node-output assertions addressed by RFC 6901 JSON Pointer and bounded
+finding-count ranges; conflicting or unavailable criterion evidence remains inconclusive and
+must not be replaced with an LLM quality score. Exact trace-failure counts are the fallback
+when no criteria are declared. Raw finding totals and duration remain observations only, and
+mismatched inputs/scopes are always inconclusive.
 
 The generic workflow-graph `core.ai.agent` now prepares each turn in an activity and runs
 the loop as a patch-gated Temporal child Workflow. Inline provider keys are sealed with

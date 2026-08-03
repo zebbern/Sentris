@@ -4,9 +4,11 @@ import { z } from 'zod';
 import {
   OPERATOR_WORKFLOW_EDIT_OPERATIONS,
   OPERATOR_COMMAND_DEFINITIONS,
+  OperatorCompareRunsInputSchema,
   OperatorGetFindingInputSchema,
   OperatorGetWorkflowInputSchema,
   OperatorRunWorkflowInputSchema,
+  OperatorRunComparisonResultSchema,
   OperatorGetMcpPromptInputSchema,
   OperatorInvokeMcpToolInputSchema,
   OperatorListFindingsInputSchema,
@@ -23,6 +25,7 @@ import {
   OperatorWorkflowApplyResultSchema,
   OperatorWorkflowDraftResultSchema,
 } from '../operator.js';
+import { WorkflowSuccessCriteriaSchema } from '../workflow-graph.js';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -130,6 +133,113 @@ describe('Operator run controls', () => {
     });
   });
 
+  it('accepts one bounded improve-run journey separately from direct commands', () => {
+    expect(
+      OperatorCreateTurnSchema.parse({
+        clientTurnId: SESSION_ID,
+        message: 'Improve this run and compare the result',
+        journey: { kind: 'improve_run', sourceRunId: 'sentris-run-source' },
+      }).journey,
+    ).toEqual({ kind: 'improve_run', sourceRunId: 'sentris-run-source' });
+    expect(
+      OperatorCreateTurnSchema.safeParse({
+        clientTurnId: SESSION_ID,
+        message: 'Ambiguous control request',
+        directCommand: {
+          commandName: 'get_run',
+          arguments: { runId: 'sentris-run-source' },
+        },
+        journey: { kind: 'improve_run', sourceRunId: 'sentris-run-source' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('keeps run comparison read-only, distinct, and available as a direct review command', () => {
+    expect(OPERATOR_COMMAND_DEFINITIONS.compare_runs.effect).toBe('read');
+    expect(
+      OperatorCompareRunsInputSchema.safeParse({
+        sourceRunId: 'sentris-run-1',
+        candidateRunId: 'sentris-run-1',
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorCreateTurnSchema.parse({
+        clientTurnId: SESSION_ID,
+        message: 'Compare the improved run with its source',
+        directCommand: {
+          commandName: 'compare_runs',
+          arguments: {
+            sourceRunId: 'sentris-run-source',
+            candidateRunId: 'sentris-run-candidate',
+          },
+        },
+      }).directCommand,
+    ).toEqual({
+      commandName: 'compare_runs',
+      arguments: {
+        sourceRunId: 'sentris-run-source',
+        candidateRunId: 'sentris-run-candidate',
+      },
+    });
+  });
+
+  it('validates the evidence-based run comparison result contract', () => {
+    expect(
+      OperatorRunComparisonResultSchema.parse({
+        kind: 'run-comparison',
+        assessment: 'improved',
+        comparable: true,
+        source: {
+          runId: 'sentris-run-source',
+          workflowId: '22222222-2222-4222-8222-222222222222',
+          workflowVersionId: '33333333-3333-4333-8333-333333333333',
+          status: 'FAILED',
+          durationMs: 10_000,
+          trace: { availability: 'available', failedEventCount: 2 },
+          findings: { availability: 'available', total: 1 },
+        },
+        candidate: {
+          runId: 'sentris-run-candidate',
+          workflowId: '22222222-2222-4222-8222-222222222222',
+          workflowVersionId: '44444444-4444-4444-8444-444444444444',
+          status: 'COMPLETED',
+          durationMs: 8_000,
+          trace: { availability: 'available', failedEventCount: 0 },
+          findings: { availability: 'available', total: 2 },
+        },
+        changes: {
+          statusChanged: true,
+          failedEventCountDelta: -2,
+          findingTotalDelta: 1,
+          durationDeltaMs: -2_000,
+        },
+        successCriteria: {
+          benchmarkVersionId: '44444444-4444-4444-8444-444444444444',
+          criteria: [
+            {
+              criterion: {
+                id: 'report-produced',
+                title: 'Produces a report',
+                kind: 'output_assertion',
+                nodeRef: 'agent',
+                path: '/report',
+                operator: 'not_empty',
+              },
+              source: { outcome: 'failed', message: 'Output was empty', actual: '""' },
+              candidate: {
+                outcome: 'passed',
+                message: 'Output was not empty',
+                actual: '"Report"',
+              },
+              assessment: 'improved',
+            },
+          ],
+        },
+        caveats: ['Finding and duration changes are observations only.'],
+      }).assessment,
+    ).toBe('improved');
+  });
+
   it('defines one strict versioned payload while accepting legacy route-only storage', () => {
     const routeContext = {
       path: '/workflows/22222222-2222-4222-8222-222222222222',
@@ -144,7 +254,10 @@ describe('Operator run controls', () => {
       },
     };
 
-    expect(OperatorPersistedTurnPayloadSchema.parse(payload)).toEqual(payload);
+    expect(OperatorPersistedTurnPayloadSchema.parse(payload)).toEqual({
+      ...payload,
+      journey: null,
+    });
     expect(OperatorStoredTurnContextSchema.parse(routeContext)).toEqual(routeContext);
     expect(OperatorStoredTurnContextSchema.parse(null)).toBeNull();
     expect(OperatorPersistedTurnPayloadSchema.safeParse({ ...payload, version: 2 }).success).toBe(
@@ -293,6 +406,17 @@ describe('Operator workflow authoring commands', () => {
           operation: 'remove_edge' as const,
           edgeId: 'obsolete-edge',
         },
+        {
+          operation: 'set_success_criteria' as const,
+          successCriteria: [
+            {
+              id: 'findings-produced',
+              title: 'Produces at least one finding',
+              kind: 'finding_count' as const,
+              minimum: 1,
+            },
+          ],
+        },
       ],
     };
 
@@ -326,6 +450,46 @@ describe('Operator workflow authoring commands', () => {
           },
         ],
       }).success,
+    ).toBe(false);
+  });
+
+  it('validates deterministic workflow success criteria', () => {
+    expect(
+      WorkflowSuccessCriteriaSchema.parse([
+        {
+          id: 'report-produced',
+          title: 'Produces a report',
+          kind: 'output_assertion',
+          nodeRef: 'agent',
+          path: '/report',
+          operator: 'not_empty',
+        },
+        {
+          id: 'findings-produced',
+          title: 'Produces findings',
+          kind: 'finding_count',
+          minimum: 1,
+        },
+      ]),
+    ).toHaveLength(2);
+    expect(
+      WorkflowSuccessCriteriaSchema.safeParse([
+        {
+          id: 'score',
+          title: 'High confidence score',
+          kind: 'output_assertion',
+          nodeRef: 'agent',
+          path: '/score',
+          operator: 'gte',
+          expected: '0.8',
+        },
+      ]).success,
+    ).toBe(false);
+    expect(
+      WorkflowSuccessCriteriaSchema.safeParse([
+        { id: 'duplicate', title: 'First', kind: 'finding_count', minimum: 1 },
+        { id: 'duplicate', title: 'Second', kind: 'finding_count', maximum: 3 },
+      ]).success,
     ).toBe(false);
   });
 

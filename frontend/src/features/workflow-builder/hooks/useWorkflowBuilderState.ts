@@ -417,13 +417,15 @@ export function useWorkflowBuilderState() {
       nodes: WorkflowGraph['nodes'];
       edges: WorkflowGraph['edges'];
       viewport?: WorkflowGraph['viewport'];
+      successCriteria?: WorkflowGraph['successCriteria'];
     }) => {
       const deserialized = deserializeWorkflowGraph(graph);
       setDesignNodes(deserialized.nodes);
       setDesignEdges(deserialized.edges);
+      setMetadata({ successCriteria: graph.successCriteria ?? [] });
       markDirty();
     },
-    [setDesignNodes, setDesignEdges, markDirty],
+    [setDesignNodes, setDesignEdges, setMetadata, markDirty],
   );
 
   const shouldShowInitialLoader =

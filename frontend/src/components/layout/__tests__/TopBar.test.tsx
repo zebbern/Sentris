@@ -21,6 +21,7 @@ const resetStores = () => {
       description: '',
       currentVersionId: null,
       currentVersion: null,
+      successCriteria: [],
     },
     isDirty: false,
   });
@@ -156,6 +157,7 @@ describeTopBar('TopBar', () => {
         description: '',
         currentVersionId: null,
         currentVersion: null,
+        successCriteria: [],
       },
       isDirty: false,
     });

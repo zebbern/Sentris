@@ -236,4 +236,98 @@ describe('OperatorTimeline', () => {
       },
     });
   });
+
+  it('renders a structured run comparison and offers revision of the candidate', () => {
+    const onRunCommand = mock(() => {});
+    const comparisonAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'compare-action',
+      commandName: 'compare_runs',
+      effect: 'read',
+      status: 'succeeded',
+      approvalRequired: false,
+      runId: null,
+      arguments: {
+        sourceRunId: 'sentris-run-source',
+        candidateRunId: 'sentris-run-candidate',
+      },
+      result: {
+        kind: 'run-comparison',
+        assessment: 'improved',
+        comparable: true,
+        source: {
+          runId: 'sentris-run-source',
+          workflowId: '22222222-2222-4222-8222-222222222222',
+          workflowVersionId: '33333333-3333-4333-8333-333333333333',
+          status: 'FAILED',
+          durationMs: 10_000,
+          trace: { availability: 'available', failedEventCount: 2 },
+          findings: { availability: 'available', total: 1 },
+        },
+        candidate: {
+          runId: 'sentris-run-candidate',
+          workflowId: '22222222-2222-4222-8222-222222222222',
+          workflowVersionId: '44444444-4444-4444-8444-444444444444',
+          status: 'COMPLETED',
+          durationMs: 8_000,
+          trace: { availability: 'available', failedEventCount: 0 },
+          findings: { availability: 'available', total: 2 },
+        },
+        changes: {
+          statusChanged: true,
+          failedEventCountDelta: -2,
+          findingTotalDelta: 1,
+          durationDeltaMs: -2_000,
+        },
+        successCriteria: {
+          benchmarkVersionId: '44444444-4444-4444-8444-444444444444',
+          criteria: [
+            {
+              criterion: {
+                id: 'report',
+                title: 'Produces an investigation report',
+                kind: 'output_assertion',
+                nodeRef: 'agent',
+                path: '/report',
+                operator: 'not_empty',
+              },
+              source: { outcome: 'failed', message: 'The declared output was empty' },
+              candidate: {
+                outcome: 'passed',
+                message: 'The declared output was not empty',
+              },
+              assessment: 'improved',
+            },
+          ],
+        },
+        caveats: ['Finding and duration changes are observations, not proof of workflow quality.'],
+      },
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={[comparisonAction]}
+        isActive={false}
+        onDecision={mock(() => {})}
+        onRunCommand={onRunCommand}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getAllByText('Improved')).toHaveLength(2);
+    expect(screen.getByText('Failure events')).toBeInTheDocument();
+    expect(screen.getByText('-2')).toBeInTheDocument();
+    expect(screen.getByText('Declared success criteria')).toBeInTheDocument();
+    expect(screen.getByText('Produces an investigation report')).toBeInTheDocument();
+    expect(screen.getByText('Source failed → Candidate passed')).toBeInTheDocument();
+    expect(screen.queryByText(/"kind": "run-comparison"/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revise again' }));
+    expect(onRunCommand).toHaveBeenCalledWith({
+      message:
+        'Try another evidence-based improvement from candidate run sentris-run-candidate, then rerun and compare it.',
+      journey: { kind: 'improve_run', sourceRunId: 'sentris-run-candidate' },
+    });
+  });
 });

@@ -70,12 +70,34 @@ export function validateWorkflowGraph(
     const component = componentRegistry.get(action.componentId);
     if (!component) continue; // Already reported above
 
-    const portSnapshot = resolveActionPortSnapshot(action, component);
-    actionPorts.set(action.ref, portSnapshot);
-
     const paramsForValidation = { ...(action.params ?? {}) } as Record<string, unknown>;
     const inputOverrides = { ...(action.inputOverrides ?? {}) } as Record<string, unknown>;
     const placeholderFields = new Set<string>();
+
+    const paramValidation = component.parameters
+      ? component.parameters.safeParse(paramsForValidation)
+      : {
+          success: Object.keys(paramsForValidation).length === 0,
+          error: new Error('Component does not accept parameters'),
+        };
+
+    if (!paramValidation.success) {
+      errors.push({
+        node: action.ref,
+        field: 'params',
+        message: `Component parameter validation failed: ${formatValidationError(paramValidation.error)}`,
+        severity: 'error',
+        suggestion: 'Check component parameter schema for required fields and correct types',
+      });
+    }
+
+    const portSnapshot = paramValidation.success
+      ? resolveActionPortSnapshot(action, component)
+      : {
+          inputs: extractPorts(component.inputs),
+          outputs: extractPorts(component.outputs),
+        };
+    actionPorts.set(action.ref, portSnapshot);
 
     for (const inputPort of portSnapshot.inputs) {
       const hasStaticValue =
@@ -93,23 +115,6 @@ export function validateWorkflowGraph(
       }
     }
 
-    const paramValidation = component.parameters
-      ? component.parameters.safeParse(paramsForValidation)
-      : {
-          success: Object.keys(paramsForValidation).length === 0,
-          error: new Error('Component does not accept parameters'),
-        };
-
-    if (!paramValidation.success) {
-      errors.push({
-        node: action.ref,
-        field: 'params',
-        message: `Component parameter validation failed: ${paramValidation.error?.message ?? 'Invalid parameters'}`,
-        severity: 'error',
-        suggestion: 'Check component parameter schema for required fields and correct types',
-      });
-    }
-
     const validation = component.inputs.safeParse(inputOverrides);
     if (!validation.success) {
       const relevantIssues = validation.error.issues.filter(
@@ -125,7 +130,7 @@ export function validateWorkflowGraph(
         errors.push({
           node: action.ref,
           field: 'inputOverrides',
-          message: `Component input validation failed: ${filteredError.message}`,
+          message: `Component input validation failed: ${formatValidationError(filteredError)}`,
           severity: 'error',
           suggestion: 'Check component input schema for required ports and correct types',
         });
@@ -150,6 +155,18 @@ export function validateWorkflowGraph(
     errors,
     warnings,
   };
+}
+
+function formatValidationError(error: unknown): string {
+  if (error instanceof ZodError) {
+    return error.issues
+      .map((issue) => {
+        const path = issue.path.map(String).join('.');
+        return `${path ? `${path}: ` : ''}${issue.message}`;
+      })
+      .join('; ');
+  }
+  return error instanceof Error ? error.message : 'Invalid value';
 }
 
 function isPlaceholderIssue(issue: ZodIssue, placeholderFields: Set<string>): boolean {

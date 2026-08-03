@@ -9,6 +9,7 @@ import { track, Events } from '@/features/analytics/events';
 import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { logger } from '@/lib/logger';
+import type { WorkflowSuccessCriterion } from '@sentris/shared';
 
 interface WorkflowMetadataShape {
   id: string | null;
@@ -16,11 +17,13 @@ interface WorkflowMetadataShape {
   description: string;
   currentVersionId: string | null;
   currentVersion: number | null;
+  successCriteria: WorkflowSuccessCriterion[];
 }
 
 interface SavedMetadata {
   name: string;
   description: string;
+  successCriteria: WorkflowSuccessCriterion[];
 }
 
 type ToastFn = (params: {
@@ -89,6 +92,7 @@ export function useDesignWorkflowPersistence({
   const [lastSavedMetadata, setLastSavedMetadata] = useState<SavedMetadata | null>(null);
   const [hasGraphChanges, setHasGraphChanges] = useState(false);
   const [hasMetadataChanges, setHasMetadataChanges] = useState(false);
+  const [hasSuccessCriteriaChanges, setHasSuccessCriteriaChanges] = useState(false);
 
   useEffect(() => {
     const currentSignature = computeGraphSignature(designNodes, designEdges);
@@ -106,11 +110,13 @@ export function useDesignWorkflowPersistence({
     const normalizedMetadata: SavedMetadata = {
       name: metadata.name,
       description: metadata.description ?? '',
+      successCriteria: metadata.successCriteria,
     };
 
     if (lastSavedMetadata === null) {
       setLastSavedMetadata(normalizedMetadata);
       setHasMetadataChanges(false);
+      setHasSuccessCriteriaChanges(false);
       return;
     }
 
@@ -118,16 +124,27 @@ export function useDesignWorkflowPersistence({
       normalizedMetadata.name !== lastSavedMetadata.name ||
       normalizedMetadata.description !== lastSavedMetadata.description;
     setHasMetadataChanges(changed);
-  }, [metadata.name, metadata.description, lastSavedMetadata]);
+    setHasSuccessCriteriaChanges(
+      JSON.stringify(normalizedMetadata.successCriteria) !==
+        JSON.stringify(lastSavedMetadata.successCriteria),
+    );
+  }, [metadata.name, metadata.description, metadata.successCriteria, lastSavedMetadata]);
 
   useEffect(() => {
-    const shouldBeDirty = hasGraphChanges || hasMetadataChanges;
+    const shouldBeDirty = hasGraphChanges || hasMetadataChanges || hasSuccessCriteriaChanges;
     if (shouldBeDirty && !isDirty) {
       markDirty();
     } else if (!shouldBeDirty && isDirty) {
       markClean();
     }
-  }, [hasGraphChanges, hasMetadataChanges, isDirty, markDirty, markClean]);
+  }, [
+    hasGraphChanges,
+    hasMetadataChanges,
+    hasSuccessCriteriaChanges,
+    isDirty,
+    markDirty,
+    markClean,
+  ]);
 
   const handleSave = useCallback(
     async (showToast = true) => {
@@ -176,7 +193,8 @@ export function useDesignWorkflowPersistence({
         }
 
         const workflowId = metadata.id;
-        const metadataChangesOnly = hasMetadataChanges && !hasGraphChanges;
+        const metadataChangesOnly =
+          hasMetadataChanges && !hasGraphChanges && !hasSuccessCriteriaChanges;
 
         if (metadataChangesOnly && workflowId && !isNewWorkflow && !expectedVersionId) {
           const updatedMetadata = await api.workflows.updateMetadata(workflowId, {
@@ -190,11 +208,13 @@ export function useDesignWorkflowPersistence({
             description: updatedMetadata.description ?? '',
             currentVersionId: updatedMetadata.currentVersionId ?? null,
             currentVersion: updatedMetadata.currentVersion ?? null,
+            successCriteria: updatedMetadata.graph.successCriteria ?? metadata.successCriteria,
           });
 
           setLastSavedMetadata({
             name: updatedMetadata.name,
             description: updatedMetadata.description ?? '',
+            successCriteria: updatedMetadata.graph.successCriteria ?? metadata.successCriteria,
           });
           setHasMetadataChanges(false);
           markClean();
@@ -229,6 +249,7 @@ export function useDesignWorkflowPersistence({
             metadata.description || undefined,
             designNodes,
             designEdges,
+            metadata.successCriteria,
           );
 
           const savedWorkflow = await api.workflows.create(payload);
@@ -240,6 +261,7 @@ export function useDesignWorkflowPersistence({
             description: savedWorkflow.description ?? '',
             currentVersionId: savedWorkflow.currentVersionId ?? null,
             currentVersion: savedWorkflow.currentVersion ?? null,
+            successCriteria: savedWorkflow.graph.successCriteria ?? metadata.successCriteria,
           });
           markClean();
           const newSignature = computeGraphSignature(
@@ -250,9 +272,11 @@ export function useDesignWorkflowPersistence({
           setLastSavedMetadata({
             name: savedWorkflow.name,
             description: savedWorkflow.description ?? '',
+            successCriteria: savedWorkflow.graph.successCriteria ?? metadata.successCriteria,
           });
           setHasGraphChanges(false);
           setHasMetadataChanges(false);
+          setHasSuccessCriteriaChanges(false);
 
           designSavedSnapshotRef.current = {
             nodes: cloneNodes(designNodesRef.current),
@@ -284,6 +308,7 @@ export function useDesignWorkflowPersistence({
             metadata.description || undefined,
             designNodes,
             designEdges,
+            metadata.successCriteria,
           );
 
           const updatedWorkflow = await api.workflows.update(workflowId, payload, {
@@ -295,6 +320,7 @@ export function useDesignWorkflowPersistence({
             description: updatedWorkflow.description ?? '',
             currentVersionId: updatedWorkflow.currentVersionId ?? null,
             currentVersion: updatedWorkflow.currentVersion ?? null,
+            successCriteria: updatedWorkflow.graph.successCriteria ?? metadata.successCriteria,
           });
           markClean();
           const newSignature = computeGraphSignature(
@@ -305,9 +331,11 @@ export function useDesignWorkflowPersistence({
           setLastSavedMetadata({
             name: updatedWorkflow.name,
             description: updatedWorkflow.description ?? '',
+            successCriteria: updatedWorkflow.graph.successCriteria ?? metadata.successCriteria,
           });
           setHasGraphChanges(false);
           setHasMetadataChanges(false);
+          setHasSuccessCriteriaChanges(false);
 
           designSavedSnapshotRef.current = {
             nodes: cloneNodes(designNodesRef.current),
@@ -381,12 +409,14 @@ export function useDesignWorkflowPersistence({
       metadata.description,
       metadata.id,
       metadata.name,
+      metadata.successCriteria,
       navigate,
       setMetadata,
       setWorkflowId,
       toast,
       hasGraphChanges,
       hasMetadataChanges,
+      hasSuccessCriteriaChanges,
       workflowRoutePrefix,
       expectedVersionId,
       onExpectedVersionSaveSuccess,
