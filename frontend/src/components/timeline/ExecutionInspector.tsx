@@ -5,7 +5,7 @@ import { ExecutionTimeline } from '@/components/timeline/ExecutionTimeline';
 import { EventInspector } from '@/components/timeline/EventInspector';
 import { Button } from '@/components/ui/button';
 import { MessageModal } from '@/components/ui/MessageModal';
-import { Globe, Loader2, FileSearch } from 'lucide-react';
+import { Globe, Loader2, FileSearch, Sparkles } from 'lucide-react';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { logger } from '@/lib/logger';
 import { useExecutionStore } from '@/store/executionStore';
@@ -28,6 +28,7 @@ import { useAutoFocusOnCompletion } from '@/hooks/useAutoFocusOnCompletion';
 import { useRunArtifacts } from '@/hooks/queries/useArtifactQueries';
 import { useExecutionNodeIO } from '@/hooks/queries/useExecutionQueries';
 import { TERMINAL_STATUSES } from '@sentris/shared';
+import { createOperatorImproveRunNavigationState } from '@/features/operator/operatorHandoff';
 
 const formatTime = (timestamp: string) => {
   const date = new Date(timestamp);
@@ -296,13 +297,36 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
             runsPage={runsPage ?? null}
             isLoadingRuns={isLoadingRuns}
           />
-          {runStatus?.progress &&
-            selectedRunId === liveRunId &&
-            (status === 'running' || status === 'queued') && (
-              <span className="text-[11px] font-medium text-muted-foreground">
-                {runStatus.progress.completedActions}/{runStatus.progress.totalActions}
-              </span>
-            )}
+          <div className="flex shrink-0 items-center gap-2">
+            {selectedRun && TERMINAL_STATUSES.includes(selectedRun.status) ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 px-2 text-[11px]"
+                onClick={() =>
+                  navigate('/operator', {
+                    state: createOperatorImproveRunNavigationState(
+                      selectedRun.id,
+                      `/workflows/${workflowId}/runs/${selectedRun.id}`,
+                    ),
+                  })
+                }
+                aria-label="Improve this run with Operator"
+                title="Improve this run with Operator"
+              >
+                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                Improve
+              </Button>
+            ) : null}
+            {runStatus?.progress &&
+              selectedRunId === liveRunId &&
+              (status === 'running' || status === 'queued') && (
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  {runStatus.progress.completedActions}/{runStatus.progress.totalActions}
+                </span>
+              )}
+          </div>
         </div>
 
         {/* Run Results Summary Banner — only for terminal runs */}

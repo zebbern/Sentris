@@ -17,7 +17,7 @@ import {
   Settings2,
   Sparkles,
 } from 'lucide-react';
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,11 @@ import {
   useUpdateOperatorSession,
 } from '@/hooks/queries/useOperatorQueries';
 import { cn } from '@/lib/utils';
+import {
+  createOperatorTurnFromHandoff,
+  readOperatorImproveRunHandoff,
+  type OperatorImproveRunHandoff,
+} from '@/features/operator/operatorHandoff';
 
 const SUGGESTED_PROMPTS = [
   'Show my workflows',
@@ -151,7 +156,7 @@ function MobileSessionPicker({
   );
 }
 
-function NewOperatorSession() {
+function NewOperatorSession({ handoff }: { handoff: OperatorImproveRunHandoff | null }) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const createSession = useCreateOperatorSession();
@@ -172,7 +177,10 @@ function NewOperatorSession() {
 
     try {
       const session = await createSession.mutateAsync({ approvalMode, model: modelConfig });
-      navigate(`/operator/${session.id}`, { replace: true });
+      navigate(`/operator/${session.id}`, {
+        replace: true,
+        state: handoff ? { operatorHandoff: handoff } : null,
+      });
     } catch (error) {
       toast({
         title: 'Could not create Operator session',
@@ -193,9 +201,13 @@ function NewOperatorSession() {
             <Sparkles className="h-4.5 w-4.5" />
           </div>
           <div>
-            <h2 className="text-base font-semibold">Start an Operator session</h2>
+            <h2 className="text-base font-semibold">
+              {handoff ? 'Set up Operator to improve this run' : 'Start an Operator session'}
+            </h2>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Connect a model, then ask Operator to inspect or run your existing workflows.
+              {handoff
+                ? 'Connect a model once; Operator will then inspect, improve, rerun, and compare this completed run.'
+                : 'Connect a model, then ask Operator to inspect or run your existing workflows.'}
             </p>
           </div>
         </div>
@@ -226,7 +238,7 @@ function NewOperatorSession() {
           ) : (
             <Bot className="h-4 w-4" />
           )}
-          Create session
+          {handoff ? 'Create session and improve run' : 'Create session'}
         </Button>
       </form>
     </div>
@@ -296,13 +308,21 @@ function SessionModelSettings({ session }: { session: OperatorSessionDetail }) {
   );
 }
 
-function ActiveSession({ session }: { session: OperatorSessionDetail }) {
+function ActiveSession({
+  session,
+  handoff,
+}: {
+  session: OperatorSessionDetail;
+  handoff: OperatorImproveRunHandoff | null;
+}) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const createTurn = useCreateOperatorTurn();
   const decideAction = useDecideOperatorAction();
   const [message, setMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const startedHandoffRef = useRef<string | null>(null);
   const isActive = operatorSessionHasActiveTurn(session);
   const latestTurnError = getOperatorSessionLatestTurnError(session);
   const expectedWorkflowDraftCount = session.actions.filter(
@@ -320,33 +340,56 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
   }, [session.messages.length, session.actions.length, isActive]);
 
-  const sendTurn = async (
-    content: string,
-    directCommand?: OperatorDirectCommand,
-    journey?: OperatorJourney,
-  ) => {
-    if (!content || isActive || createTurn.isPending) return;
+  const sendTurn = useCallback(
+    async (
+      content: string,
+      directCommand?: OperatorDirectCommand,
+      journey?: OperatorJourney,
+      options?: { clientTurnId?: string; contextPath?: string },
+    ) => {
+      if (!content || isActive || createTurn.isPending) return;
 
-    try {
-      await createTurn.mutateAsync({
-        sessionId: session.id,
-        input: {
-          clientTurnId: crypto.randomUUID(),
-          message: content,
-          context: { path: location.pathname },
-          ...(directCommand ? { directCommand } : {}),
-          ...(journey ? { journey } : {}),
-        },
-      });
-      setMessage('');
-    } catch (error) {
-      toast({
-        title: 'Could not send message',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      try {
+        await createTurn.mutateAsync({
+          sessionId: session.id,
+          input: {
+            clientTurnId: options?.clientTurnId ?? crypto.randomUUID(),
+            message: content,
+            context: { path: options?.contextPath ?? location.pathname },
+            ...(directCommand ? { directCommand } : {}),
+            ...(journey ? { journey } : {}),
+          },
+        });
+        setMessage('');
+      } catch (error) {
+        toast({
+          title: 'Could not send message',
+          description: error instanceof Error ? error.message : 'Unknown error',
+          variant: 'destructive',
+        });
+      }
+    },
+    [createTurn, isActive, location.pathname, session.id, toast],
+  );
+
+  useEffect(() => {
+    if (
+      !handoff ||
+      isActive ||
+      createTurn.isPending ||
+      startedHandoffRef.current === handoff.clientTurnId
+    ) {
+      return;
     }
-  };
+
+    startedHandoffRef.current = handoff.clientTurnId;
+    const turn = createOperatorTurnFromHandoff(handoff);
+    navigate(location.pathname, { replace: true, state: null });
+    void sendTurn(turn.message, undefined, turn.journey, {
+      clientTurnId: turn.clientTurnId,
+      contextPath: turn.context?.path,
+    });
+  }, [createTurn.isPending, handoff, isActive, location.pathname, navigate, sendTurn]);
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -450,8 +493,24 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
 export function OperatorPage() {
   useDocumentTitle('Operator');
   const { sessionId } = useParams<{ sessionId?: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const handoff = readOperatorImproveRunHandoff(location.state);
   const sessionsQuery = useOperatorSessions();
   const sessionQuery = useOperatorSessionStream(sessionId);
+  const latestSessionId = sessionsQuery.data?.[0]?.id;
+
+  useEffect(() => {
+    if (sessionId || !handoff || !latestSessionId) return;
+    navigate(`/operator/${latestSessionId}`, {
+      replace: true,
+      state: { operatorHandoff: handoff },
+    });
+  }, [handoff, latestSessionId, navigate, sessionId]);
+
+  const isResolvingHandoff = Boolean(
+    !sessionId && handoff && (sessionsQuery.isLoading || latestSessionId),
+  );
 
   return (
     <div className="flex h-full min-h-[calc(100vh-2.5rem)] bg-background">
@@ -464,7 +523,16 @@ export function OperatorPage() {
       <section className="flex min-w-0 flex-1 flex-col" aria-busy={sessionQuery.isFetching}>
         <MobileSessionPicker sessionId={sessionId} sessions={sessionsQuery.data} />
 
-        {!sessionId ? <NewOperatorSession /> : null}
+        {!sessionId && !isResolvingHandoff ? <NewOperatorSession handoff={handoff} /> : null}
+
+        {isResolvingHandoff ? (
+          <div
+            className="flex flex-1 items-center justify-center"
+            aria-label="Opening Operator session"
+          >
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : null}
 
         {sessionId && sessionQuery.isLoading ? (
           <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 px-4 py-8">
@@ -486,7 +554,7 @@ export function OperatorPage() {
           </div>
         ) : null}
 
-        {sessionQuery.data ? <ActiveSession session={sessionQuery.data} /> : null}
+        {sessionQuery.data ? <ActiveSession session={sessionQuery.data} handoff={handoff} /> : null}
       </section>
     </div>
   );
