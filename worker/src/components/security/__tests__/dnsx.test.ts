@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterEach, vi, mock } from 'bun:test';
 import * as sdk from '@sentris/component-sdk';
 import type { DnsxInput, DnsxOutput } from '../dnsx';
 
-mock.module('../../utils/isolated-volume', () => ({
+mock.module('../../../utils/isolated-volume', () => ({
   IsolatedContainerVolume: class {
     async initialize() {
       return 'test-volume';

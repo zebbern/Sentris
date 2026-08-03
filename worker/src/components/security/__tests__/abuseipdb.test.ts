@@ -66,12 +66,13 @@ describe('abuseipdb component', () => {
       },
     };
 
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+    const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(mockResponse), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
     );
+    context.http.fetch = fetchSpy as unknown as typeof context.http.fetch;
 
     const result = await component.execute(executePayload, context);
 
@@ -108,11 +109,11 @@ describe('abuseipdb component', () => {
       },
     };
 
-    vi.spyOn(global, 'fetch').mockResolvedValue(
+    context.http.fetch = vi.fn().mockResolvedValue(
       new Response(null, {
         status: 404,
       }),
-    );
+    ) as unknown as typeof context.http.fetch;
 
     const result = await component.execute(executePayload, context);
     expect(result.abuseConfidenceScore).toBe(0);
@@ -139,12 +140,12 @@ describe('abuseipdb component', () => {
       },
     };
 
-    vi.spyOn(global, 'fetch').mockResolvedValue(
+    context.http.fetch = vi.fn().mockResolvedValue(
       new Response('Unauthorized', {
         status: 401,
         statusText: 'Unauthorized',
       }),
-    );
+    ) as unknown as typeof context.http.fetch;
 
     await expect(component.execute(executePayload, context)).rejects.toThrow();
   });
@@ -233,12 +234,13 @@ describe('abuseipdb component', () => {
       },
     };
 
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+    const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(mockResponse), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
     );
+    context.http.fetch = fetchSpy as unknown as typeof context.http.fetch;
 
     await component.execute(executePayload, context);
 

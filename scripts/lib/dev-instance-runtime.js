@@ -551,9 +551,9 @@ function createRootTestPlan(options = {}) {
       // from the repo root can load duplicate ConfigService identities and break
       // controller construction in HTTP contract specs.
       { command: 'bun', args: ['test'], cwd: 'backend' },
-      // Keep worker rooted at the monorepo so `cleanupPaths: ['worker/dist']`
-      // remains effective and compiled dist tests are not double-executed.
-      { command: 'bun', args: ['test', 'worker'] },
+      // Bun module mocks and imported registries are process-global. Keep worker test
+      // files in isolated processes while the runner applies bounded concurrency.
+      { command: 'bun', args: ['scripts/test-worker.js'] },
       { command: 'bun', args: ['test', 'e2e-tests'] },
       { command: 'bun', args: ['run', 'test'], cwd: 'frontend' },
     ],

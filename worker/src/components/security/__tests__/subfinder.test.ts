@@ -1,13 +1,28 @@
-import { it, expect, beforeAll, afterEach, vi, describe } from 'bun:test';
+import { it, expect, beforeAll, afterEach, vi, describe, mock } from 'bun:test';
 import * as sdk from '@sentris/component-sdk';
-import { componentRegistry } from '../../index';
 import type { SubfinderInput, SubfinderOutput } from '../subfinder';
 
 import { dockerDescribe } from './docker-test-env';
 
+mock.module('../../../utils/isolated-volume', () => ({
+  IsolatedContainerVolume: class {
+    async initialize() {
+      return 'test-volume';
+    }
+
+    getVolumeConfig(target: string, readOnly = true) {
+      return { source: 'test-volume', target, readOnly };
+    }
+
+    async cleanup() {}
+  },
+}));
+
+let componentRegistry: typeof sdk.componentRegistry;
+
 dockerDescribe('subfinder component', () => {
   beforeAll(async () => {
-    await import('../../index');
+    ({ componentRegistry } = await import('../../index'));
   });
 
   afterEach(() => {
@@ -174,7 +189,7 @@ dockerDescribe('subfinder component', () => {
 
 describe('subfinder container resources', () => {
   beforeAll(async () => {
-    await import('../../index');
+    ({ componentRegistry } = await import('../../index'));
   });
 
   afterEach(() => {

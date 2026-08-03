@@ -37,7 +37,7 @@ describe('github.org.membership.remove component', () => {
 
     process.env.INTERNAL_SERVICE_TOKEN = 'test-internal-token';
 
-    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const fetchMock = vi.fn();
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -63,6 +63,7 @@ describe('github.org.membership.remove component', () => {
       componentRef: 'github-remove',
       organizationId: 'org-1',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     const executePayload = {
       inputs: {
@@ -89,6 +90,7 @@ describe('github.org.membership.remove component', () => {
           'X-Run-Id': 'test-run',
         }),
       }),
+      expect.any(Object),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
@@ -111,7 +113,7 @@ describe('github.org.membership.remove component', () => {
 
     process.env.INTERNAL_SERVICE_TOKEN = 'test-internal-token';
 
-    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const fetchMock = vi.fn();
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -142,6 +144,7 @@ describe('github.org.membership.remove component', () => {
       runId: 'test-run',
       componentRef: 'github-remove',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     const executePayload = {
       inputs: {
@@ -163,6 +166,7 @@ describe('github.org.membership.remove component', () => {
       1,
       'http://localhost:3211/api/v1/integrations/connections/connection-999/token',
       expect.any(Object),
+      expect.any(Object),
     );
   });
 
@@ -175,7 +179,7 @@ describe('github.org.membership.remove component', () => {
 
     delete process.env.INTERNAL_SERVICE_TOKEN;
 
-    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const fetchMock = vi.fn();
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -199,6 +203,7 @@ describe('github.org.membership.remove component', () => {
       runId: 'test-run',
       componentRef: 'github-remove',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
     const progressSpy = vi.spyOn(context, 'emitProgress');
 
     const executePayload = {
@@ -241,7 +246,7 @@ describe('github.org.membership.remove component', () => {
 
     process.env.INTERNAL_SERVICE_TOKEN = 'test-internal-token';
 
-    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const fetchMock = vi.fn();
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -264,6 +269,7 @@ describe('github.org.membership.remove component', () => {
       runId: 'test-run',
       componentRef: 'github-remove',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     const executePayload = {
       inputs: {
@@ -282,6 +288,7 @@ describe('github.org.membership.remove component', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       'http://localhost:3211/api/v1/integrations/connections/connection-456/token',
+      expect.any(Object),
       expect.any(Object),
     );
   });

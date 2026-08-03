@@ -4,15 +4,12 @@ import { componentRegistry } from '../../index';
 import { AtlassianOffboardingInput, AtlassianOffboardingOutput } from '../atlassian-offboarding';
 
 describe('atlassian offboarding component', () => {
-  const originalFetch = globalThis.fetch;
-
   beforeAll(() => {
     // Ensure all components are registered before tests run
     require('../../index');
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
 
@@ -90,12 +87,11 @@ describe('atlassian offboarding component', () => {
         return Promise.resolve(new Response(null, { status: 200 }));
       });
 
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
     const context = createExecutionContext({
       runId: 'test-run',
       componentRef: 'atlassian-offboarding-success',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     const executePayload = {
       inputs: {
@@ -189,8 +185,6 @@ describe('atlassian offboarding component', () => {
       .fn<(url: unknown, init?: any) => Promise<Response>>()
       .mockRejectedValueOnce(new Error('network down'));
 
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
     const inputValues = {
       orgId: 'org-123',
       accessToken: 'token',
@@ -201,6 +195,7 @@ describe('atlassian offboarding component', () => {
       runId: 'test-run',
       componentRef: 'atlassian-offboarding-network-search',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     await expect(component.execute({ inputs: inputValues, params: {} }, context)).rejects.toThrow(
       'Failed to call Atlassian search API: network down',
@@ -220,8 +215,6 @@ describe('atlassian offboarding component', () => {
         }),
       );
 
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
     const inputValues = {
       orgId: 'org-123',
       accessToken: 'token',
@@ -232,6 +225,7 @@ describe('atlassian offboarding component', () => {
       runId: 'test-run',
       componentRef: 'atlassian-offboarding-search-non-ok',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     await expect(component.execute({ inputs: inputValues, params: {} }, context)).rejects.toThrow(
       /{"error":"bad request"}/,
@@ -246,8 +240,6 @@ describe('atlassian offboarding component', () => {
       .mockResolvedValueOnce(new Response('not-json', { status: 200 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
 
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
     const inputValues = {
       orgId: 'org-123',
       accessToken: 'token',
@@ -258,6 +250,7 @@ describe('atlassian offboarding component', () => {
       runId: 'test-run',
       componentRef: 'atlassian-offboarding-json-fail',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     await expect(component.execute({ inputs: inputValues, params: {} }, context)).rejects.toThrow(
       /Unable to parse Atlassian search response JSON/,
@@ -271,8 +264,6 @@ describe('atlassian offboarding component', () => {
       .fn<(url: unknown, init?: any) => Promise<Response>>()
       .mockResolvedValueOnce(createJsonResponse({ values: [] }));
 
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
     const inputValues = {
       orgId: 'org-123',
       accessToken: 'token',
@@ -283,6 +274,7 @@ describe('atlassian offboarding component', () => {
       runId: 'test-run',
       componentRef: 'atlassian-offboarding-not-found',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     const result = await component.execute({ inputs: inputValues, params: {} }, context);
 
@@ -318,8 +310,6 @@ describe('atlassian offboarding component', () => {
         }),
       );
 
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
     const inputValues = {
       orgId: 'org-123',
       accessToken: 'token',
@@ -330,6 +320,7 @@ describe('atlassian offboarding component', () => {
       runId: 'test-run',
       componentRef: 'atlassian-offboarding-delete-fail',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     const result = await component.execute({ inputs: inputValues, params: {} }, context);
 
@@ -353,8 +344,6 @@ describe('atlassian offboarding component', () => {
       )
       .mockRejectedValueOnce(new Error('timeout'));
 
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
     const inputValues = {
       orgId: 'org-123',
       accessToken: 'token',
@@ -365,6 +354,7 @@ describe('atlassian offboarding component', () => {
       runId: 'test-run',
       componentRef: 'atlassian-offboarding-delete-network',
     });
+    context.http.fetch = fetchMock as unknown as typeof context.http.fetch;
 
     const result = await component.execute({ inputs: inputValues, params: {} }, context);
 

@@ -516,7 +516,7 @@ describe('dev script instance runtime', () => {
         { command: 'bun', args: ['test', 'scripts/__tests__'] },
         { command: 'bun', args: ['test', 'packages'] },
         { command: 'bun', args: ['test'], cwd: 'backend' },
-        { command: 'bun', args: ['test', 'worker'] },
+        { command: 'bun', args: ['scripts/test-worker.js'] },
         { command: 'bun', args: ['test', 'e2e-tests'] },
         { command: 'bun', args: ['run', 'test'], cwd: 'frontend' },
       ],

@@ -161,6 +161,69 @@ describe('executeWorkflow', () => {
         },
       });
     }
+
+    if (!componentRegistry.has('test.for-each.queue')) {
+      componentRegistry.register({
+        id: 'test.for-each.queue',
+        label: 'For Each Queue',
+        category: 'transform',
+        runner: { kind: 'inline' },
+        inputs: inputs({
+          items: withPortMeta(z.array(z.string()), { label: 'Items' }),
+        }),
+        outputs: outputs({
+          items: withPortMeta(z.array(z.string()), { label: 'Items' }),
+        }),
+        async execute({ inputs }) {
+          return { items: inputs.items.map(String) };
+        },
+      });
+    }
+
+    if (!componentRegistry.has('test.for-each.body')) {
+      componentRegistry.register({
+        id: 'test.for-each.body',
+        label: 'For Each Body',
+        category: 'transform',
+        runner: { kind: 'inline' },
+        inputs: inputs({
+          currentItem: withPortMeta(z.string(), { label: 'Current Item' }),
+        }),
+        outputs: outputs({
+          result: withPortMeta(z.object({ item: z.string() }), {
+            label: 'Result',
+            connectionType: { kind: 'primitive', name: 'json' },
+          }),
+        }),
+        async execute({ inputs }) {
+          return { result: { item: inputs.currentItem } };
+        },
+      });
+    }
+
+    if (!componentRegistry.has('test.for-each.finalize')) {
+      componentRegistry.register({
+        id: 'test.for-each.finalize',
+        label: 'For Each Finalize',
+        category: 'transform',
+        runner: { kind: 'inline' },
+        inputs: inputs({
+          results: withPortMeta(z.array(z.object({ item: z.string() })), {
+            label: 'Results',
+            connectionType: { kind: 'primitive', name: 'json' },
+          }),
+        }),
+        outputs: outputs({
+          report: withPortMeta(z.object({ items: z.array(z.object({ item: z.string() })) }), {
+            label: 'Report',
+            connectionType: { kind: 'primitive', name: 'json' },
+          }),
+        }),
+        async execute({ inputs }) {
+          return { report: { items: inputs.results } };
+        },
+      });
+    }
   });
 
   it('does not write workflow diagnostics to console.log by default', async () => {
@@ -1197,12 +1260,8 @@ describe('executeWorkflow', () => {
         },
         {
           ref: 'build_queue',
-          componentId: 'core.logic.script',
-          params: {
-            variables: [{ name: 'items', type: 'list-text' }],
-            returns: [{ name: 'items', type: 'list-text' }],
-            code: 'export function script(input) { return { items: Array.isArray(input.items) ? input.items.map(String) : [] }; }',
-          },
+          componentId: 'test.for-each.queue',
+          params: {},
           inputOverrides: {},
           dependsOn: ['trigger'],
           inputMappings: {
@@ -1221,12 +1280,8 @@ describe('executeWorkflow', () => {
         },
         {
           ref: 'finalize',
-          componentId: 'core.logic.script',
-          params: {
-            variables: [{ name: 'results', type: 'list-json' }],
-            returns: [{ name: 'report', type: 'json' }],
-            code: 'export function script(input) { return { report: { items: input.results || [] } }; }',
-          },
+          componentId: 'test.for-each.finalize',
+          params: {},
           inputOverrides: {},
           dependsOn: ['loop'],
           inputMappings: {
@@ -1260,12 +1315,8 @@ describe('executeWorkflow', () => {
             actions: [
               {
                 ref: 'body_step',
-                componentId: 'core.logic.script',
-                params: {
-                  variables: [{ name: 'currentItem', type: 'string' }],
-                  returns: [{ name: 'result', type: 'json' }],
-                  code: 'export function script(input) { return { result: { item: input.currentItem } }; }',
-                },
+                componentId: 'test.for-each.body',
+                params: {},
                 inputOverrides: {},
                 dependsOn: [],
                 inputMappings: {

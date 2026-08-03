@@ -1,15 +1,34 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from 'bun:test';
+import { describe, it, expect, beforeAll, afterEach, vi, mock } from 'bun:test';
 import * as sdk from '@sentris/component-sdk';
-import { componentRegistry } from '../../index';
 import type {
   ShufflednsMassdnsInput,
   ShufflednsMassdnsInputData,
   ShufflednsMassdnsOutput,
 } from '../shuffledns-massdns';
 
+mock.module('../../../utils/isolated-volume', () => ({
+  IsolatedContainerVolume: class {
+    async initialize() {
+      return 'test-volume';
+    }
+
+    getVolumeName() {
+      return 'test-volume';
+    }
+
+    getVolumeConfig(target: string, readOnly = true) {
+      return { source: 'test-volume', target, readOnly };
+    }
+
+    async cleanup() {}
+  },
+}));
+
+let componentRegistry: typeof sdk.componentRegistry;
+
 describe('shuffledns-massdns component', () => {
   beforeAll(async () => {
-    await import('../../index');
+    ({ componentRegistry } = await import('../../index'));
   });
 
   afterEach(() => {
