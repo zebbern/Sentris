@@ -347,10 +347,12 @@ credential placeholders from the freshly fetched persisted graph. Turn records s
 initiating actor roles so delayed authoring keeps the user's workflow authority. Provider-native
 tool-call continuation metadata lives in the Temporal turn history; Postgres action rows remain
 provider-neutral audit records. Run-derived update proposals carry their validated source-run
-identity through apply. The improvement journey runs the newly saved version with that source
-run's stored inputs and scope; manual authoring controls may still perform these stages in
-separate turns. Keep this distinct from Retry, which continues to select the original immutable
-version. Once both runs are terminal, the read-only `compare_runs` command verifies
+identity through apply and stage a new immutable version without changing the workflow's
+`current_version_id`. The improvement journey runs that exact candidate with the source run's
+stored inputs and scope; manual authoring controls may still perform these stages in separate
+turns. Version-unspecified launches and optimistic edit fences use `current_version_id`, not the
+numerically latest staged version. Keep this distinct from Retry, which continues to select the
+original immutable version. Once both runs are terminal, the read-only `compare_runs` command verifies
 same-workflow lineage and stored input/scope comparability,
 then assesses terminal outcome. Optional deterministic success criteria live in the immutable
 workflow graph and use the candidate version as the fixed benchmark for both runs. Supported
@@ -358,7 +360,11 @@ v1 criteria are scalar node-output assertions addressed by RFC 6901 JSON Pointer
 finding-count ranges; conflicting or unavailable criterion evidence remains inconclusive and
 must not be replaced with an LLM quality score. Exact trace-failure counts are the fallback
 when no criteria are declared. Raw finding totals and duration remain observations only, and
-mismatched inputs/scopes are always inconclusive.
+mismatched inputs/scopes are always inconclusive. Comparison does not auto-promote: the
+consequential `promote_workflow_version` command is the canonical Keep action and accepts only
+the exact terminal candidate run/version pair while fencing on the compared source/base version
+so a concurrent workflow edit cannot be overwritten. Revise starts a new improvement journey from the
+candidate without changing the current-version pointer.
 
 The generic workflow-graph `core.ai.agent` now prepares each turn in an activity and runs
 the loop as a patch-gated Temporal child Workflow. Inline provider keys are sealed with

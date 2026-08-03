@@ -91,14 +91,18 @@ export function OperatorWorkflowDraftCard({
             variant="outline"
             className="h-5 border-emerald-500/30 px-1.5 text-[10px] text-emerald-600 dark:text-emerald-300"
           >
-            {result.created ? 'Created' : `Saved as v${result.version}`}
+            {result.created
+              ? 'Created'
+              : result.staged
+                ? `Staged v${result.version}`
+                : `Saved as v${result.version}`}
           </Badge>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <Button asChild variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-[11px]">
             <Link to={`/workflows/${encodeURIComponent(result.workflowId)}`}>
               <ExternalLink className="h-3 w-3" />
-              Open saved workflow
+              Open workflow
             </Link>
           </Button>
           {canRunImprovedVersion ? (

@@ -27,7 +27,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { OperatorModelForm } from '@/features/operator/OperatorModelForm';
 import { OperatorModeSelect } from '@/features/operator/OperatorModeSelect';
+import { OperatorJourneyPipeline } from '@/features/operator/OperatorJourneyPipeline';
 import { OperatorTimeline } from '@/features/operator/OperatorTimeline';
+import { projectOperatorJourneyPipeline } from '@/features/operator/operatorJourneyPipelineProjector';
 import {
   createDefaultOperatorModelDraft,
   draftToModelConfig,
@@ -49,8 +51,8 @@ import {
 import { cn } from '@/lib/utils';
 import {
   createOperatorTurnFromHandoff,
-  readOperatorImproveRunHandoff,
-  type OperatorImproveRunHandoff,
+  readOperatorTurnHandoff,
+  type OperatorTurnHandoff,
 } from '@/features/operator/operatorHandoff';
 
 const SUGGESTED_PROMPTS = [
@@ -156,7 +158,7 @@ function MobileSessionPicker({
   );
 }
 
-function NewOperatorSession({ handoff }: { handoff: OperatorImproveRunHandoff | null }) {
+function NewOperatorSession({ handoff }: { handoff: OperatorTurnHandoff | null }) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const createSession = useCreateOperatorSession();
@@ -202,10 +204,12 @@ function NewOperatorSession({ handoff }: { handoff: OperatorImproveRunHandoff | 
           </div>
           <div>
             <h2 className="text-base font-semibold">
-              {handoff ? 'Set up Operator to improve this run' : 'Start an Operator session'}
+              {handoff?.kind === 'improve_run'
+                ? 'Set up Operator to improve this run'
+                : 'Start an Operator session'}
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {handoff
+              {handoff?.kind === 'improve_run'
                 ? 'Connect a model once; Operator will then inspect, improve, rerun, and compare this completed run.'
                 : 'Connect a model, then ask Operator to inspect or run your existing workflows.'}
             </p>
@@ -313,7 +317,7 @@ function ActiveSession({
   handoff,
 }: {
   session: OperatorSessionDetail;
-  handoff: OperatorImproveRunHandoff | null;
+  handoff: OperatorTurnHandoff | null;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -333,6 +337,7 @@ function ActiveSession({
     isActive,
     expectedWorkflowDraftCount,
   );
+  const journeyPipeline = projectOperatorJourneyPipeline(session);
 
   useEffect(() => {
     const viewport = scrollRef.current;
@@ -385,7 +390,7 @@ function ActiveSession({
     startedHandoffRef.current = handoff.clientTurnId;
     const turn = createOperatorTurnFromHandoff(handoff);
     navigate(location.pathname, { replace: true, state: null });
-    void sendTurn(turn.message, undefined, turn.journey, {
+    void sendTurn(turn.message, turn.directCommand, turn.journey, {
       clientTurnId: turn.clientTurnId,
       contextPath: turn.context?.path,
     });
@@ -424,6 +429,7 @@ function ActiveSession({
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-5">
         <div className="mx-auto max-w-3xl">
+          {journeyPipeline ? <OperatorJourneyPipeline pipeline={journeyPipeline} /> : null}
           <OperatorTimeline
             messages={session.messages}
             actions={session.actions}
@@ -495,7 +501,7 @@ export function OperatorPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const handoff = readOperatorImproveRunHandoff(location.state);
+  const handoff = readOperatorTurnHandoff(location.state);
   const sessionsQuery = useOperatorSessions();
   const sessionQuery = useOperatorSessionStream(sessionId);
   const latestSessionId = sessionsQuery.data?.[0]?.id;

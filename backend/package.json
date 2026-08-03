@@ -9,7 +9,7 @@
     "start:prod": "bun run migration:run && bun run build/main.js",
     "build": "bun scripts/build-app.ts",
     "test": "bun test",
-    "lint": "eslint .",
+    "lint": "eslint . --cache --cache-location ../.cache/eslint/backend/ --cache-strategy content",
     "typecheck": "tsc --build",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "generate:openapi": "bun scripts/generate-openapi.ts",
@@ -108,9 +108,7 @@
     "drizzle-kit": "^0.31.8",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.5",
     "globals": "^17.1.0",
-    "prettier": "^3.8.1",
     "supertest": "^7.2.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.53.1"

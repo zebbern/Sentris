@@ -31,7 +31,7 @@ type OperatorActionDecisionPayload = components['schemas']['OperatorActionDecisi
 
 /**
  * Sentris API Client
- * 
+ *
  * Type-safe client for the Sentris backend API
  */
 export class SentrisApiClient {
@@ -40,7 +40,7 @@ export class SentrisApiClient {
 
   constructor(config: ClientConfig = {}) {
     this.baseUrl = config.baseUrl || 'http://localhost:3211';
-    
+
     this.client = createClient<paths>({
       baseUrl: this.baseUrl,
       credentials: config.credentials,
@@ -77,13 +77,13 @@ export class SentrisApiClient {
   }
 
   // ===== Health =====
-  
+
   async health() {
     return this.client.GET('/api/v1/health');
   }
 
   // ===== Workflows =====
-  
+
   async listWorkflows() {
     return this.client.GET('/api/v1/workflows');
   }
@@ -153,10 +153,10 @@ export class SentrisApiClient {
   }
 
   // ===== Workflow Runs =====
-  
+
   async getWorkflowRunStatus(runId: string, temporalRunId?: string) {
     return this.client.GET('/api/v1/workflows/runs/{runId}/status', {
-      params: { 
+      params: {
         path: { runId },
         query: temporalRunId ? { temporalRunId } : {},
       },
@@ -225,13 +225,16 @@ export class SentrisApiClient {
     });
   }
 
-  async getWorkflowRunLogs(runId: string, options?: {
-    nodeRef?: string;
-    stream?: 'stdout' | 'stderr' | 'console';
-    level?: 'debug' | 'info' | 'warn' | 'error';
-    limit?: number;
-    cursor?: string;
-  }) {
+  async getWorkflowRunLogs(
+    runId: string,
+    options?: {
+      nodeRef?: string;
+      stream?: 'stdout' | 'stderr' | 'console';
+      level?: 'debug' | 'info' | 'warn' | 'error';
+      limit?: number;
+      cursor?: string;
+    },
+  ) {
     return this.client.GET('/api/v1/workflows/runs/{runId}/logs', {
       params: {
         path: { runId },
@@ -297,6 +300,12 @@ export class SentrisApiClient {
 
   async listOperatorSessions() {
     return this.client.GET('/api/v1/operator/sessions');
+  }
+
+  async getOperatorRunImprovement(runId: string) {
+    return this.client.GET('/api/v1/operator/run-improvements/{runId}', {
+      params: { path: { runId } },
+    });
   }
 
   async createOperatorSession(input: CreateOperatorSessionPayload) {
@@ -407,7 +416,7 @@ export class SentrisApiClient {
   }
 
   // ===== Files =====
-  
+
   async listFiles(limit: number = 100) {
     return this.client.GET('/api/v1/files', {
       params: {
@@ -419,7 +428,7 @@ export class SentrisApiClient {
   async uploadFile(file: File) {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     // Use the typed client - it will automatically apply middleware (including auth headers)
     // For multipart/form-data, openapi-fetch accepts FormData directly
     return this.client.POST('/api/v1/files/upload', {
@@ -437,16 +446,16 @@ export class SentrisApiClient {
   async downloadFile(id: string): Promise<Blob> {
     // Use the typed client - it will automatically apply middleware (including auth headers)
     // For blob responses, openapi-fetch returns the blob directly or in a response object
-    const response = await this.client.GET('/api/v1/files/{id}/download', {
+    const response = (await this.client.GET('/api/v1/files/{id}/download', {
       params: { path: { id } },
       parseAs: 'blob', // Request blob response for binary data
-    }) as any; // Type assertion needed as parseAs: 'blob' changes the response type
-    
+    })) as any; // Type assertion needed as parseAs: 'blob' changes the response type
+
     // Handle both response.data and direct blob response
     if (response?.error) {
       throw new Error(`Failed to download file: ${String(response.error)}`);
     }
-    
+
     return (response?.data ?? response) as Blob;
   }
 
@@ -457,7 +466,7 @@ export class SentrisApiClient {
   }
 
   // ===== Components =====
-  
+
   async listComponents() {
     return this.client.GET('/api/v1/components');
   }
@@ -523,7 +532,8 @@ export class SentrisApiClient {
         query: {
           limit: options?.limit?.toString(), // API expects string for some reason? No, schema says regex string or transformed number. Let's pass as is if typed correctly or string. DTO schema accepts string.
           offset: options?.offset?.toString(),
-          isActive: options?.isActive === undefined ? undefined : (options.isActive ? 'true' : 'false'),
+          isActive:
+            options?.isActive === undefined ? undefined : options.isActive ? 'true' : 'false',
         },
       },
     });
@@ -649,8 +659,8 @@ export class SentrisApiClient {
   }
 
   async resolveHumanInputByToken(
-    token: string, 
-    payload: components['schemas']['ResolveByTokenDto']
+    token: string,
+    payload: components['schemas']['ResolveByTokenDto'],
   ) {
     return this.client.POST('/api/v1/human-inputs/resolve/{token}', {
       params: { path: { token } },
@@ -676,7 +686,10 @@ export class SentrisApiClient {
     });
   }
 
-  async updateWebhookConfiguration(id: string, payload: components['schemas']['UpdateWebhookRequestDto']) {
+  async updateWebhookConfiguration(
+    id: string,
+    payload: components['schemas']['UpdateWebhookRequestDto'],
+  ) {
     return this.client.PUT('/api/v1/webhooks/configurations/{id}', {
       params: { path: { id } },
       body: payload,
@@ -692,7 +705,7 @@ export class SentrisApiClient {
   async deleteWebhookConfiguration(id: string) {
     return this.client.DELETE('/api/v1/webhooks/configurations/{id}', {
       params: { path: { id } },
-      });
+    });
   }
 
   async listDeliveries(id: string) {

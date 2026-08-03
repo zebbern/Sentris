@@ -8,7 +8,7 @@
 import type { z } from 'zod';
 
 /** Loose shape of `schema._def` across Zod versions */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod internals are untyped
+
 export type ZodDef = { type?: string; typeName?: string; [key: string]: any };
 
 /**
@@ -42,12 +42,11 @@ export const LEGACY_TYPE_MAP: Record<string, string> = {
 /** Resolve the short type name from a Zod `_def` object. */
 export function getDefType(def: ZodDef | undefined): string | undefined {
   const raw = def?.type ?? def?.typeName;
-  return raw ? LEGACY_TYPE_MAP[raw] ?? raw : undefined;
+  return raw ? (LEGACY_TYPE_MAP[raw] ?? raw) : undefined;
 }
 
 /** Convenience wrapper: extract the short type name directly from a schema. */
 export function getSchemaType(schema: z.ZodTypeAny): string | undefined {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing Zod internals
   return getDefType((schema as any)._def);
 }
 
@@ -59,7 +58,6 @@ export function unwrapEffects(schema: z.ZodTypeAny): z.ZodTypeAny {
   let current = schema;
 
   while (true) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod internals
     const def = (current as any)._def as ZodDef | undefined;
 
     if (!def) break;
@@ -92,12 +90,11 @@ export function unwrapEffects(schema: z.ZodTypeAny): z.ZodTypeAny {
  * Unwrap a schema through optional/nullable/default/effects/pipe wrappers
  * and return the inner `ZodObject` if one is found, or `null`.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod internals
+
 export function unwrapToObject(schema: z.ZodTypeAny): z.ZodObject<any, any> | null {
   let current = schema;
 
   while (true) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod internals
     const def = (current as any)._def as ZodDef | undefined;
     const typeName = getDefType(def);
 
@@ -106,7 +103,6 @@ export function unwrapToObject(schema: z.ZodTypeAny): z.ZodObject<any, any> | nu
     }
 
     if (typeName === 'object') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod internals
       return current as z.ZodObject<any, any>;
     }
 
@@ -134,7 +130,6 @@ export function unwrapToObject(schema: z.ZodTypeAny): z.ZodObject<any, any> | nu
  * handling both lazy (function) and eager shape formats.
  */
 export function getObjectShape(schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod internals
   const shape = (schema as any).shape;
   if (typeof shape === 'function') {
     return shape();
@@ -152,7 +147,6 @@ export function getObjectShape(schema: z.ZodTypeAny): Record<string, z.ZodTypeAn
 export function isOptional(schema: z.ZodTypeAny): boolean {
   let current = schema;
   while (true) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod internals
     const def = (current as any)._def as ZodDef | undefined;
     if (!def) {
       return false;
@@ -184,7 +178,6 @@ export function isOptionalForJsonSchema(schema: z.ZodTypeAny): boolean {
   let current = schema;
 
   while (true) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod internals
     const def = (current as any)._def as ZodDef | undefined;
 
     if (!def) break;
@@ -213,6 +206,6 @@ export function isOptionalForJsonSchema(schema: z.ZodTypeAny): boolean {
 export function isPrimitiveType(schema: z.ZodTypeAny): boolean {
   const typeName = getSchemaType(schema);
   return ['string', 'number', 'boolean', 'bigint', 'date', 'symbol', 'enum', 'literal'].includes(
-    typeName ?? ''
+    typeName ?? '',
   );
 }

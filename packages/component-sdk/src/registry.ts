@@ -10,10 +10,7 @@ import { extractPorts } from './zod-ports';
 import { extractParameters } from './zod-parameters';
 import { getPortMeta } from './port-meta';
 import { validateComponentSchema, validateParameterSchema } from './schema-validation';
-import {
-  unwrapToObject,
-  getObjectShape,
-} from './zod-helpers';
+import { unwrapToObject, getObjectShape } from './zod-helpers';
 
 type AnyComponentDefinition = ComponentDefinition<any, any, any, any, any, any>;
 
@@ -40,9 +37,11 @@ export interface CachedComponentMetadata {
 export class ComponentRegistry {
   private components = new Map<string, CachedComponentMetadata>();
 
-  register<IS extends Record<string, any>, OS extends Record<string, any>, PS extends Record<string, any> = {}>(
-    definition: ComponentDefinition<IS, OS, PS, any, any, any>
-  ): void {
+  register<
+    IS extends Record<string, any>,
+    OS extends Record<string, any>,
+    PS extends Record<string, any> = {},
+  >(definition: ComponentDefinition<IS, OS, PS, any, any, any>): void {
     if (this.components.has(definition.id)) {
       throw new ConfigurationError(`Component ${definition.id} is already registered`, {
         configKey: 'componentId',
@@ -58,7 +57,7 @@ export class ComponentRegistry {
         {
           configKey: 'inputs',
           details: { componentId: definition.id, errors: inputValidation.errors },
-        }
+        },
       );
     }
 
@@ -69,7 +68,7 @@ export class ComponentRegistry {
         {
           configKey: 'outputs',
           details: { componentId: definition.id, errors: outputValidation.errors },
-        }
+        },
       );
     }
 
@@ -81,7 +80,7 @@ export class ComponentRegistry {
           {
             configKey: 'parameters',
             details: { componentId: definition.id, errors: parameterValidation.errors },
-          }
+          },
         );
       }
     }
@@ -91,9 +90,7 @@ export class ComponentRegistry {
     // Compute derived ports and connection types
     const inputPorts = extractPorts(definition.inputs);
     const outputPorts = extractPorts(definition.outputs);
-    const parameterFields = definition.parameters
-      ? extractParameters(definition.parameters)
-      : [];
+    const parameterFields = definition.parameters ? extractParameters(definition.parameters) : [];
 
     const connectionTypes: Record<string, any> = {};
     for (const port of [...inputPorts, ...outputPorts]) {
@@ -128,26 +125,30 @@ export class ComponentRegistry {
    */
   get<
     ISchema extends InputsSchema<any> = InputsSchema<Record<string, any>>,
-    OSchema extends OutputsSchema<any> = OutputsSchema<Record<string, any>>
+    OSchema extends OutputsSchema<any> = OutputsSchema<Record<string, any>>,
   >(
-    id: string
-  ): ComponentDefinition<
-    ShapeFromSchema<ISchema>,
-    ShapeFromSchema<OSchema>,
-    any,
-    InferredFromSchema<ISchema>,
-    InferredFromSchema<OSchema>,
-    any
-  > | undefined {
+    id: string,
+  ):
+    | ComponentDefinition<
+        ShapeFromSchema<ISchema>,
+        ShapeFromSchema<OSchema>,
+        any,
+        InferredFromSchema<ISchema>,
+        InferredFromSchema<OSchema>,
+        any
+      >
+    | undefined {
     const cached = this.components.get(id);
-    return cached?.definition as ComponentDefinition<
-      ShapeFromSchema<ISchema>,
-      ShapeFromSchema<OSchema>,
-      any,
-      InferredFromSchema<ISchema>,
-      InferredFromSchema<OSchema>,
-      any
-    > | undefined;
+    return cached?.definition as
+      | ComponentDefinition<
+          ShapeFromSchema<ISchema>,
+          ShapeFromSchema<OSchema>,
+          any,
+          InferredFromSchema<ISchema>,
+          InferredFromSchema<OSchema>,
+          any
+        >
+      | undefined;
   }
 
   getMetadata(id: string): CachedComponentMetadata | undefined {
@@ -185,11 +186,11 @@ function validatePortMetadata(definition: AnyComponentDefinition) {
       const portMeta = getPortMeta(fieldSchema);
       if (!portMeta) {
         throw new ConfigurationError(
-          `Component ${definition.id} input \"${fieldName}\" must be a port (use port() or withPortMeta).`,
+          `Component ${definition.id} input "${fieldName}" must be a port (use port() or withPortMeta).`,
           {
             configKey: 'inputs',
             details: { componentId: definition.id, fieldName },
-          }
+          },
         );
       }
     }
@@ -205,16 +206,15 @@ function validatePortMetadata(definition: AnyComponentDefinition) {
       const portMeta = getPortMeta(fieldSchema);
       if (!portMeta) {
         throw new ConfigurationError(
-          `Component ${definition.id} output \"${fieldName}\" must declare port() or withPortMeta for port metadata.`,
+          `Component ${definition.id} output "${fieldName}" must declare port() or withPortMeta for port metadata.`,
           {
             configKey: 'outputs',
             details: { componentId: definition.id, fieldName },
-          }
+          },
         );
       }
     }
   }
 }
-
 
 export const componentRegistry = new ComponentRegistry();

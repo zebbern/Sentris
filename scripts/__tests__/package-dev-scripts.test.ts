@@ -8,11 +8,26 @@ import { describe, expect, it } from 'bun:test';
 const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as {
   scripts: Record<string, string>;
 };
+const frontendPackageJson = JSON.parse(
+  readFileSync(join(process.cwd(), 'frontend', 'package.json'), 'utf8'),
+) as { scripts: Record<string, string> };
 const backendPackageJson = JSON.parse(
   readFileSync(join(process.cwd(), 'backend', 'package.json'), 'utf8'),
 ) as { scripts: Record<string, string> };
 const workerPackageJson = JSON.parse(
   readFileSync(join(process.cwd(), 'worker', 'package.json'), 'utf8'),
+) as { scripts: Record<string, string> };
+const sharedPackageJson = JSON.parse(
+  readFileSync(join(process.cwd(), 'packages', 'shared', 'package.json'), 'utf8'),
+) as { scripts: Record<string, string> };
+const contractsPackageJson = JSON.parse(
+  readFileSync(join(process.cwd(), 'packages', 'contracts', 'package.json'), 'utf8'),
+) as { scripts: Record<string, string> };
+const componentSdkPackageJson = JSON.parse(
+  readFileSync(join(process.cwd(), 'packages', 'component-sdk', 'package.json'), 'utf8'),
+) as { scripts: Record<string, string> };
+const backendClientPackageJson = JSON.parse(
+  readFileSync(join(process.cwd(), 'packages', 'backend-client', 'package.json'), 'utf8'),
 ) as { scripts: Record<string, string> };
 const require = createRequire(import.meta.url);
 
@@ -173,6 +188,38 @@ describe('package development scripts', () => {
     expect(packageJson.scripts.typecheck).toBe('tsc --build');
     expect(backendPackageJson.scripts.typecheck).toBe('tsc --build');
     expect(workerPackageJson.scripts.typecheck).toBe('tsc --build');
+  });
+
+  it('keeps code linting fast while preserving a separate cached formatting gate', () => {
+    expect(packageJson.scripts.lint).toBe('bun run lint:code && bun run format:check');
+    expect(packageJson.scripts['lint:code']).toBe(
+      'bun run --parallel lint:frontend lint:backend lint:worker lint:shared lint:contracts lint:component-sdk lint:backend-client',
+    );
+    expect(packageJson.scripts['format:check']).toContain('prettier');
+    expect(packageJson.scripts['format:check']).toContain('--cache');
+
+    for (const childPackage of [
+      frontendPackageJson,
+      backendPackageJson,
+      workerPackageJson,
+      sharedPackageJson,
+      contractsPackageJson,
+      componentSdkPackageJson,
+      backendClientPackageJson,
+    ]) {
+      expect(childPackage.scripts.lint).toContain('eslint . --cache');
+      expect(childPackage.scripts.lint).not.toContain('prettier');
+    }
+
+    for (const relativePath of [
+      'frontend/eslint.config.mjs',
+      'backend/eslint.config.mjs',
+      'worker/eslint.config.mjs',
+    ]) {
+      const config = readFileSync(join(process.cwd(), relativePath), 'utf8');
+      expect(config).not.toContain('eslint-plugin-prettier');
+      expect(config).not.toContain("'prettier/prettier'");
+    }
   });
 
   it('keeps template and security verification scripts off shell chaining', () => {

@@ -7,6 +7,7 @@
   "types": "./src/index.ts",
   "scripts": {
     "generate": "openapi-typescript ../../openapi.json --output src/client.ts && echo '✅ Client types regenerated from OpenAPI spec'",
+    "lint": "eslint . --cache --cache-location ../../.cache/eslint/backend-client/ --cache-strategy content",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -206,6 +206,7 @@ describe('WorkflowsController', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         organizationId,
+        currentVersionId: null,
         mutationIdempotencyKey: null,
       };
       repositoryStore.set(id, record);
@@ -226,6 +227,26 @@ describe('WorkflowsController', () => {
         graph: input,
         updatedAt: new Date(),
         compiledDefinition: existing.compiledDefinition,
+      };
+      repositoryStore.set(id, updated);
+      return updated;
+    },
+    async activateVersion(id, version, options: RepositoryOptions = {}) {
+      const existing = repositoryStore.get(id);
+      if (!existing) {
+        throw new Error(`Workflow ${id} not found`);
+      }
+      if (options.organizationId && existing.organizationId !== options.organizationId) {
+        throw new Error('Forbidden');
+      }
+      const updated: WorkflowRecord = {
+        ...existing,
+        name: version.graph.name,
+        description: version.graph.description ?? null,
+        graph: version.graph,
+        currentVersionId: version.id,
+        compiledDefinition: version.compiledDefinition,
+        updatedAt: new Date(),
       };
       repositoryStore.set(id, updated);
       return updated;

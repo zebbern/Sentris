@@ -1,5 +1,5 @@
 import type { OperatorRunComparisonResult } from '@sentris/shared';
-import { ExternalLink, Search } from 'lucide-react';
+import { Check, ExternalLink, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
@@ -25,14 +25,19 @@ const ASSESSMENT_STYLES: Record<OperatorRunComparisonResult['assessment'], strin
 interface OperatorRunComparisonCardProps {
   result: OperatorRunComparisonResult;
   disabled: boolean;
+  kept?: boolean;
   onCommand: (request: OperatorRunCommandRequest) => void;
 }
 
 export function OperatorRunComparisonCard({
   result,
   disabled,
+  kept = false,
   onCommand,
 }: OperatorRunComparisonCardProps) {
+  const candidateVersionId = result.candidate.workflowVersionId;
+  const baseVersionId = result.source.workflowVersionId;
+
   return (
     <div className="space-y-2.5 rounded-md border border-border/70 bg-background/60 p-2.5">
       <div className="flex items-center gap-2">
@@ -106,22 +111,50 @@ export function OperatorRunComparisonCard({
         </details>
       ) : null}
 
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="h-7 gap-1.5 px-2 text-[11px]"
-        disabled={disabled}
-        onClick={() =>
-          onCommand({
-            message: `Try another evidence-based improvement from candidate run ${result.candidate.runId}, then rerun and compare it.`,
-            journey: { kind: 'improve_run', sourceRunId: result.candidate.runId },
-          })
-        }
-      >
-        <Search className="h-3 w-3" />
-        Revise again
-      </Button>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {candidateVersionId && baseVersionId ? (
+          <Button
+            type="button"
+            size="sm"
+            variant={kept ? 'outline' : 'default'}
+            className="h-7 gap-1.5 px-2 text-[11px]"
+            disabled={disabled || kept}
+            onClick={() =>
+              onCommand({
+                message: `Keep candidate workflow version ${candidateVersionId} from run ${result.candidate.runId}`,
+                directCommand: {
+                  commandName: 'promote_workflow_version',
+                  arguments: {
+                    workflowId: result.candidate.workflowId,
+                    versionId: candidateVersionId,
+                    baseVersionId,
+                    candidateRunId: result.candidate.runId,
+                  },
+                },
+              })
+            }
+          >
+            <Check className="h-3 w-3" />
+            {kept ? 'Candidate kept' : 'Keep candidate'}
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 gap-1.5 px-2 text-[11px]"
+          disabled={disabled}
+          onClick={() =>
+            onCommand({
+              message: `Try another evidence-based improvement from candidate run ${result.candidate.runId}, then rerun and compare it.`,
+              journey: { kind: 'improve_run', sourceRunId: result.candidate.runId },
+            })
+          }
+        >
+          <Search className="h-3 w-3" />
+          Revise again
+        </Button>
+      </div>
     </div>
   );
 }

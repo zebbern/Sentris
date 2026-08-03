@@ -29,6 +29,8 @@ import { useRunArtifacts } from '@/hooks/queries/useArtifactQueries';
 import { useExecutionNodeIO } from '@/hooks/queries/useExecutionQueries';
 import { TERMINAL_STATUSES } from '@sentris/shared';
 import { createOperatorImproveRunNavigationState } from '@/features/operator/operatorHandoff';
+import { OperatorRunImprovementPanel } from '@/features/operator/OperatorRunImprovementPanel';
+import { useOperatorRunImprovementProjection } from '@/features/operator/operatorRunImprovement';
 
 const formatTime = (timestamp: string) => {
   const date = new Date(timestamp);
@@ -209,6 +211,12 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
     () => runs.find((run) => run.id === selectedRunId),
     [runs, selectedRunId],
   );
+  const operatorImprovement = useOperatorRunImprovementProjection(selectedRun?.id);
+  const activeOperatorImprovement =
+    operatorImprovement.improvement &&
+    ['queued', 'running', 'awaiting_approval'].includes(operatorImprovement.improvement.status)
+      ? operatorImprovement.improvement
+      : null;
   const triggerDisplay = selectedRun
     ? getTriggerDisplay(selectedRun.triggerType, selectedRun.triggerLabel)
     : null;
@@ -304,19 +312,28 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
                 size="sm"
                 variant="outline"
                 className="h-7 gap-1.5 px-2 text-[11px]"
-                onClick={() =>
+                disabled={operatorImprovement.isLoading}
+                onClick={() => {
+                  if (activeOperatorImprovement) {
+                    navigate(`/operator/${activeOperatorImprovement.sessionId}`);
+                    return;
+                  }
                   navigate('/operator', {
                     state: createOperatorImproveRunNavigationState(
                       selectedRun.id,
                       `/workflows/${workflowId}/runs/${selectedRun.id}`,
                     ),
-                  })
-                }
+                  });
+                }}
                 aria-label="Improve this run with Operator"
                 title="Improve this run with Operator"
               >
                 <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                Improve
+                {activeOperatorImprovement
+                  ? 'View'
+                  : operatorImprovement.improvement
+                    ? 'Improve again'
+                    : 'Improve'}
               </Button>
             ) : null}
             {runStatus?.progress &&
@@ -333,6 +350,10 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
         {selectedRun && TERMINAL_STATUSES.includes(selectedRun.status) && (
           <RunResultsSummary runId={selectedRunId!} selectedRun={selectedRun} />
         )}
+
+        {operatorImprovement.improvement ? (
+          <OperatorRunImprovementPanel improvement={operatorImprovement.improvement} />
+        ) : null}
 
         {!selectedRun && (
           <div className="px-3 py-4 border-b text-xs text-muted-foreground text-center">

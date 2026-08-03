@@ -50,6 +50,7 @@ function makeWorkflowRecord(overrides: Record<string, unknown> = {}) {
     description: null,
     graph: { name: 'Test Workflow', nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
     organizationId: DEFAULT_ORGANIZATION_ID,
+    currentVersionId: null,
     mutationIdempotencyKey: null,
     compiledDefinition: null,
     lastRun: null,

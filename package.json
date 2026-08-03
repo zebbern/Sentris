@@ -58,11 +58,18 @@
     "performance:compare": "bun scripts/performance-budget.ts",
     "performance:pair": "bun scripts/release-performance-pair.ts",
     "dev:docs": "cd docs && mint dev",
-    "lint": "bun run lint:frontend && bun run lint:backend && bun run lint:worker",
+    "lint": "bun run lint:code && bun run format:check",
+    "lint:code": "bun run --parallel lint:frontend lint:backend lint:worker lint:shared lint:contracts lint:component-sdk lint:backend-client",
     "lint:frontend": "bun --cwd=frontend run lint",
     "lint:backend": "bun --cwd=backend run lint",
     "lint:worker": "bun --cwd=worker run lint",
-    "lint:fix": "bun run lint:frontend --fix && bun run lint:backend --fix && bun run lint:worker --fix",
+    "lint:shared": "bun --cwd=packages/shared run lint",
+    "lint:contracts": "bun --cwd=packages/contracts run lint",
+    "lint:component-sdk": "bun --cwd=packages/component-sdk run lint",
+    "lint:backend-client": "bun --cwd=packages/backend-client run lint",
+    "format:check": "prettier \"frontend/src/**/*.{ts,tsx}\" \"frontend/*.{ts,tsx}\" \"backend/**/*.ts\" \"worker/src/**/*.ts\" --check --cache --cache-location .cache/prettier/.prettier-cache --cache-strategy content",
+    "format": "prettier \"frontend/src/**/*.{ts,tsx}\" \"frontend/*.{ts,tsx}\" \"backend/**/*.ts\" \"worker/src/**/*.ts\" --write --cache --cache-location .cache/prettier/.prettier-cache --cache-strategy content",
+    "lint:fix": "bun run lint:frontend --fix && bun run lint:backend --fix && bun run lint:worker --fix && bun run lint:shared --fix && bun run lint:contracts --fix && bun run lint:component-sdk --fix && bun run lint:backend-client --fix && bun run format",
     "release:sync-versions": "bun scripts/sync-versions.ts",
     "prepare": "husky"
   },
@@ -79,15 +86,41 @@
     "openapi-typescript": "^7.10.1",
     "playwright": "^1.62.0",
     "pm2": "^6.0.14",
+    "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "undici": "^7.19.0"
   },
   "lint-staged": {
-    "frontend/**/*.{ts,tsx,js,jsx}": "bun --cwd=frontend eslint --fix --config eslint.config.mjs",
-    "backend/**/*.{ts,js}": "bun --cwd=backend eslint --fix --config eslint.config.mjs",
-    "worker/**/*.{ts,js}": "bun --cwd=worker eslint --fix --config eslint.config.mjs",
-    "*.{json,md,yml,yaml}": "bunx prettier --write"
+    "frontend/**/*.{ts,tsx,js,jsx}": [
+      "bun --cwd=frontend eslint --fix --config eslint.config.mjs",
+      "prettier --write"
+    ],
+    "backend/**/*.{ts,js}": [
+      "bun --cwd=backend eslint --fix --config eslint.config.mjs",
+      "prettier --write"
+    ],
+    "worker/**/*.{ts,js}": [
+      "bun --cwd=worker eslint --fix --config eslint.config.mjs",
+      "prettier --write"
+    ],
+    "packages/shared/**/*.{ts,js}": [
+      "bun --cwd=packages/shared eslint --fix --config eslint.config.mjs",
+      "prettier --write"
+    ],
+    "packages/contracts/**/*.{ts,js}": [
+      "bun --cwd=packages/contracts eslint --fix --config eslint.config.mjs",
+      "prettier --write"
+    ],
+    "packages/component-sdk/**/*.{ts,js}": [
+      "bun --cwd=packages/component-sdk eslint --fix --config eslint.config.mjs",
+      "prettier --write"
+    ],
+    "packages/backend-client/**/*.{ts,js}": [
+      "bun --cwd=packages/backend-client eslint --fix --config eslint.config.mjs",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": "prettier --write"
   },
   "overrides": {
     "multer": ">=2.1.0",

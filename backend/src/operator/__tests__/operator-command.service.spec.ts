@@ -47,6 +47,13 @@ describe('OperatorCommandService', () => {
         .mockImplementation((_workflowId: string, versionId: string) =>
           Promise.resolve({ id: versionId, graph: { successCriteria: [] } }),
         ),
+      promoteVersion: vi.fn().mockResolvedValue({
+        workflowId: WORKFLOW_ID,
+        id: WORKFLOW_VERSION_ID,
+        version: 4,
+        name: 'Improved workflow',
+        alreadyCurrent: false,
+      }),
     };
     findings = {
       listFindings: vi.fn().mockResolvedValue({
@@ -121,6 +128,44 @@ describe('OperatorCommandService', () => {
       },
     );
     expect(result.runId).toBe('sentris-run-1');
+  });
+
+  it('promotes an explicitly kept candidate version through the canonical workflow service', async () => {
+    workflows.getRun = vi.fn().mockResolvedValue({
+      id: 'sentris-run-candidate',
+      workflowId: WORKFLOW_ID,
+      workflowVersionId: WORKFLOW_VERSION_ID,
+      status: 'COMPLETED',
+    });
+    const result = await service.execute({
+      commandName: 'promote_workflow_version',
+      arguments: {
+        workflowId: WORKFLOW_ID,
+        versionId: WORKFLOW_VERSION_ID,
+        baseVersionId: '55555555-5555-4555-8555-555555555555',
+        candidateRunId: 'sentris-run-candidate',
+      },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(workflows.promoteVersion).toHaveBeenCalledWith(WORKFLOW_ID, WORKFLOW_VERSION_ID, auth, {
+      candidateRunId: 'sentris-run-candidate',
+      expectedCurrentVersionId: '55555555-5555-4555-8555-555555555555',
+    });
+    expect(result.result).toEqual({
+      kind: 'workflow-version-promoted',
+      workflowId: WORKFLOW_ID,
+      versionId: WORKFLOW_VERSION_ID,
+      version: 4,
+      name: 'Improved workflow',
+      candidateRunId: 'sentris-run-candidate',
+      alreadyCurrent: false,
+    });
   });
 
   it('dispatches compact workflow edits through the canonical authoring service', async () => {

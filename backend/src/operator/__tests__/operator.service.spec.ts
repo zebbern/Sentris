@@ -132,6 +132,7 @@ describe('OperatorService', () => {
       listTurns: vi.fn().mockResolvedValue([]),
       listMessages: vi.fn().mockResolvedValue([]),
       listActions: vi.fn().mockResolvedValue([]),
+      findLatestRunImprovement: vi.fn().mockResolvedValue(null),
       attachTemporal: vi.fn().mockResolvedValue(undefined),
       getTurnWithSession: vi
         .fn()
@@ -144,12 +145,14 @@ describe('OperatorService', () => {
       setTurnStatus: vi.fn(),
       completeAction: vi.fn(),
       failAction: vi.fn(),
+      failTurn: vi.fn(),
       settleMcpAction: vi.fn(),
     };
     commands = { execute: vi.fn() };
     secrets = { getSecret: vi.fn().mockResolvedValue({ id: SECRET_ID }) };
     temporal = {
       executeWorkflowUpdate: vi.fn().mockResolvedValue(undefined),
+      describeWorkflow: vi.fn(),
       startWorkflow: vi.fn().mockResolvedValue({
         workflowId: `operator-turn:${SESSION_ID}:${TURN_ID}`,
         runId: 'temporal-operator-run',
@@ -169,6 +172,27 @@ describe('OperatorService', () => {
       temporal as unknown as TemporalService,
       workflowAuthoring as unknown as OperatorWorkflowAuthoringService,
     );
+  });
+
+  it('returns the latest user-owned Operator improvement reference for a source run', async () => {
+    repository.findLatestRunImprovement.mockResolvedValue({
+      turn: turnRecord({ createdAt: new Date('2026-08-03T08:15:00Z') }),
+      session: sessionRecord(),
+    });
+
+    await expect(service.getRunImprovement(auth, 'sentris-run-source')).resolves.toEqual({
+      improvement: {
+        sourceRunId: 'sentris-run-source',
+        sessionId: SESSION_ID,
+        turnId: TURN_ID,
+        createdAt: '2026-08-03T08:15:00.000Z',
+      },
+    });
+    expect(repository.findLatestRunImprovement).toHaveBeenCalledWith({
+      organizationId: 'operator-org',
+      userId: 'operator-user',
+      sourceRunId: 'sentris-run-source',
+    });
   });
 
   it('rejects API-key and internal actors before touching session state', async () => {
@@ -221,6 +245,63 @@ describe('OperatorService', () => {
     const result = await service.getSession(auth, SESSION_ID);
 
     expect(result.turns[0]?.context).toEqual(legacyContext);
+  });
+
+  it('exposes the persisted journey in the public session projection', async () => {
+    const journey = { kind: 'improve_run', sourceRunId: 'sentris-run-source' } as const;
+    repository.listTurns.mockResolvedValueOnce([
+      turnRecord({
+        context: {
+          version: 2,
+          routeContext: { path: '/runs/sentris-run-source' },
+          directCommand: null,
+          journey,
+        },
+      }),
+    ]);
+
+    const result = await service.getSession(auth, SESSION_ID);
+
+    expect(result.turns[0]?.journey).toEqual(journey);
+  });
+
+  it('unlocks a session whose approved action belongs to an already-closed durable turn', async () => {
+    const staleTurn = turnRecord({ status: 'awaiting_approval' });
+    const failedTurn = turnRecord({
+      status: 'failed',
+      error: 'Operator durable turn closed as COMPLETED before the approved action could execute.',
+      completedAt: new Date('2026-08-02T10:03:01Z'),
+    });
+    const approved = { ...actionRecord('ask', 'approved'), version: 1 };
+    const failedAction = {
+      ...approved,
+      status: 'failed' as const,
+      error: failedTurn.error,
+      completedAt: failedTurn.completedAt,
+    };
+    repository.listTurns.mockResolvedValueOnce([staleTurn]).mockResolvedValueOnce([failedTurn]);
+    repository.listActions.mockResolvedValueOnce([approved]).mockResolvedValueOnce([failedAction]);
+    repository.listMessages.mockResolvedValue([]);
+    temporal.describeWorkflow.mockResolvedValue({
+      workflowId: staleTurn.temporalWorkflowId,
+      runId: staleTurn.temporalRunId,
+      status: 'COMPLETED',
+      startTime: '2026-08-02T10:01:00.000Z',
+      closeTime: '2026-08-02T10:03:00.000Z',
+      historyLength: 42,
+      taskQueue: 'sentris-default',
+    });
+
+    const result = await service.getSession(auth, SESSION_ID);
+
+    expect(repository.failTurn).toHaveBeenCalledWith({
+      turn: staleTurn,
+      session: sessionRecord(),
+      error: 'Operator durable turn closed as COMPLETED before the approved action could execute.',
+      auth,
+    });
+    expect(result.turns[0]?.status).toBe('failed');
+    expect(result.actions[0]?.status).toBe('failed');
   });
 
   it('places a structured direct command in the durable turn input', async () => {
@@ -496,6 +577,43 @@ describe('OperatorService', () => {
       args: { actionId: ACTION_ID, decision: 'approved', expectedVersion: 0 },
     });
     expect(result.status).toBe('approved');
+  });
+
+  it('reconciles a stale approval when the durable turn is already closed', async () => {
+    const approved = { ...actionRecord('ask', 'approved'), version: 1 };
+    const context = {
+      action: approved,
+      turn: turnRecord(),
+      session: sessionRecord(),
+    };
+    repository.decideAction.mockResolvedValue(approved);
+    repository.getActionWithTurnSession.mockResolvedValue(context);
+    temporal.executeWorkflowUpdate.mockRejectedValue(
+      new Error('workflow execution already completed'),
+    );
+    temporal.describeWorkflow.mockResolvedValue({
+      workflowId: context.turn.temporalWorkflowId,
+      runId: context.turn.temporalRunId,
+      status: 'COMPLETED',
+      startTime: '2026-08-02T10:01:00.000Z',
+      closeTime: '2026-08-02T10:03:00.000Z',
+      historyLength: 42,
+      taskQueue: 'sentris-default',
+    });
+
+    await expect(
+      service.decideAction(auth, ACTION_ID, {
+        decision: 'approved',
+        expectedVersion: 0,
+      }),
+    ).rejects.toThrow('Operator turn is no longer running');
+
+    expect(repository.failTurn).toHaveBeenCalledWith({
+      turn: context.turn,
+      session: context.session,
+      error: 'Operator durable turn closed as COMPLETED before the approval could be applied.',
+      auth,
+    });
   });
 
   it('persists a terminal launched-run observation for durable reloads', async () => {

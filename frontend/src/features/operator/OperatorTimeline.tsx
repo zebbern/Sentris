@@ -1,6 +1,7 @@
 import {
   OperatorWorkflowApplyResultSchema,
   OperatorWorkflowDraftResultSchema,
+  OperatorWorkflowPromotionResultSchema,
   OperatorRunComparisonResultSchema,
   OperatorRunWorkflowInputSchema,
   type OperatorActionStatus,
@@ -47,6 +48,7 @@ const COMMAND_LABELS: Record<OperatorCommandName, string> = {
   propose_workflow_draft: 'Draft workflow',
   propose_workflow_edits: 'Draft workflow edits',
   apply_workflow_draft: 'Save workflow draft',
+  promote_workflow_version: 'Keep candidate version',
   list_runs: 'List runs',
   get_run: 'Inspect run',
   compare_runs: 'Compare runs',
@@ -134,6 +136,7 @@ interface ActionEventProps {
   onRunCommand: (request: OperatorRunCommandRequest) => void;
   workflowDrafts: OperatorWorkflowDraftDetail[];
   appliedDraftIds: ReadonlySet<string>;
+  keptVersionIds: ReadonlySet<string>;
 }
 
 function ActionEvent({
@@ -144,6 +147,7 @@ function ActionEvent({
   onRunCommand,
   workflowDrafts,
   appliedDraftIds,
+  keptVersionIds,
 }: ActionEventProps) {
   const argumentsPreview = formatPreview(action.arguments);
   const draftResult = OperatorWorkflowDraftResultSchema.safeParse(action.result);
@@ -264,6 +268,10 @@ function ActionEvent({
           <OperatorRunComparisonCard
             result={runComparison.data}
             disabled={runCommandDisabled}
+            kept={
+              Boolean(runComparison.data.candidate.workflowVersionId) &&
+              keptVersionIds.has(runComparison.data.candidate.workflowVersionId ?? '')
+            }
             onCommand={onRunCommand}
           />
         ) : null}
@@ -338,6 +346,13 @@ export function OperatorTimeline({
       return parsed.success ? [parsed.data.draftId] : [];
     }),
   );
+  const keptVersionIds = new Set(
+    actions.flatMap((action) => {
+      if (action.status !== 'succeeded') return [];
+      const parsed = OperatorWorkflowPromotionResultSchema.safeParse(action.result);
+      return parsed.success ? [parsed.data.versionId] : [];
+    }),
+  );
 
   return (
     <div className="space-y-3">
@@ -354,6 +369,7 @@ export function OperatorTimeline({
             onRunCommand={onRunCommand}
             workflowDrafts={workflowDrafts}
             appliedDraftIds={appliedDraftIds}
+            keptVersionIds={keptVersionIds}
           />
         ),
       )}

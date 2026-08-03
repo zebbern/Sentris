@@ -133,6 +133,7 @@ describe('WorkflowsService', () => {
     graph: sampleGraph,
     compiledDefinition: null,
     organizationId: TEST_ORG,
+    currentVersionId: null,
     mutationIdempotencyKey: null,
     lastRun: null,
     runCount: 0,
@@ -156,6 +157,16 @@ describe('WorkflowsService', () => {
     },
     async update() {
       return makeWorkflowRecord();
+    },
+    async activateVersion(id: string, version: MockWorkflowVersion) {
+      return makeWorkflowRecord({
+        id,
+        name: version.graph.name,
+        description: version.graph.description ?? null,
+        graph: version.graph,
+        currentVersionId: version.id,
+        compiledDefinition: version.compiledDefinition,
+      });
     },
     async findById() {
       return makeWorkflowRecord();
@@ -593,6 +604,7 @@ describe('WorkflowsService', () => {
       lastRun: null,
       runCount: 0,
       organizationId: TEST_ORG,
+      currentVersionId: null,
       mutationIdempotencyKey: null,
     });
 
@@ -647,6 +659,7 @@ describe('WorkflowsService', () => {
       lastRun: null,
       runCount: 0,
       organizationId: TEST_ORG,
+      currentVersionId: null,
       mutationIdempotencyKey: null,
     });
 
@@ -676,6 +689,7 @@ describe('WorkflowsService', () => {
       lastRun: null,
       runCount: 0,
       organizationId: TEST_ORG,
+      currentVersionId: null,
       mutationIdempotencyKey: null,
     });
 
@@ -950,6 +964,61 @@ describe('WorkflowsService', () => {
     expect(updated.id).toBe('workflow-id');
     expect(updated.currentVersionId).toBeDefined();
     expect(updated.currentVersion).toBe(1);
+  });
+
+  it('stages an immutable candidate without changing the active workflow version', async () => {
+    const baseVersion = createWorkflowVersionRecord('workflow-id');
+    repositoryMock.findByIdForUpdate = async () =>
+      makeWorkflowRecord({ currentVersionId: baseVersion.id });
+    const activateVersion = vi.spyOn(repositoryMock as any, 'activateVersion');
+
+    const staged = await service.stageVersion('workflow-id', sampleGraph, authContext, {
+      expectedVersionId: baseVersion.id,
+    });
+
+    expect(staged).toMatchObject({ workflowId: 'workflow-id', version: 2 });
+    expect(staged.id).not.toBe(baseVersion.id);
+    expect(activateVersion).not.toHaveBeenCalled();
+  });
+
+  it('promotes the exact staged version as the active workflow version', async () => {
+    const baseVersion = createWorkflowVersionRecord('workflow-id');
+    const candidateVersion = createWorkflowVersionRecord('workflow-id');
+    repositoryMock.findByIdForUpdate = async () =>
+      makeWorkflowRecord({ currentVersionId: baseVersion.id });
+    const activateVersion = vi.spyOn(repositoryMock as any, 'activateVersion');
+
+    const promoted = await service.promoteVersion('workflow-id', candidateVersion.id, authContext, {
+      candidateRunId: 'sentris-run-candidate',
+      expectedCurrentVersionId: baseVersion.id,
+    });
+
+    expect(promoted).toMatchObject({
+      id: candidateVersion.id,
+      workflowId: 'workflow-id',
+      version: candidateVersion.version,
+      alreadyCurrent: false,
+    });
+    expect(activateVersion).toHaveBeenCalledWith(
+      'workflow-id',
+      candidateVersion,
+      expect.objectContaining({ organizationId: TEST_ORG }),
+    );
+  });
+
+  it('rejects promotion when the workflow changed while the candidate was being tested', async () => {
+    const candidateBase = createWorkflowVersionRecord('workflow-id');
+    const candidateVersion = createWorkflowVersionRecord('workflow-id');
+    const newerCurrent = createWorkflowVersionRecord('workflow-id');
+    repositoryMock.findByIdForUpdate = async () =>
+      makeWorkflowRecord({ currentVersionId: newerCurrent.id });
+
+    await expect(
+      service.promoteVersion('workflow-id', candidateVersion.id, authContext, {
+        candidateRunId: 'sentris-run-candidate',
+        expectedCurrentVersionId: candidateBase.id,
+      }),
+    ).rejects.toThrow('changed since candidate base version');
   });
 
   it('saves an incomplete graph as a draft for later configuration', async () => {

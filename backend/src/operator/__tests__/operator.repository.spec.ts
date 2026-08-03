@@ -270,7 +270,7 @@ describe('OperatorRepository.createTurn', () => {
       arguments: { runId: 'sentris-run-1' },
     };
     const persistedPayload = {
-      version: 1 as const,
+      version: 2 as const,
       routeContext: context,
       directCommand,
       journey: null,

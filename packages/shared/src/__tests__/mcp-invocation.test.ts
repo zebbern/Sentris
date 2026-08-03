@@ -486,9 +486,11 @@ describe('durable MCP operation dispatch contracts', () => {
   it('carries immutable operation authority to a fence-capturing dispatch claim', () => {
     const contracts = mcpInvocationContracts as Record<string, unknown>;
     const preparedSchema = contracts.PrepareMcpOperationOutcomeSchema as
-      { safeParse(value: unknown): { success: boolean; data?: unknown } } | undefined;
+      | { safeParse(value: unknown): { success: boolean; data?: unknown } }
+      | undefined;
     const claimSchema = contracts.ClaimMcpOperationDispatchRequestSchema as
-      { safeParse(value: unknown): { success: boolean; data?: unknown } } | undefined;
+      | { safeParse(value: unknown): { success: boolean; data?: unknown } }
+      | undefined;
     const prepared = {
       kind: 'prepared' as const,
       plan: {
@@ -558,7 +560,8 @@ describe('durable MCP operation dispatch contracts', () => {
   it('rejects a tool reference whose nullable compatibility projection drifts', () => {
     const contracts = mcpInvocationContracts as Record<string, unknown>;
     const schema = contracts.PreparedMcpOperationRefSchema as
-      { safeParse(value: unknown): { success: boolean } } | undefined;
+      | { safeParse(value: unknown): { success: boolean } }
+      | undefined;
     expect(
       schema?.safeParse({
         invocationId: INVOCATION_ID,
@@ -905,7 +908,8 @@ describe('buildInvocationManifest', () => {
     const contracts = mcpInvocationContracts as Record<string, unknown>;
     expect(contracts.MCP_OPERATION_UPDATE_NAME).toBe('executeMcpOperation');
     const schema = contracts.McpOperationInvocationRequestSchema as
-      { safeParse(value: unknown): { success: boolean; data?: unknown } } | undefined;
+      | { safeParse(value: unknown): { success: boolean; data?: unknown } }
+      | undefined;
     expect(schema?.safeParse(genericRequest)).toEqual({ success: true, data: genericRequest });
   });
 
@@ -1003,6 +1007,7 @@ describe('buildInvocationManifest', () => {
     );
     const originalEntry = { ...manifest.entries[0] };
 
+    // eslint-disable-next-line no-constant-condition -- compile-time-only readonly assertions
     if (false) {
       // @ts-expect-error Invocation manifests expose readonly properties.
       manifest.capabilityGrantId = OTHER_GRANT_ID;
@@ -1074,6 +1079,7 @@ describe('resolveInvocationManifestEntry', () => {
       toolName: 'scanner.scan_target',
     });
 
+    // eslint-disable-next-line no-constant-condition -- compile-time-only readonly assertion
     if (false) {
       // @ts-expect-error Resolved manifest entry properties are readonly.
       resolved.destination = 'mcp-activity';

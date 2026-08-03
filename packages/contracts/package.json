@@ -10,6 +10,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "lint": "eslint . --cache --cache-location ../../.cache/eslint/contracts/ --cache-strategy content",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

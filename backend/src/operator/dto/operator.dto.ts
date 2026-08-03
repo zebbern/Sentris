@@ -6,6 +6,7 @@ import {
   OperatorCommandNameSchema,
   OperatorCreateSessionSchema,
   OperatorCreateTurnSchema,
+  OperatorRunImprovementLookupSchema,
   OperatorTurnStatusSchema,
   OperatorUpdateSessionSchema,
   OperatorWorkflowDraftDetailSchema,
@@ -18,6 +19,9 @@ export class CreateOperatorTurnDto extends createZodDto(OperatorCreateTurnSchema
 export class OperatorActionDecisionDto extends createZodDto(OperatorActionDecisionSchema) {}
 export class OperatorWorkflowDraftDetailDto extends createZodDto(
   OperatorWorkflowDraftDetailSchema,
+) {}
+export class OperatorRunImprovementLookupDto extends createZodDto(
+  OperatorRunImprovementLookupSchema,
 ) {}
 
 const OrganizationIdSchema = z.string().trim().min(1).max(191);

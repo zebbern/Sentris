@@ -61,6 +61,7 @@ function makeWorkflowRecord(overrides: Partial<WorkflowRecord> = {}): WorkflowRe
     description: null,
     graph: { name: 'Test Workflow', nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
     compiledDefinition: null,
+    currentVersionId: null,
     organizationId: TEST_ORG,
     createdAt: now,
     updatedAt: now,
@@ -283,16 +284,21 @@ describe('WorkflowVersionService', () => {
       });
     });
 
-    it('should resolve to latest version when no version specified', async () => {
-      const latest = makeVersionRecord({ version: 5 });
-      versionRepo.findLatestByWorkflowId.mockResolvedValue(latest);
+    it('should resolve to the workflow current version when no version is specified', async () => {
+      const current = makeVersionRecord({ id: 'ver-current', version: 3 });
+      repo.findById.mockResolvedValue(makeWorkflowRecord({ currentVersionId: current.id }));
+      versionRepo.findById.mockResolvedValue(current);
 
       const result = await service.resolveWorkflowVersion('wf-1', {}, TEST_ORG);
 
-      expect(result).toEqual(latest);
-      expect(versionRepo.findLatestByWorkflowId).toHaveBeenCalledWith('wf-1', {
+      expect(result).toEqual(current);
+      expect(repo.findById).toHaveBeenCalledWith('wf-1', {
         organizationId: TEST_ORG,
       });
+      expect(versionRepo.findById).toHaveBeenCalledWith('ver-current', {
+        organizationId: TEST_ORG,
+      });
+      expect(versionRepo.findLatestByWorkflowId).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when no versions exist', async () => {

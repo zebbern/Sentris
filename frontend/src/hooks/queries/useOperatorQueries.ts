@@ -90,6 +90,16 @@ export function useOperatorSessions() {
   });
 }
 
+export function useOperatorRunImprovement(sourceRunId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.operator.runImprovement(sourceRunId ?? ''),
+    queryFn: sourceRunId ? () => api.operator.getRunImprovement(sourceRunId) : skipToken,
+    ...(sourceRunId ? {} : { gcTime: 0 }),
+    staleTime: 5_000,
+    refetchInterval: (query) => (query.state.data?.improvement ? false : 5_000),
+  });
+}
+
 function useOperatorSessionQuery(
   sessionId: string | undefined,
   streamState: OperatorStreamState | null,
@@ -449,6 +459,11 @@ export function useCreateOperatorTurn() {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.operator.session(variables.sessionId),
       });
+      if (variables.input.journey?.kind === 'improve_run') {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.operator.runImprovement(variables.input.journey.sourceRunId),
+        });
+      }
     },
   });
 }

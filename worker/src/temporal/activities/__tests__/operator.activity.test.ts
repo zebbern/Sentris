@@ -185,6 +185,58 @@ describe('Operator activities', () => {
     );
   });
 
+  test('asks an improvement proposal to add reviewable success criteria when none exist', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        session: {
+          id: SESSION_ID,
+          title: 'Session',
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+          approvalMode: 'ask',
+          status: 'active',
+          model: {
+            provider: 'openai',
+            modelId: 'gpt-test',
+            apiKeySecretId: SECRET_ID,
+            baseUrl: null,
+          },
+          createdAt: '2026-08-02T00:00:00.000Z',
+          updatedAt: '2026-08-02T00:00:00.000Z',
+        },
+        turn: {
+          id: TURN_ID,
+          sessionId: SESSION_ID,
+          status: 'running',
+          context: { path: `/workflows/${WORKFLOW_ID}`, workflowId: WORKFLOW_ID },
+        },
+        messages: [{ role: 'user', content: 'Improve this run' }],
+        actions: [],
+      }),
+    );
+    generateTextImpl.mockResolvedValue({ text: '', finishReason: 'stop', toolCalls: [] });
+
+    await activities.operatorModelStepActivity({
+      ...base,
+      step: 1,
+      mode: 'improve_run_proposal',
+      sourceRunId: 'sentris-run-source',
+    });
+
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'If the inspected workflow has no success criteria',
+    );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'include set_success_criteria in the reviewed proposal',
+    );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'never invent a node output path or threshold',
+    );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'If neither the run evidence supports an execution change nor the exact contracts support a criterion',
+    );
+  });
+
   test('recovers a provider-declared tool generation error with a text-only diagnosis', async () => {
     fetchImpl.mockResolvedValueOnce(
       jsonResponse({

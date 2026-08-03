@@ -2,8 +2,10 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   createOperatorImproveRunNavigationState,
+  createOperatorDirectCommandNavigationState,
   createOperatorTurnFromHandoff,
   readOperatorImproveRunHandoff,
+  readOperatorTurnHandoff,
 } from '@/features/operator/operatorHandoff';
 
 const CLIENT_TURN_ID = '11111111-1111-4111-8111-111111111111';
@@ -27,9 +29,58 @@ describe('Operator run improvement handoff', () => {
     });
   });
 
+  it('builds one typed, idempotent direct-command turn from a run-page action', () => {
+    const state = createOperatorDirectCommandNavigationState(
+      'Keep this tested candidate',
+      {
+        commandName: 'promote_workflow_version',
+        arguments: {
+          workflowId: '22222222-2222-4222-8222-222222222222',
+          versionId: '33333333-3333-4333-8333-333333333333',
+          baseVersionId: '44444444-4444-4444-8444-444444444444',
+          candidateRunId: 'sentris-run-candidate',
+        },
+      },
+      '/runs/sentris-run-candidate',
+      () => CLIENT_TURN_ID,
+    );
+
+    const handoff = readOperatorTurnHandoff(state);
+    expect(handoff?.kind).toBe('direct_command');
+    expect(createOperatorTurnFromHandoff(handoff!)).toEqual({
+      clientTurnId: CLIENT_TURN_ID,
+      message: 'Keep this tested candidate',
+      context: { path: '/runs/sentris-run-candidate' },
+      directCommand: {
+        commandName: 'promote_workflow_version',
+        arguments: {
+          workflowId: '22222222-2222-4222-8222-222222222222',
+          versionId: '33333333-3333-4333-8333-333333333333',
+          baseVersionId: '44444444-4444-4444-8444-444444444444',
+          candidateRunId: 'sentris-run-candidate',
+        },
+      },
+    });
+  });
+
   it('ignores malformed or unrelated navigation state', () => {
     expect(readOperatorImproveRunHandoff(null)).toBeNull();
     expect(readOperatorImproveRunHandoff({ operatorHandoff: { kind: 'improve_run' } })).toBeNull();
+    expect(
+      readOperatorTurnHandoff({
+        operatorHandoff: {
+          version: 1,
+          kind: 'direct_command',
+          clientTurnId: CLIENT_TURN_ID,
+          message: 'Keep it',
+          sourcePath: '/runs/candidate',
+          directCommand: {
+            commandName: 'promote_workflow_version',
+            arguments: { workflowId: 'not-a-uuid', versionId: 'bad', candidateRunId: '' },
+          },
+        },
+      }),
+    ).toBeNull();
     expect(
       readOperatorImproveRunHandoff({
         operatorHandoff: {

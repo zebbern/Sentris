@@ -121,6 +121,34 @@ export class OperatorRepository {
       .orderBy(desc(operatorSessionsTable.updatedAt));
   }
 
+  async findLatestRunImprovement(input: {
+    organizationId: string;
+    userId: string;
+    sourceRunId: string;
+  }): Promise<
+    | {
+        turn: OperatorTurnRecord;
+        session: OperatorSessionRecord;
+      }
+    | undefined
+  > {
+    const [row] = await this.db
+      .select({ turn: operatorTurnsTable, session: operatorSessionsTable })
+      .from(operatorTurnsTable)
+      .innerJoin(operatorSessionsTable, eq(operatorTurnsTable.sessionId, operatorSessionsTable.id))
+      .where(
+        and(
+          eq(operatorSessionsTable.organizationId, input.organizationId),
+          eq(operatorSessionsTable.userId, input.userId),
+          sql`${operatorTurnsTable.context} -> 'journey' ->> 'kind' = 'improve_run'`,
+          sql`${operatorTurnsTable.context} -> 'journey' ->> 'sourceRunId' = ${input.sourceRunId}`,
+        ),
+      )
+      .orderBy(desc(operatorTurnsTable.createdAt))
+      .limit(1);
+    return row;
+  }
+
   async findSession(
     sessionId: string,
     owner: { organizationId: string; userId: string },

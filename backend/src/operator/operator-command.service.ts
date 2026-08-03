@@ -4,6 +4,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import {
   OPERATOR_COMMAND_DEFINITIONS,
   OperatorRunComparisonResultSchema,
+  OperatorWorkflowPromotionResultSchema,
   MCP_CAPABILITY_CONTRACT_VERSION,
   McpOperationSchema,
   TERMINAL_STATUSES,
@@ -243,6 +244,11 @@ export class OperatorCommandService {
           input.auth,
           input.sessionId,
         );
+      case 'promote_workflow_version':
+        return this.promoteWorkflowVersion(
+          OPERATOR_COMMAND_DEFINITIONS.promote_workflow_version.inputSchema.parse(input.arguments),
+          input.auth,
+        );
       case 'list_runs':
         return this.listRuns(
           OPERATOR_COMMAND_DEFINITIONS.list_runs.inputSchema.parse(input.arguments),
@@ -443,6 +449,46 @@ export class OperatorCommandService {
         arguments: input,
         auth,
         sessionId,
+      }),
+    };
+  }
+
+  private async promoteWorkflowVersion(
+    input: OperatorCommandInputMap['promote_workflow_version'],
+    auth: AuthContext,
+  ): Promise<{ result: unknown }> {
+    const candidateRun = await this.workflowsService.getRun(input.candidateRunId, auth);
+    if (
+      candidateRun.workflowId !== input.workflowId ||
+      candidateRun.workflowVersionId !== input.versionId
+    ) {
+      throw new ConflictException(
+        `Candidate run ${input.candidateRunId} does not reference workflow version ${input.versionId}`,
+      );
+    }
+    if (!(TERMINAL_STATUSES as readonly string[]).includes(candidateRun.status)) {
+      throw new ConflictException(
+        `Candidate run ${input.candidateRunId} is still ${candidateRun.status}; wait before keeping it`,
+      );
+    }
+    const promoted = await this.workflowsService.promoteVersion(
+      input.workflowId,
+      input.versionId,
+      auth,
+      {
+        candidateRunId: input.candidateRunId,
+        expectedCurrentVersionId: input.baseVersionId,
+      },
+    );
+    return {
+      result: OperatorWorkflowPromotionResultSchema.parse({
+        kind: 'workflow-version-promoted',
+        workflowId: promoted.workflowId,
+        versionId: promoted.id,
+        version: promoted.version,
+        name: promoted.name,
+        candidateRunId: input.candidateRunId,
+        alreadyCurrent: promoted.alreadyCurrent,
       }),
     };
   }

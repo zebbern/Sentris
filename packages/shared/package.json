@@ -26,6 +26,7 @@
   "license": "MIT",
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target bun",
+    "lint": "eslint . --cache --cache-location ../../.cache/eslint/shared/ --cache-strategy content",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -113,6 +113,13 @@
       "when": 1785688382468,
       "tag": "0015_operator_workflow_authoring",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785778707173,
+      "tag": "0016_operator_candidate_version_promotion",
+      "breakpoints": true
     }
   ]
 }

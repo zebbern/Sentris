@@ -854,22 +854,40 @@ export class OperatorWorkflowAuthoringService {
     compileWorkflowGraph(effectiveGraph);
 
     const idempotencyKey = `operator-draft:${context.action.id}`;
+    const staged = Boolean(proposal.input.workflowId && proposal.input.sourceRunId);
     const saved = proposal.input.workflowId
-      ? await this.workflowsService.update(proposal.input.workflowId, effectiveGraph, input.auth, {
-          expectedVersionId: proposal.input.baseVersionId,
-          idempotencyKey,
-        })
+      ? staged
+        ? await this.workflowsService.stageVersion(
+            proposal.input.workflowId,
+            effectiveGraph,
+            input.auth,
+            {
+              expectedVersionId: proposal.input.baseVersionId,
+              idempotencyKey,
+            },
+          )
+        : await this.workflowsService.update(
+            proposal.input.workflowId,
+            effectiveGraph,
+            input.auth,
+            {
+              expectedVersionId: proposal.input.baseVersionId,
+              idempotencyKey,
+            },
+          )
       : await this.workflowsService.create(effectiveGraph, input.auth, { idempotencyKey });
-    if (!saved.currentVersionId || !saved.currentVersion) {
+    const versionId = 'currentVersionId' in saved ? saved.currentVersionId : saved.id;
+    const version = 'currentVersion' in saved ? saved.currentVersion : saved.version;
+    if (!versionId || !version)
       throw new Error('Workflow save did not return an immutable version');
-    }
     return {
       kind: 'workflow-applied',
       draftId: context.action.id,
-      workflowId: saved.id,
-      versionId: saved.currentVersionId,
-      version: saved.currentVersion,
+      workflowId: proposal.input.workflowId ?? saved.id,
+      versionId,
+      version,
       created: !proposal.input.workflowId,
+      staged,
       name: saved.name,
       ...(proposal.input.sourceRunId ? { sourceRunId: proposal.input.sourceRunId } : {}),
     };

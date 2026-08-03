@@ -19,6 +19,7 @@ import {
   OperatorCreateTurnSchema,
   OperatorUpdateSessionSchema,
   type OperatorActionView,
+  type OperatorRunImprovementLookup,
   type OperatorSessionDetail,
   type OperatorSessionSummary,
   type OperatorTurnAccepted,
@@ -34,6 +35,9 @@ import {
   OperatorActionIdParamSchema,
   OperatorIdParamDto,
   OperatorIdParamSchema,
+  OperatorRunIdParamDto,
+  OperatorRunIdParamSchema,
+  OperatorRunImprovementLookupDto,
   OperatorWorkflowDraftDetailDto,
   UpdateOperatorSessionDto,
 } from './dto/operator.dto';
@@ -52,6 +56,16 @@ export class OperatorController {
   @ApiOperation({ summary: 'List Operator sessions owned by the current user' })
   listSessions(@CurrentAuth() auth: AuthContext | null): Promise<OperatorSessionSummary[]> {
     return this.operatorService.listSessions(auth);
+  }
+
+  @Get('run-improvements/:runId')
+  @ApiOperation({ summary: 'Locate the latest Operator improvement for one source run' })
+  @ApiOkResponse({ type: OperatorRunImprovementLookupDto })
+  getRunImprovement(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param(new ZodValidationPipe(OperatorRunIdParamSchema)) params: OperatorRunIdParamDto,
+  ): Promise<OperatorRunImprovementLookup> {
+    return this.operatorService.getRunImprovement(auth, params.runId);
   }
 
   @Post('sessions')

@@ -614,8 +614,10 @@ function buildSystemPrompt(
       ? [
           `The user explicitly started one complete improvement journey for source run ${sourceRunId ?? 'unknown'}.`,
           'Inspect the saved workflow and exact component definitions, then propose only the smallest evidence-supported ID-based edit. Include the exact sourceRunId in propose_workflow_edits.',
+          'If the inspected workflow has no success criteria and its exact component contracts or run evidence justify a concrete output or finding-count check, include set_success_criteria in the reviewed proposal.',
+          'Success criteria must measure observable workflow outcomes; never invent a node output path or threshold. If no criterion is justified, leave the list empty and explain what evidence is missing.',
           'Do not call apply_workflow_draft, run_workflow, or compare_runs; the durable journey performs those stages after a valid proposal and normal approval.',
-          'If the run evidence does not justify a concrete workflow change, explain that and make no tool call.',
+          'If neither the run evidence supports an execution change nor the exact contracts support a criterion, explain that and make no tool call.',
         ]
       : mode === 'improve_run_summary'
         ? [

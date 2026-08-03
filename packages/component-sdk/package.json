@@ -16,6 +16,7 @@
     "./zod-ports": "./src/zod-ports.ts"
   },
   "scripts": {
+    "lint": "eslint . --cache --cache-location ../../.cache/eslint/component-sdk/ --cache-strategy content",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },

@@ -1,7 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import prettier from 'eslint-plugin-prettier';
 import configPrettier from 'eslint-config-prettier';
 
 export default tseslint.config(
@@ -20,22 +19,8 @@ export default tseslint.config(
         ...globals.node,
         ...globals.es2024,
       },
-      parserOptions: {
-        project: [
-          './tsconfig.json',
-          './tsconfig.scripts.json',
-          './tsconfig.script-tests.json',
-          './tsconfig.findings-opensearch-smoke.json',
-        ],
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-    plugins: {
-      prettier,
     },
     rules: {
-      'prettier/prettier': 'error',
-
       '@typescript-eslint/no-unused-vars': [
         'error',
         {

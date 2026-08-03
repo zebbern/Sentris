@@ -23,6 +23,7 @@ export const workflowsTable = pgTable(
     name: text('name').notNull(),
     description: text('description'),
     graph: jsonb('graph').$type<WorkflowGraph>().notNull(),
+    currentVersionId: uuid('current_version_id'),
     organizationId: varchar('organization_id', { length: 191 }),
     mutationIdempotencyKey: varchar('mutation_idempotency_key', { length: 191 }),
     compiledDefinition: jsonb('compiled_definition')
@@ -40,6 +41,7 @@ export const workflowsTable = pgTable(
       table.createdAt,
     ),
     updatedAtIdx: index('workflows_updated_at_idx').on(table.updatedAt),
+    currentVersionIdx: index('workflows_current_version_id_idx').on(table.currentVersionId),
     mutationIdempotencyKeyUniqueIdx: uniqueIndex('workflows_mutation_idempotency_key_uidx').on(
       table.mutationIdempotencyKey,
     ),

@@ -19,6 +19,7 @@ import {
   type OperatorModelContext,
   type OperatorPreparedAction,
   type OperatorRunObservation,
+  type OperatorRunImprovementLookup,
   type OperatorSessionDetail,
   type OperatorSessionSummary,
   type OperatorTurnAccepted,
@@ -49,6 +50,9 @@ const DEFAULT_SESSION_TITLE = 'New Operator session';
 
 @Injectable()
 export class OperatorService {
+  /** Per-backend-process throttle; Postgres and Temporal remain the canonical state owners. */
+  private readonly decisionReconciliationChecks = new Map<string, number>();
+
   constructor(
     private readonly repository: OperatorRepository,
     private readonly commandService: OperatorCommandService,
@@ -83,14 +87,43 @@ export class OperatorService {
     return sessions.map((session) => this.toSessionSummary(session));
   }
 
+  async getRunImprovement(
+    auth: AuthContext | null,
+    sourceRunId: string,
+  ): Promise<OperatorRunImprovementLookup> {
+    const user = this.requireUserAuth(auth);
+    const match = await this.repository.findLatestRunImprovement({
+      organizationId: user.organizationId,
+      userId: user.userId,
+      sourceRunId,
+    });
+    return {
+      improvement: match
+        ? {
+            sourceRunId,
+            sessionId: match.session.id,
+            turnId: match.turn.id,
+            createdAt: match.turn.createdAt.toISOString(),
+          }
+        : null,
+    };
+  }
+
   async getSession(auth: AuthContext | null, sessionId: string): Promise<OperatorSessionDetail> {
     const user = this.requireUserAuth(auth);
     const session = await this.requireOwnedSession(sessionId, user);
-    const [turns, messages, actions] = await Promise.all([
+    let [turns, messages, actions] = await Promise.all([
       this.repository.listTurns(session.id),
       this.repository.listMessages(session.id),
       this.repository.listActions(session.id),
     ]);
+    if (await this.reconcileStaleApprovedAction(session, turns, actions, user)) {
+      [turns, messages, actions] = await Promise.all([
+        this.repository.listTurns(session.id),
+        this.repository.listMessages(session.id),
+        this.repository.listActions(session.id),
+      ]);
+    }
     return {
       ...this.toSessionSummary(session),
       turns: turns.map((turn) => this.toTurnView(turn)),
@@ -233,18 +266,84 @@ export class OperatorService {
     if (!context?.turn.temporalWorkflowId) {
       throw new ConflictException('Operator turn has not started');
     }
-    await this.temporalService.executeWorkflowUpdate({
-      workflowId: context.turn.temporalWorkflowId,
-      temporalRunId: context.turn.temporalRunId ?? undefined,
-      updateName: 'operatorActionDecision',
-      updateId: `operator-decision:${action.id}:${action.version}`,
-      args: {
-        actionId: action.id,
-        decision: input.decision,
-        expectedVersion: input.expectedVersion,
-      },
-    });
+    try {
+      await this.temporalService.executeWorkflowUpdate({
+        workflowId: context.turn.temporalWorkflowId,
+        temporalRunId: context.turn.temporalRunId ?? undefined,
+        updateName: 'operatorActionDecision',
+        updateId: `operator-decision:${action.id}:${action.version}`,
+        args: {
+          actionId: action.id,
+          decision: input.decision,
+          expectedVersion: input.expectedVersion,
+        },
+      });
+    } catch (error: unknown) {
+      const described = await this.temporalService.describeWorkflow({
+        workflowId: context.turn.temporalWorkflowId,
+        runId: context.turn.temporalRunId ?? undefined,
+      });
+      if (described.status === 'RUNNING') throw error;
+      const reconciliationError = `Operator durable turn closed as ${described.status} before the approval could be applied.`;
+      await this.repository.failTurn({
+        turn: context.turn,
+        session: context.session,
+        error: reconciliationError,
+        auth: user,
+      });
+      throw new ConflictException('Operator turn is no longer running; start a new turn');
+    }
     return this.toActionView(action);
+  }
+
+  private async reconcileStaleApprovedAction(
+    session: OperatorSessionRecord,
+    turns: OperatorTurnRecord[],
+    actions: OperatorActionRecord[],
+    auth: AuthContext,
+  ): Promise<boolean> {
+    const activeTurnIds = new Set(
+      turns
+        .filter((turn) => ['queued', 'running', 'awaiting_approval'].includes(turn.status))
+        .map((turn) => turn.id),
+    );
+    const action = [...actions]
+      .reverse()
+      .find((candidate) => candidate.status === 'approved' && activeTurnIds.has(candidate.turnId));
+    if (!action) return false;
+
+    const turn = turns.find((candidate) => candidate.id === action.turnId);
+    if (!turn?.temporalWorkflowId) return false;
+
+    const reconciliationKey = `${action.id}:${action.version}`;
+    const now = Date.now();
+    const previousCheck = this.decisionReconciliationChecks.get(reconciliationKey);
+    if (previousCheck && now - previousCheck < 15_000) return false;
+    if (!previousCheck && this.decisionReconciliationChecks.size >= 2_048) {
+      const oldestKey = this.decisionReconciliationChecks.keys().next().value;
+      if (oldestKey) this.decisionReconciliationChecks.delete(oldestKey);
+    }
+    this.decisionReconciliationChecks.set(reconciliationKey, now);
+
+    let described: Awaited<ReturnType<TemporalService['describeWorkflow']>>;
+    try {
+      described = await this.temporalService.describeWorkflow({
+        workflowId: turn.temporalWorkflowId,
+        runId: turn.temporalRunId ?? undefined,
+      });
+    } catch {
+      return false;
+    }
+    if (described.status === 'RUNNING') return false;
+
+    await this.repository.failTurn({
+      turn,
+      session,
+      error: `Operator durable turn closed as ${described.status} before the approved action could execute.`,
+      auth,
+    });
+    this.decisionReconciliationChecks.delete(reconciliationKey);
+    return true;
   }
 
   async getInternalContext(turnId: string, organizationId: string): Promise<OperatorModelContext> {
@@ -564,6 +663,7 @@ export class OperatorService {
       temporalWorkflowId: turn.temporalWorkflowId,
       temporalRunId: turn.temporalRunId,
       context: persistedPayload.routeContext,
+      journey: persistedPayload.journey,
       error: turn.error,
       createdAt: turn.createdAt.toISOString(),
       startedAt: turn.startedAt?.toISOString() ?? null,

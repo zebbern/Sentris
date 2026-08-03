@@ -323,6 +323,22 @@ describe('OperatorTimeline', () => {
     expect(screen.getByText('Source failed → Candidate passed')).toBeInTheDocument();
     expect(screen.queryByText(/"kind": "run-comparison"/)).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Keep candidate' }));
+    expect(onRunCommand).toHaveBeenCalledWith({
+      message:
+        'Keep candidate workflow version 44444444-4444-4444-8444-444444444444 from run sentris-run-candidate',
+      directCommand: {
+        commandName: 'promote_workflow_version',
+        arguments: {
+          workflowId: '22222222-2222-4222-8222-222222222222',
+          versionId: '44444444-4444-4444-8444-444444444444',
+          baseVersionId: '33333333-3333-4333-8333-333333333333',
+          candidateRunId: 'sentris-run-candidate',
+        },
+      },
+    });
+    onRunCommand.mockClear();
+
     fireEvent.click(screen.getByRole('button', { name: 'Revise again' }));
     expect(onRunCommand).toHaveBeenCalledWith({
       message:

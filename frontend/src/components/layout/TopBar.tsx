@@ -393,6 +393,34 @@ export function TopBar({
           </div>
 
           <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-1 md:gap-1.5">
+            {mode === 'design' ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  TOOLBAR_ICON_BUTTON_CLASS,
+                  'relative',
+                  metadata.successCriteria.length > 0 && 'text-primary',
+                )}
+                aria-label={
+                  metadata.successCriteria.length > 0
+                    ? `Success criteria, ${metadata.successCriteria.length} configured`
+                    : 'Success criteria, none configured'
+                }
+                title="Success criteria"
+                disabled={!canEdit}
+                onClick={() => setSuccessCriteriaOpen(true)}
+              >
+                <ListChecks className="h-3.5 w-3.5" />
+                {metadata.successCriteria.length > 0 ? (
+                  <span className="absolute right-0.5 top-0.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-primary px-0.5 text-[8px] font-semibold leading-none text-primary-foreground">
+                    {metadata.successCriteria.length}
+                  </span>
+                ) : null}
+              </Button>
+            ) : null}
+
             {showSaveButton && (
               <Button
                 onClick={() => void handleSave()}
@@ -539,23 +567,6 @@ export function TopBar({
                         <DropdownMenuItem onClick={onToggleVersionHistory}>
                           <History className="mr-2 h-4 w-4" />
                           <span>Version History</span>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    {mode === 'design' && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => setSuccessCriteriaOpen(true)}
-                          disabled={!canEdit}
-                        >
-                          <ListChecks className="mr-2 h-4 w-4" />
-                          <span>Success Criteria</span>
-                          {metadata.successCriteria.length > 0 ? (
-                            <span className="ml-auto pl-4 text-xs text-muted-foreground">
-                              {metadata.successCriteria.length}
-                            </span>
-                          ) : null}
                         </DropdownMenuItem>
                       </>
                     )}

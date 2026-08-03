@@ -11,6 +11,7 @@ import type {
   WorkflowTransactionExecutor,
   WorkflowTransactionOptions,
 } from './workflow-transaction-executor';
+import type { WorkflowVersionRecord } from '../../database/schema';
 
 export type WorkflowRecord = typeof workflowsTable.$inferSelect;
 
@@ -110,6 +111,30 @@ export class WorkflowRepository {
       throw new Error(`Workflow ${id} not found`);
     }
 
+    return record;
+  }
+
+  async activateVersion(
+    id: string,
+    version: Pick<WorkflowVersionRecord, 'id' | 'graph' | 'compiledDefinition'>,
+    options: WorkflowRepositoryOptions = {},
+  ): Promise<WorkflowRecord> {
+    const executor = options.executor ?? this.db;
+    const graph = WorkflowGraphSchema.parse(version.graph);
+    const [record] = await executor
+      .update(workflowsTable)
+      .set({
+        name: graph.name,
+        description: graph.description ?? null,
+        graph,
+        currentVersionId: version.id,
+        compiledDefinition: version.compiledDefinition,
+        updatedAt: new Date(),
+      })
+      .where(this.buildIdFilter(id, options.organizationId))
+      .returning();
+
+    if (!record) throw new Error(`Workflow ${id} not found`);
     return record;
   }
 

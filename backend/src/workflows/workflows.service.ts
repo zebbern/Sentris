@@ -95,6 +95,17 @@ export interface UpdateWorkflowMutationOptions extends CreateWorkflowMutationOpt
   expectedVersionId?: string;
 }
 
+export interface StagedWorkflowVersion {
+  id: string;
+  workflowId: string;
+  version: number;
+  name: string;
+}
+
+export interface PromotedWorkflowVersion extends StagedWorkflowVersion {
+  alreadyCurrent: boolean;
+}
+
 const FLOW_CONTEXT_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const FLOW_CONTEXT_SWEEP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -287,6 +298,10 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
         },
         { executor },
       );
+      const activeRecord = await this.repository.activateVersion(record.id, createdVersion, {
+        organizationId,
+        executor,
+      });
       if (auth?.userId) {
         await this.roleRepository.upsert(
           {
@@ -298,7 +313,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
           { executor },
         );
       }
-      const createdResponse = this.buildWorkflowResponse(record, createdVersion);
+      const createdResponse = this.buildWorkflowResponse(activeRecord, createdVersion);
       await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
         action: 'workflow.create',
         resourceType: 'workflow',
@@ -364,27 +379,26 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
       }
 
       if (options.expectedVersionId) {
-        const latestVersion = await this.versionRepository.findLatestByWorkflowId(id, {
-          organizationId,
-          executor,
-        });
-        if (latestVersion?.id !== options.expectedVersionId) {
+        if (lockedWorkflow.currentVersionId !== options.expectedVersionId) {
           throw new ConflictException(
             `Workflow ${id} changed since version ${options.expectedVersionId}; refresh before saving`,
           );
         }
       }
 
-      const record = await this.repository.update(id, input, { organizationId, executor });
       const createdVersion = await this.versionRepository.create(
         {
-          workflowId: record.id,
+          workflowId: lockedWorkflow.id,
           graph: input,
           organizationId,
           mutationIdempotencyKey: idempotencyKey,
         },
         { executor },
       );
+      const record = await this.repository.activateVersion(id, createdVersion, {
+        organizationId,
+        executor,
+      });
       const updatedResponse = this.buildWorkflowResponse(record, createdVersion);
       await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
         action: 'workflow.update',
@@ -409,6 +423,125 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     return response;
   }
 
+  async stageVersion(
+    id: string,
+    dto: WorkflowGraphDto,
+    auth?: AuthContext | null,
+    options: UpdateWorkflowMutationOptions = {},
+  ): Promise<StagedWorkflowVersion> {
+    const input = this.parse(dto);
+    const idempotencyKey = this.normalizeMutationIdempotencyKey(options.idempotencyKey);
+    const organizationId = await this.requireWorkflowAdmin(id, auth);
+
+    return this.repository.transaction(async (executor) => {
+      const workflow = await this.repository.findByIdForUpdate(id, { organizationId, executor });
+      if (!workflow) throw new NotFoundException(`Workflow ${id} not found`);
+
+      if (idempotencyKey) {
+        const replay = await this.versionRepository.findByMutationIdempotencyKey(idempotencyKey, {
+          organizationId,
+          executor,
+        });
+        if (replay) {
+          if (replay.workflowId !== id) {
+            throw new ConflictException(
+              `Workflow mutation key '${idempotencyKey}' is already used by another workflow`,
+            );
+          }
+          this.assertMutationReplayMatches(replay, input, idempotencyKey);
+          return {
+            id: replay.id,
+            workflowId: replay.workflowId,
+            version: replay.version,
+            name: WorkflowGraphSchema.parse(replay.graph).name,
+          };
+        }
+      }
+
+      if (options.expectedVersionId) {
+        const base = await this.versionRepository.findById(options.expectedVersionId, {
+          organizationId,
+          executor,
+        });
+        if (!base || base.workflowId !== id) {
+          throw new ConflictException(
+            `Workflow ${id} version ${options.expectedVersionId} is unavailable for candidate staging`,
+          );
+        }
+      }
+
+      const version = await this.versionRepository.create(
+        {
+          workflowId: id,
+          graph: input,
+          organizationId,
+          mutationIdempotencyKey: idempotencyKey,
+        },
+        { executor },
+      );
+      await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
+        action: 'workflow.version.stage',
+        resourceType: 'workflow',
+        resourceId: id,
+        resourceName: workflow.name,
+        metadata: {
+          versionId: version.id,
+          version: version.version,
+          baseVersionId: options.expectedVersionId ?? null,
+        },
+      });
+      return { id: version.id, workflowId: id, version: version.version, name: input.name };
+    });
+  }
+
+  async promoteVersion(
+    id: string,
+    versionId: string,
+    auth: AuthContext | null | undefined,
+    metadata: { candidateRunId?: string; expectedCurrentVersionId: string },
+  ): Promise<PromotedWorkflowVersion> {
+    const organizationId = await this.requireWorkflowAdmin(id, auth);
+    return this.repository.transaction(async (executor) => {
+      const workflow = await this.repository.findByIdForUpdate(id, { organizationId, executor });
+      if (!workflow) throw new NotFoundException(`Workflow ${id} not found`);
+      const version = await this.versionRepository.findById(versionId, {
+        organizationId,
+        executor,
+      });
+      if (!version || version.workflowId !== id) {
+        throw new NotFoundException(`Workflow version ${versionId} not found for workflow ${id}`);
+      }
+      const alreadyCurrent = workflow.currentVersionId === version.id;
+      if (!alreadyCurrent) {
+        if (workflow.currentVersionId !== metadata.expectedCurrentVersionId) {
+          throw new ConflictException(
+            `Workflow ${id} changed since candidate base version ${metadata.expectedCurrentVersionId}; compare a new candidate before keeping it`,
+          );
+        }
+        await this.repository.activateVersion(id, version, { organizationId, executor });
+        await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
+          action: 'workflow.version.promote',
+          resourceType: 'workflow',
+          resourceId: id,
+          resourceName: WorkflowGraphSchema.parse(version.graph).name,
+          metadata: {
+            versionId: version.id,
+            version: version.version,
+            baseVersionId: metadata.expectedCurrentVersionId,
+            candidateRunId: metadata.candidateRunId ?? null,
+          },
+        });
+      }
+      return {
+        id: version.id,
+        workflowId: id,
+        version: version.version,
+        name: WorkflowGraphSchema.parse(version.graph).name,
+        alreadyCurrent,
+      };
+    });
+  }
+
   async updateMetadata(
     id: string,
     dto: UpdateWorkflowMetadataDto,
@@ -421,10 +554,15 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
         { name: dto.name, description: dto.description ?? null },
         { organizationId, executor },
       );
-      const version = await this.versionRepository.findLatestByWorkflowId(id, {
-        organizationId,
-        executor,
-      });
+      const version = record.currentVersionId
+        ? await this.versionRepository.findById(record.currentVersionId, {
+            organizationId,
+            executor,
+          })
+        : await this.versionRepository.findLatestByWorkflowId(id, {
+            organizationId,
+            executor,
+          });
       const updatedResponse = this.buildWorkflowResponse(record, version ?? null);
       await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
         action: 'workflow.update_metadata',
@@ -447,7 +585,9 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     if (!record) {
       throw new NotFoundException(`Workflow ${id} not found`);
     }
-    const version = await this.versionRepository.findLatestByWorkflowId(id, { organizationId });
+    const version = record.currentVersionId
+      ? await this.versionRepository.findById(record.currentVersionId, { organizationId })
+      : await this.versionRepository.findLatestByWorkflowId(id, { organizationId });
     return this.buildWorkflowResponse(record, version ?? null);
   }
 
@@ -676,13 +816,29 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     const records = await this.repository.list({ organizationId });
     const filtered = filteredIds ? records.filter((r) => filteredIds!.includes(r.id)) : records;
 
-    const workflowIds = filtered.map((r) => r.id);
-    const latestVersions = await this.versionRepository.findLatestByWorkflowIds(workflowIds, {
+    const currentVersionIds = filtered.flatMap((record) =>
+      record.currentVersionId ? [record.currentVersionId] : [],
+    );
+    const currentVersions = await this.versionRepository.findByIds(currentVersionIds, {
       organizationId,
     });
-    const latestVersionsMap = new Map(latestVersions.map((v) => [v.workflowId, v]));
+    const currentVersionsMap = new Map(currentVersions.map((version) => [version.id, version]));
+    const legacyWorkflowIds = filtered
+      .filter((record) => !record.currentVersionId)
+      .map((record) => record.id);
+    const legacyVersions = await this.versionRepository.findLatestByWorkflowIds(legacyWorkflowIds, {
+      organizationId,
+    });
+    const legacyVersionsMap = new Map(
+      legacyVersions.map((version) => [version.workflowId, version]),
+    );
     const responses = filtered.map((record) =>
-      this.buildWorkflowResponse(record, latestVersionsMap.get(record.id) ?? null),
+      this.buildWorkflowResponse(
+        record,
+        (record.currentVersionId
+          ? currentVersionsMap.get(record.currentVersionId)
+          : legacyVersionsMap.get(record.id)) ?? null,
+      ),
     );
     this.logger.log(`Loaded ${responses.length} workflow(s) from repository`);
     return responses;

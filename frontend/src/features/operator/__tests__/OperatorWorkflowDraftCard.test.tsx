@@ -128,6 +128,7 @@ describe('OperatorWorkflowDraftCard', () => {
       versionId: VERSION_ID,
       version: 4,
       created: false,
+      staged: false,
       name: 'NPM package investigation',
     };
 
@@ -136,7 +137,7 @@ describe('OperatorWorkflowDraftCard', () => {
     );
 
     expect(screen.getByText('Saved as v4')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open saved workflow/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /open workflow/i })).toHaveAttribute(
       'href',
       `/workflows/${WORKFLOW_ID}`,
     );
@@ -151,6 +152,7 @@ describe('OperatorWorkflowDraftCard', () => {
       versionId: VERSION_ID,
       version: 5,
       created: false,
+      staged: true,
       name: 'NPM package investigation',
       sourceRunId: SOURCE_RUN_ID,
     };

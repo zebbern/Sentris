@@ -4,11920 +4,12196 @@
  */
 
 export interface paths {
-    "/api/v1/auth/validate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["AppController_validateAuth"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["AppController_login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["AppController_logout"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/instances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List alive backend instances (admin only) */
-        get: operations["AdminInstancesController_listInstances"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/instances/stale-sessions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Detect sessions owned by dead instances (admin only) */
-        get: operations["AdminInstancesController_detectStaleSessions"];
-        put?: never;
-        post?: never;
-        /** Clean up stale sessions owned by dead instances (admin only) */
-        delete: operations["AdminInstancesController_cleanupStaleSessions"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agents/{agentRunId}/parts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get stored agent trace parts */
-        get: operations["AgentsController_parts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agents/{agentRunId}/chat": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Stream agent chat via SSE */
-        post: operations["AgentsController_chat"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List workflow runs */
-        get: operations["WorkflowRunsController_listRuns"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a workflow run */
-        get: operations["WorkflowRunsController_getRun"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/children": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List child workflow runs */
-        get: operations["WorkflowRunsController_listChildRuns"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run status */
-        get: operations["WorkflowRunsController_status"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/result": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run result */
-        get: operations["WorkflowRunsController_result"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run configuration */
-        get: operations["WorkflowRunsController_config"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Cancel a workflow run */
-        post: operations["WorkflowRunsController_cancel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/trace": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run trace events */
-        get: operations["WorkflowRunObservabilityController_trace"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run event timeline */
-        get: operations["WorkflowRunObservabilityController_events"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/dataflows": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run data flows */
-        get: operations["WorkflowRunObservabilityController_dataflows"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/artifacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List workflow run artifacts */
-        get: operations["WorkflowRunObservabilityController_runArtifacts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/artifacts/{artifactId}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download a workflow run artifact */
-        get: operations["WorkflowRunObservabilityController_downloadRunArtifact"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/node-io": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List node inputs and outputs for a workflow run */
-        get: operations["WorkflowRunObservabilityController_getNodeIO"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/node-io/{nodeRef}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get specific node input/output for a workflow run */
-        get: operations["WorkflowRunObservabilityController_getNodeIODetail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run logs */
-        get: operations["WorkflowRunObservabilityController_logs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Stream workflow run updates via SSE */
-        get: operations["WorkflowRunStreamController_stream"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/terminal": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run terminal output */
-        get: operations["WorkflowRunStreamController_terminalChunks"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/terminal/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List terminal archive recordings for a workflow run */
-        get: operations["WorkflowRunStreamController_listTerminalArchives"];
-        put?: never;
-        /** Archive terminal output for a workflow run */
-        post: operations["WorkflowRunStreamController_archiveTerminal"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/terminal/archive/{recordId}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download a terminal archive recording */
-        get: operations["WorkflowRunStreamController_downloadTerminalArchive"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflow-tags": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all unique tags with usage counts */
-        get: operations["WorkflowTagsController_listAllTags"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all workflows */
-        get: operations["WorkflowsController_findAll"];
-        put?: never;
-        /** Create a new workflow */
-        post: operations["WorkflowsController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a workflow by ID */
-        get: operations["WorkflowsController_findOne"];
-        /** Update a workflow */
-        put: operations["WorkflowsController_update"];
-        post?: never;
-        /** Delete a workflow */
-        delete: operations["WorkflowsController_remove"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/{id}/metadata": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update workflow metadata */
-        patch: operations["WorkflowsController_updateMetadata"];
-        trace?: never;
-    };
-    "/api/v1/workflows/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List workflow summaries */
-        get: operations["WorkflowsController_listSummary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/{id}/runtime-inputs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow runtime inputs */
-        get: operations["WorkflowsController_getRuntimeInputs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/{workflowId}/versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all versions of a workflow */
-        get: operations["WorkflowsController_listVersions"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/{workflowId}/versions/{versionId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a specific workflow version */
-        get: operations["WorkflowsController_findVersion"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/{id}/commit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Commit a workflow version */
-        post: operations["WorkflowsController_commit"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/{id}/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Run a workflow */
-        post: operations["WorkflowsController_run"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/{id}/tags": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get tags for a workflow */
-        get: operations["WorkflowsController_getWorkflowTags"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Set tags for a workflow (replaces all existing tags) */
-        patch: operations["WorkflowsController_setWorkflowTags"];
-        trace?: never;
-    };
-    "/api/v1/files/upload": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Upload a file */
-        post: operations["FilesController_uploadFile"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/files": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List uploaded files */
-        get: operations["FilesController_listFiles"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/files/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get file metadata */
-        get: operations["FilesController_getFile"];
-        put?: never;
-        post?: never;
-        /** Delete a file */
-        delete: operations["FilesController_deleteFile"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/files/{id}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download a file */
-        get: operations["FilesController_downloadFile"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/artifacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List workspace artifacts */
-        get: operations["ArtifactsController_listArtifacts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/artifacts/{id}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download an artifact */
-        get: operations["ArtifactsController_downloadArtifact"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/artifacts/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete an artifact */
-        delete: operations["ArtifactsController_deleteArtifact"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/analytics/query": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Query analytics data */
-        post: operations["AnalyticsController_queryAnalytics"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/analytics/settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get analytics settings */
-        get: operations["AnalyticsController_getAnalyticsSettings"];
-        /** Update analytics settings */
-        put: operations["AnalyticsController_updateAnalyticsSettings"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/analytics/ensure-tenant": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Ensure tenant resources exist for an organization */
-        post: operations["AnalyticsController_ensureTenant"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List security findings with pagination and filters */
-        get: operations["FindingsController_listFindings"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get severity distribution stats for findings */
-        get: operations["FindingsController_getStats"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Export security findings as CSV or JSON */
-        get: operations["FindingsController_exportFindings"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a single security finding by ID */
-        get: operations["FindingsController_getFinding"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/{id}/triage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update triage state for a finding */
-        patch: operations["FindingTriageController_updateTriage"];
-        trace?: never;
-    };
-    "/api/v1/findings/bulk-triage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Bulk update triage state for multiple findings */
-        post: operations["FindingTriageController_bulkTriage"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/{id}/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get triage event history for a finding */
-        get: operations["FindingTriageController_getHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/{id}/ticket": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get linked ticket for a finding */
-        get: operations["FindingTriageController_getTicket"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/analytics/posture-trend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get posture trend over time by severity */
-        get: operations["TriageAnalyticsController_getPostureTrend"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/analytics/triage-velocity": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get triage velocity (status changes) over time */
-        get: operations["TriageAnalyticsController_getTriageVelocity"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/analytics/mttr": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Mean Time to Remediate by severity */
-        get: operations["TriageAnalyticsController_getMttr"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/analytics/sla-compliance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get SLA compliance rates by severity */
-        get: operations["TriageAnalyticsController_getSlaCompliance"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/analytics/status-distribution": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get current status distribution of all findings */
-        get: operations["TriageAnalyticsController_getStatusDistribution"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/analytics/top-assignees": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get top assignees by triage volume */
-        get: operations["TriageAnalyticsController_getTopAssignees"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/findings/sla-policies": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get SLA policies for the organization */
-        get: operations["TriageAnalyticsController_getSlaPolicies"];
-        /** Upsert SLA policies for the organization */
-        put: operations["TriageAnalyticsController_upsertSlaPolicies"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/org/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List organization members for assignee picker */
-        get: operations["OrgMembersController_listMembers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ticketing/connection": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Jira connection status */
-        get: operations["TicketingController_getConnection"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ticketing/connect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Initiate Jira OAuth 2.0 connection */
-        post: operations["TicketingController_connect"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ticketing/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Handle Jira OAuth callback */
-        get: operations["TicketingController_callback"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ticketing/disconnect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Disconnect Jira integration */
-        delete: operations["TicketingController_disconnect"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ticketing/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Update ticketing configuration */
-        put: operations["TicketingController_updateConfig"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ticketing/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Jira projects */
-        get: operations["TicketingController_listProjects"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ticketing/issue-types/{projectKey}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Jira issue types for a project */
-        get: operations["TicketingController_listIssueTypes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ticketing/reconciliation/{findingTriageId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reconcile an ambiguous Jira ticket creation */
-        post: operations["TicketingController_reconcileTicketCreation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ticketing/jira/webhook/{secret}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Receive Jira webhook
-         * @description Public endpoint for receiving Jira issue transition webhooks. Authentication is via the unguessable URL secret.
-         */
-        post: operations["JiraWebhookController_receive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all integration providers */
-        get: operations["IntegrationsController_listProviders"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/providers/{provider}/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get provider OAuth configuration */
-        get: operations["IntegrationsController_getProviderConfiguration"];
-        /** Create or update provider OAuth configuration */
-        put: operations["IntegrationsController_upsertProviderConfiguration"];
-        post?: never;
-        /** Delete provider OAuth configuration */
-        delete: operations["IntegrationsController_deleteProviderConfiguration"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/connections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List integration connections */
-        get: operations["IntegrationsController_listConnections"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/{provider}/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Start OAuth authorization flow */
-        post: operations["IntegrationsController_startOAuth"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/{provider}/exchange": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Complete OAuth token exchange */
-        post: operations["IntegrationsController_completeOAuth"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/connections/{id}/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Refresh an integration connection */
-        post: operations["IntegrationsController_refreshConnection"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/connections/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Disconnect an integration connection */
-        delete: operations["IntegrationsController_disconnectConnection"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/connections/{id}/token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Issue a connection access token */
-        post: operations["IntegrationsController_issueConnectionToken"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/api-keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List API keys */
-        get: operations["ApiKeysController_list"];
-        put?: never;
-        /** Create a new API key */
-        post: operations["ApiKeysController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/api-keys/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get an API key by ID */
-        get: operations["ApiKeysController_get"];
-        put?: never;
-        post?: never;
-        /** Delete an API key */
-        delete: operations["ApiKeysController_delete"];
-        options?: never;
-        head?: never;
-        /** Update an API key */
-        patch: operations["ApiKeysController_update"];
-        trace?: never;
-    };
-    "/api/v1/api-keys/{id}/revoke": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Revoke an API key */
-        post: operations["ApiKeysController_revoke"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/components": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all registered components */
-        get: operations["ComponentsController_listComponents"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/components/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a component by ID */
-        get: operations["ComponentsController_getComponent"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/components/{id}/resolve-ports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Resolve dynamic ports for a component */
-        post: operations["ComponentsController_resolvePorts"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/secrets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all secrets */
-        get: operations["SecretsController_listSecrets"];
-        put?: never;
-        /** Create a new secret */
-        post: operations["SecretsController_createSecret"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/secrets/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a secret by ID */
-        get: operations["SecretsController_getSecret"];
-        put?: never;
-        post?: never;
-        /** Delete a secret */
-        delete: operations["SecretsController_deleteSecret"];
-        options?: never;
-        head?: never;
-        /** Update secret metadata */
-        patch: operations["SecretsController_updateSecret"];
-        trace?: never;
-    };
-    "/api/v1/secrets/{id}/value": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a secret value */
-        get: operations["SecretsController_getSecretValue"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/secrets/{id}/rotate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Rotate a secret value */
-        put: operations["SecretsController_rotateSecret"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/schedules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List schedules */
-        get: operations["SchedulesController_list"];
-        put?: never;
-        /** Create a schedule */
-        post: operations["SchedulesController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/schedules/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a schedule by ID */
-        get: operations["SchedulesController_getOne"];
-        put?: never;
-        post?: never;
-        /** Delete a schedule */
-        delete: operations["SchedulesController_delete"];
-        options?: never;
-        head?: never;
-        /** Update a schedule */
-        patch: operations["SchedulesController_update"];
-        trace?: never;
-    };
-    "/api/v1/schedules/{id}/pause": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Pause a schedule */
-        post: operations["SchedulesController_pause"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/schedules/{id}/resume": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Resume a schedule */
-        post: operations["SchedulesController_resume"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/schedules/{id}/trigger": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Trigger a schedule immediately */
-        post: operations["SchedulesController_trigger"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/workflows": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List workflows accessible via webhook */
-        get: operations["WebhooksController_listWorkflows"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/workflows/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a workflow by ID via webhook */
-        get: operations["WebhooksController_getWorkflow"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/workflows/{id}/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Run a workflow via webhook */
-        post: operations["WebhooksController_runWorkflow"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/runs/{runId}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run status */
-        get: operations["WebhooksController_getRunStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/runs/{runId}/result": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run result */
-        get: operations["WebhooksController_getRunResult"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/runs/{runId}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Cancel a workflow run */
-        post: operations["WebhooksController_cancelRun"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/inbound/{path}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Receive inbound webhook
-         * @description Public endpoint for receiving webhook deliveries. No authentication required - security relies on the unguessable webhook path.
-         */
-        post: operations["InboundWebhookController_receive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/configurations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all webhook configurations */
-        get: operations["WebhooksAdminController_list"];
-        put?: never;
-        /** Create a new webhook configuration */
-        post: operations["WebhooksAdminController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/configurations/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a webhook configuration by ID */
-        get: operations["WebhooksAdminController_get"];
-        /** Update a webhook configuration */
-        put: operations["WebhooksAdminController_update"];
-        post?: never;
-        /** Delete a webhook configuration */
-        delete: operations["WebhooksAdminController_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/configurations/{id}/regenerate-path": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Regenerate webhook path (creates new URL) */
-        post: operations["WebhooksAdminController_regeneratePath"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/configurations/{id}/url": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get the webhook URL for a configuration */
-        get: operations["WebhooksAdminController_getUrl"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/configurations/test-script": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Test a parsing script with sample data */
-        post: operations["WebhooksAdminController_testScript"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/configurations/{id}/deliveries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List delivery history for a webhook */
-        get: operations["WebhooksAdminController_listDeliveries"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/webhooks/configurations/{id}/deliveries/{deliveryId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get details of a specific delivery */
-        get: operations["WebhooksAdminController_getDelivery"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/human-inputs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List human input requests */
-        get: operations["HumanInputsController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/human-inputs/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a human input request details */
-        get: operations["HumanInputsController_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/human-inputs/{id}/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Resolve a human input request */
-        post: operations["HumanInputsController_resolve"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/human-inputs/resolve/{token}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Resolve input via public token */
-        post: operations["HumanInputsController_resolveByToken"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all MCP servers */
-        get: operations["McpServersController_listServers"];
-        put?: never;
-        /** Create a new MCP server configuration */
-        post: operations["McpServersController_createServer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/enabled": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List enabled MCP servers only */
-        get: operations["McpServersController_listEnabledServers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/tools": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all tools from enabled MCP servers */
-        get: operations["McpServersController_getAllTools"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get health status of all enabled servers */
-        get: operations["McpServersController_getHealthStatuses"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a specific MCP server */
-        get: operations["McpServersController_getServer"];
-        put?: never;
-        post?: never;
-        /** Delete an MCP server configuration */
-        delete: operations["McpServersController_deleteServer"];
-        options?: never;
-        head?: never;
-        /** Update an MCP server configuration */
-        patch: operations["McpServersController_updateServer"];
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/{id}/tools": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List discovered tools from a server */
-        get: operations["McpServersController_getServerTools"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/{id}/toggle": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Toggle MCP server enabled/disabled status */
-        post: operations["McpServersController_toggleServer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/test-enabled": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Test all enabled MCP server connections */
-        post: operations["McpServersController_testEnabledServers"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/{id}/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Test connection to an MCP server */
-        post: operations["McpServersController_testConnection"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/{serverId}/tools/{toolId}/toggle": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Toggle a tool enabled/disabled state */
-        post: operations["McpServersController_toggleToolEnabled"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-servers/{id}/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get resolved MCP server configuration (with secrets resolved) */
-        get: operations["McpServersController_getResolvedConfig"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-groups": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all MCP groups */
-        get: operations["McpGroupsController_listGroups"];
-        put?: never;
-        /** Create a new MCP group (admin only) */
-        post: operations["McpGroupsController_createGroup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-groups/templates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List available MCP group templates */
-        get: operations["McpGroupsController_listTemplates"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-groups/slug/{slug}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a group by slug */
-        get: operations["McpGroupsController_getGroupBySlug"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-groups/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a specific MCP group */
-        get: operations["McpGroupsController_getGroup"];
-        put?: never;
-        post?: never;
-        /** Delete an MCP group (admin only) */
-        delete: operations["McpGroupsController_deleteGroup"];
-        options?: never;
-        head?: never;
-        /** Update an MCP group */
-        patch: operations["McpGroupsController_updateGroup"];
-        trace?: never;
-    };
-    "/api/v1/mcp-groups/{id}/servers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get servers in a group */
-        get: operations["McpGroupsController_getServersInGroup"];
-        put?: never;
-        /** Add a server to a group (admin only) */
-        post: operations["McpGroupsController_addServerToGroup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-groups/{id}/servers/{serverId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Remove a server from a group (admin only) */
-        delete: operations["McpGroupsController_removeServerFromGroup"];
-        options?: never;
-        head?: never;
-        /** Update server metadata in a group (admin only) */
-        patch: operations["McpGroupsController_updateServerInGroup"];
-        trace?: never;
-    };
-    "/api/v1/mcp-groups/sync-templates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Sync group templates from code (admin only) */
-        post: operations["McpGroupsController_syncTemplates"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-groups/templates/{slug}/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Import a group template (admin only) */
-        post: operations["McpGroupsController_importTemplate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-registry/catalog": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Browse/search the Docker MCP Registry catalog */
-        get: operations["McpRegistryController_getCatalog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-registry/catalog/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get details for a single registry server */
-        get: operations["McpRegistryController_getCatalogEntry"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-registry/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Import a registry server into the MCP Library */
-        post: operations["McpRegistryController_importServer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-registry/sync": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Trigger a manual registry sync */
-        post: operations["McpRegistryController_triggerSync"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp-registry/sync/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get the current registry sync status */
-        get: operations["McpRegistryController_getSyncStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/notifications/channels": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all notification channels */
-        get: operations["NotificationsController_list"];
-        put?: never;
-        /** Create a notification channel */
-        post: operations["NotificationsController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/notifications/channels/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a notification channel by ID */
-        get: operations["NotificationsController_get"];
-        /** Update a notification channel */
-        put: operations["NotificationsController_update"];
-        post?: never;
-        /** Delete a notification channel */
-        delete: operations["NotificationsController_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/notifications/channels/{id}/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Send a test notification to a channel */
-        post: operations["NotificationsController_test"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/notifications/channels/{id}/deliveries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List delivery history for a notification channel */
-        get: operations["NotificationsController_listDeliveries"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/notifications/channels/{id}/deliveries/{deliveryId}/resend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Resend a failed delivery */
-        post: operations["NotificationsController_resendDelivery"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp/gateway": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Unified MCP Gateway endpoint (Streamable HTTP) */
-        get: operations["McpGatewayController_handleGateway_get"];
-        /** Unified MCP Gateway endpoint (Streamable HTTP) */
-        put: operations["McpGatewayController_handleGateway_put"];
-        /** Unified MCP Gateway endpoint (Streamable HTTP) */
-        post: operations["McpGatewayController_handleGateway_post"];
-        /** Unified MCP Gateway endpoint (Streamable HTTP) */
-        delete: operations["McpGatewayController_handleGateway_delete"];
-        /** Unified MCP Gateway endpoint (Streamable HTTP) */
-        options: operations["McpGatewayController_handleGateway_options"];
-        /** Unified MCP Gateway endpoint (Streamable HTTP) */
-        head: operations["McpGatewayController_handleGateway_head"];
-        /** Unified MCP Gateway endpoint (Streamable HTTP) */
-        patch: operations["McpGatewayController_handleGateway_patch"];
-        trace?: never;
-    };
-    "/api/v1/mcp/discover": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start MCP tool discovery
-         * @description Initiates an asynchronous discovery workflow for an MCP server. Returns 202 ACCEPTED with a workflow ID for tracking progress.
-         */
-        post: operations["McpDiscoveryController_discover"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp/discover/{workflowId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get MCP discovery status
-         * @description Queries the status of an MCP discovery workflow by workflow ID. Returns current status and discovered tools if available.
-         */
-        get: operations["McpDiscoveryController_getStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp/discover-group": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start MCP group tool discovery
-         * @description Initiates an asynchronous discovery workflow for multiple MCP servers. Returns 202 ACCEPTED with a workflow ID for tracking progress.
-         */
-        post: operations["McpDiscoveryController_discoverGroup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp/discover-group/{workflowId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get MCP group discovery status
-         * @description Queries the status of an MCP group discovery workflow by workflow ID. Returns current status and discovered tools if available.
-         */
-        get: operations["McpDiscoveryController_getGroupStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/mcp/sessions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List active MCP sessions (admin only) */
-        get: operations["McpSessionsController_listSessions"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/studio-mcp": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Studio MCP endpoint (Streamable HTTP) for external agents */
-        get: operations["StudioMcpController_handleMcp_get"];
-        /** Studio MCP endpoint (Streamable HTTP) for external agents */
-        put: operations["StudioMcpController_handleMcp_put"];
-        /** Studio MCP endpoint (Streamable HTTP) for external agents */
-        post: operations["StudioMcpController_handleMcp_post"];
-        /** Studio MCP endpoint (Streamable HTTP) for external agents */
-        delete: operations["StudioMcpController_handleMcp_delete"];
-        /** Studio MCP endpoint (Streamable HTTP) for external agents */
-        options: operations["StudioMcpController_handleMcp_options"];
-        /** Studio MCP endpoint (Streamable HTTP) for external agents */
-        head: operations["StudioMcpController_handleMcp_head"];
-        /** Studio MCP endpoint (Streamable HTTP) for external agents */
-        patch: operations["StudioMcpController_handleMcp_patch"];
-        trace?: never;
-    };
-    "/api/v1/templates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all templates */
-        get: operations["TemplatesController_listTemplates"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/categories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List template categories */
-        get: operations["TemplatesController_getCategories"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/tags": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List template tags */
-        get: operations["TemplatesController_getTags"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/my": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get my submitted templates */
-        get: operations["TemplatesController_getMyTemplates"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/repo-info": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get template repository info */
-        get: operations["TemplatesController_getRepoInfo"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/submissions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get template submissions */
-        get: operations["TemplatesController_getSubmissions"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/revalidations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List recent template live revalidations */
-        get: operations["TemplatesController_getRevalidationJobs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/revalidations/{auditId}/log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get template live revalidation log tail */
-        get: operations["TemplatesController_getRevalidationJobLog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/revalidations/{auditId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get template live revalidation status */
-        get: operations["TemplatesController_getRevalidationJob"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get template by ID */
-        get: operations["TemplatesController_getTemplate"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/community/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Import a community template from the published catalog */
-        post: operations["TemplatesController_importCommunityTemplate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/publish": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Validate a workflow for template submission */
-        post: operations["TemplatesController_publishTemplate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/{id}/revalidate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Start template live revalidation */
-        post: operations["TemplatesController_revalidateTemplate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/{id}/use": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Use a template to create a new workflow */
-        post: operations["TemplatesController_useTemplate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/templates/sync": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Sync templates from GitHub */
-        post: operations["TemplatesController_syncTemplates"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/audit-logs/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Export audit log events as CSV */
-        get: operations["AuditLogsController_export"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/audit-logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List audit log events */
-        get: operations["AuditLogsController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["HealthController_liveness"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/health/ready": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["HealthController_readiness"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/internal/health/worker-ready": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["InternalHealthController_workerReady"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent-skills": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List agent skills for the current organization */
-        get: operations["AgentSkillsController_listSkills"];
-        put?: never;
-        /** Create an agent skill */
-        post: operations["AgentSkillsController_createSkill"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent-skills/discover": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Discover skill folders under .agents/skills, .claude/skills, .github/skills, .codex/skills, .kimi/skills, and .opencode/skills */
-        get: operations["AgentSkillsController_discoverSkills"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent-skills/import-discovered": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Import discovered workspace skill folders into the org library */
-        post: operations["AgentSkillsController_importDiscoveredSkills"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent-skills/import-zip": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Import one or more skill folders from a zip archive */
-        post: operations["AgentSkillsController_importSkillZip"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent-skills/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get an agent skill by id */
-        get: operations["AgentSkillsController_getSkill"];
-        put?: never;
-        post?: never;
-        /** Delete an agent skill */
-        delete: operations["AgentSkillsController_deleteSkill"];
-        options?: never;
-        head?: never;
-        /** Update an agent skill */
-        patch: operations["AgentSkillsController_updateSkill"];
-        trace?: never;
-    };
-    "/api/v1/scopes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List scopes for the current organization */
-        get: operations["ScopesController_listScopes"];
-        put?: never;
-        /** Create a scope */
-        post: operations["ScopesController_createScope"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/scopes/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a scope by id */
-        get: operations["ScopesController_getScope"];
-        put?: never;
-        post?: never;
-        /** Delete a scope */
-        delete: operations["ScopesController_deleteScope"];
-        options?: never;
-        head?: never;
-        /** Update a scope */
-        patch: operations["ScopesController_updateScope"];
-        trace?: never;
-    };
-    "/api/v1/scopes/{id}/findings-summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get finding counts for a scope */
-        get: operations["ScopeFindingsController_getSummary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/scopes/{scopeId}/assets/compare": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Compare asset observations and scanner coverage between two runs */
-        get: operations["AssetsController_compareRuns"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/scopes/{scopeId}/assets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List discovered assets for a scope */
-        get: operations["AssetsController_listAssets"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ai/anthropic/models": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** List Anthropic models accessible to a stored API key secret */
-        post: operations["AiController_listAnthropicModels"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/outbox/dead-letters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List dead-lettered outbox events for the current organization */
-        get: operations["OutboxController_listDeadLetters"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/outbox/dead-letters/{eventId}/requeue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Requeue one dead-lettered outbox event */
-        post: operations["OutboxController_requeue"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operator/sessions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Operator sessions owned by the current user */
-        get: operations["OperatorController_listSessions"];
-        put?: never;
-        /** Create an Operator session */
-        post: operations["OperatorController_createSession"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operator/sessions/{id}/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Stream one durable Operator session projection via SSE */
-        get: operations["OperatorController_streamSession"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operator/sessions/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get one durable Operator session projection */
-        get: operations["OperatorController_getSession"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update an Operator session mode or model */
-        patch: operations["OperatorController_updateSession"];
-        trace?: never;
-    };
-    "/api/v1/operator/sessions/{id}/workflow-drafts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List durable workflow drafts for one Operator session */
-        get: operations["OperatorController_listWorkflowDrafts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operator/sessions/{id}/turns": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Submit a durable Operator turn */
-        post: operations["OperatorController_createTurn"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operator/actions/{actionId}/decision": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Approve or reject a pending Operator action */
-        post: operations["OperatorController_decideAction"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
+  '/api/v1/auth/validate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AppController_validateAuth'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/login': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AppController_login'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/logout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AppController_logout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/instances': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List alive backend instances (admin only) */
+    get: operations['AdminInstancesController_listInstances'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/instances/stale-sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Detect sessions owned by dead instances (admin only) */
+    get: operations['AdminInstancesController_detectStaleSessions'];
+    put?: never;
+    post?: never;
+    /** Clean up stale sessions owned by dead instances (admin only) */
+    delete: operations['AdminInstancesController_cleanupStaleSessions'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/agents/{agentRunId}/parts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get stored agent trace parts */
+    get: operations['AgentsController_parts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/agents/{agentRunId}/chat': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stream agent chat via SSE */
+    post: operations['AgentsController_chat'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List workflow runs */
+    get: operations['WorkflowRunsController_listRuns'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a workflow run */
+    get: operations['WorkflowRunsController_getRun'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/children': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List child workflow runs */
+    get: operations['WorkflowRunsController_listChildRuns'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run status */
+    get: operations['WorkflowRunsController_status'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/result': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run result */
+    get: operations['WorkflowRunsController_result'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run configuration */
+    get: operations['WorkflowRunsController_config'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel a workflow run */
+    post: operations['WorkflowRunsController_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/trace': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run trace events */
+    get: operations['WorkflowRunObservabilityController_trace'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run event timeline */
+    get: operations['WorkflowRunObservabilityController_events'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/dataflows': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run data flows */
+    get: operations['WorkflowRunObservabilityController_dataflows'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/artifacts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List workflow run artifacts */
+    get: operations['WorkflowRunObservabilityController_runArtifacts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/artifacts/{artifactId}/download': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Download a workflow run artifact */
+    get: operations['WorkflowRunObservabilityController_downloadRunArtifact'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/node-io': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List node inputs and outputs for a workflow run */
+    get: operations['WorkflowRunObservabilityController_getNodeIO'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/node-io/{nodeRef}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get specific node input/output for a workflow run */
+    get: operations['WorkflowRunObservabilityController_getNodeIODetail'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/logs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run logs */
+    get: operations['WorkflowRunObservabilityController_logs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/stream': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Stream workflow run updates via SSE */
+    get: operations['WorkflowRunStreamController_stream'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/terminal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run terminal output */
+    get: operations['WorkflowRunStreamController_terminalChunks'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/terminal/archive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List terminal archive recordings for a workflow run */
+    get: operations['WorkflowRunStreamController_listTerminalArchives'];
+    put?: never;
+    /** Archive terminal output for a workflow run */
+    post: operations['WorkflowRunStreamController_archiveTerminal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/runs/{runId}/terminal/archive/{recordId}/download': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Download a terminal archive recording */
+    get: operations['WorkflowRunStreamController_downloadTerminalArchive'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflow-tags': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all unique tags with usage counts */
+    get: operations['WorkflowTagsController_listAllTags'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all workflows */
+    get: operations['WorkflowsController_findAll'];
+    put?: never;
+    /** Create a new workflow */
+    post: operations['WorkflowsController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a workflow by ID */
+    get: operations['WorkflowsController_findOne'];
+    /** Update a workflow */
+    put: operations['WorkflowsController_update'];
+    post?: never;
+    /** Delete a workflow */
+    delete: operations['WorkflowsController_remove'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/{id}/metadata': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update workflow metadata */
+    patch: operations['WorkflowsController_updateMetadata'];
+    trace?: never;
+  };
+  '/api/v1/workflows/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List workflow summaries */
+    get: operations['WorkflowsController_listSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/{id}/runtime-inputs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow runtime inputs */
+    get: operations['WorkflowsController_getRuntimeInputs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/{workflowId}/versions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all versions of a workflow */
+    get: operations['WorkflowsController_listVersions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/{workflowId}/versions/{versionId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a specific workflow version */
+    get: operations['WorkflowsController_findVersion'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/{id}/commit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Commit a workflow version */
+    post: operations['WorkflowsController_commit'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/{id}/run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Run a workflow */
+    post: operations['WorkflowsController_run'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/workflows/{id}/tags': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get tags for a workflow */
+    get: operations['WorkflowsController_getWorkflowTags'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Set tags for a workflow (replaces all existing tags) */
+    patch: operations['WorkflowsController_setWorkflowTags'];
+    trace?: never;
+  };
+  '/api/v1/files/upload': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Upload a file */
+    post: operations['FilesController_uploadFile'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/files': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List uploaded files */
+    get: operations['FilesController_listFiles'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/files/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get file metadata */
+    get: operations['FilesController_getFile'];
+    put?: never;
+    post?: never;
+    /** Delete a file */
+    delete: operations['FilesController_deleteFile'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/files/{id}/download': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Download a file */
+    get: operations['FilesController_downloadFile'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/artifacts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List workspace artifacts */
+    get: operations['ArtifactsController_listArtifacts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/artifacts/{id}/download': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Download an artifact */
+    get: operations['ArtifactsController_downloadArtifact'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/artifacts/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete an artifact */
+    delete: operations['ArtifactsController_deleteArtifact'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/analytics/query': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Query analytics data */
+    post: operations['AnalyticsController_queryAnalytics'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/analytics/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get analytics settings */
+    get: operations['AnalyticsController_getAnalyticsSettings'];
+    /** Update analytics settings */
+    put: operations['AnalyticsController_updateAnalyticsSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/analytics/ensure-tenant': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Ensure tenant resources exist for an organization */
+    post: operations['AnalyticsController_ensureTenant'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List security findings with pagination and filters */
+    get: operations['FindingsController_listFindings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/stats': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get severity distribution stats for findings */
+    get: operations['FindingsController_getStats'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Export security findings as CSV or JSON */
+    get: operations['FindingsController_exportFindings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a single security finding by ID */
+    get: operations['FindingsController_getFinding'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/{id}/triage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update triage state for a finding */
+    patch: operations['FindingTriageController_updateTriage'];
+    trace?: never;
+  };
+  '/api/v1/findings/bulk-triage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Bulk update triage state for multiple findings */
+    post: operations['FindingTriageController_bulkTriage'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/{id}/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get triage event history for a finding */
+    get: operations['FindingTriageController_getHistory'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/{id}/ticket': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get linked ticket for a finding */
+    get: operations['FindingTriageController_getTicket'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/analytics/posture-trend': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get posture trend over time by severity */
+    get: operations['TriageAnalyticsController_getPostureTrend'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/analytics/triage-velocity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get triage velocity (status changes) over time */
+    get: operations['TriageAnalyticsController_getTriageVelocity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/analytics/mttr': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Mean Time to Remediate by severity */
+    get: operations['TriageAnalyticsController_getMttr'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/analytics/sla-compliance': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get SLA compliance rates by severity */
+    get: operations['TriageAnalyticsController_getSlaCompliance'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/analytics/status-distribution': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get current status distribution of all findings */
+    get: operations['TriageAnalyticsController_getStatusDistribution'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/analytics/top-assignees': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get top assignees by triage volume */
+    get: operations['TriageAnalyticsController_getTopAssignees'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/findings/sla-policies': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get SLA policies for the organization */
+    get: operations['TriageAnalyticsController_getSlaPolicies'];
+    /** Upsert SLA policies for the organization */
+    put: operations['TriageAnalyticsController_upsertSlaPolicies'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/org/members': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List organization members for assignee picker */
+    get: operations['OrgMembersController_listMembers'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ticketing/connection': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Jira connection status */
+    get: operations['TicketingController_getConnection'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ticketing/connect': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Initiate Jira OAuth 2.0 connection */
+    post: operations['TicketingController_connect'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ticketing/callback': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Handle Jira OAuth callback */
+    get: operations['TicketingController_callback'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ticketing/disconnect': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Disconnect Jira integration */
+    delete: operations['TicketingController_disconnect'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ticketing/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update ticketing configuration */
+    put: operations['TicketingController_updateConfig'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ticketing/projects': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Jira projects */
+    get: operations['TicketingController_listProjects'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ticketing/issue-types/{projectKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Jira issue types for a project */
+    get: operations['TicketingController_listIssueTypes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ticketing/reconciliation/{findingTriageId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reconcile an ambiguous Jira ticket creation */
+    post: operations['TicketingController_reconcileTicketCreation'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ticketing/jira/webhook/{secret}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Receive Jira webhook
+     * @description Public endpoint for receiving Jira issue transition webhooks. Authentication is via the unguessable URL secret.
+     */
+    post: operations['JiraWebhookController_receive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/integrations/providers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all integration providers */
+    get: operations['IntegrationsController_listProviders'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/integrations/providers/{provider}/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get provider OAuth configuration */
+    get: operations['IntegrationsController_getProviderConfiguration'];
+    /** Create or update provider OAuth configuration */
+    put: operations['IntegrationsController_upsertProviderConfiguration'];
+    post?: never;
+    /** Delete provider OAuth configuration */
+    delete: operations['IntegrationsController_deleteProviderConfiguration'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/integrations/connections': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List integration connections */
+    get: operations['IntegrationsController_listConnections'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/integrations/{provider}/start': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start OAuth authorization flow */
+    post: operations['IntegrationsController_startOAuth'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/integrations/{provider}/exchange': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Complete OAuth token exchange */
+    post: operations['IntegrationsController_completeOAuth'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/integrations/connections/{id}/refresh': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Refresh an integration connection */
+    post: operations['IntegrationsController_refreshConnection'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/integrations/connections/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Disconnect an integration connection */
+    delete: operations['IntegrationsController_disconnectConnection'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/integrations/connections/{id}/token': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Issue a connection access token */
+    post: operations['IntegrationsController_issueConnectionToken'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/api-keys': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List API keys */
+    get: operations['ApiKeysController_list'];
+    put?: never;
+    /** Create a new API key */
+    post: operations['ApiKeysController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/api-keys/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get an API key by ID */
+    get: operations['ApiKeysController_get'];
+    put?: never;
+    post?: never;
+    /** Delete an API key */
+    delete: operations['ApiKeysController_delete'];
+    options?: never;
+    head?: never;
+    /** Update an API key */
+    patch: operations['ApiKeysController_update'];
+    trace?: never;
+  };
+  '/api/v1/api-keys/{id}/revoke': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Revoke an API key */
+    post: operations['ApiKeysController_revoke'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/components': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all registered components */
+    get: operations['ComponentsController_listComponents'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/components/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a component by ID */
+    get: operations['ComponentsController_getComponent'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/components/{id}/resolve-ports': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resolve dynamic ports for a component */
+    post: operations['ComponentsController_resolvePorts'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/secrets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all secrets */
+    get: operations['SecretsController_listSecrets'];
+    put?: never;
+    /** Create a new secret */
+    post: operations['SecretsController_createSecret'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/secrets/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a secret by ID */
+    get: operations['SecretsController_getSecret'];
+    put?: never;
+    post?: never;
+    /** Delete a secret */
+    delete: operations['SecretsController_deleteSecret'];
+    options?: never;
+    head?: never;
+    /** Update secret metadata */
+    patch: operations['SecretsController_updateSecret'];
+    trace?: never;
+  };
+  '/api/v1/secrets/{id}/value': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a secret value */
+    get: operations['SecretsController_getSecretValue'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/secrets/{id}/rotate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Rotate a secret value */
+    put: operations['SecretsController_rotateSecret'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/schedules': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List schedules */
+    get: operations['SchedulesController_list'];
+    put?: never;
+    /** Create a schedule */
+    post: operations['SchedulesController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/schedules/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a schedule by ID */
+    get: operations['SchedulesController_getOne'];
+    put?: never;
+    post?: never;
+    /** Delete a schedule */
+    delete: operations['SchedulesController_delete'];
+    options?: never;
+    head?: never;
+    /** Update a schedule */
+    patch: operations['SchedulesController_update'];
+    trace?: never;
+  };
+  '/api/v1/schedules/{id}/pause': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Pause a schedule */
+    post: operations['SchedulesController_pause'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/schedules/{id}/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resume a schedule */
+    post: operations['SchedulesController_resume'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/schedules/{id}/trigger': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Trigger a schedule immediately */
+    post: operations['SchedulesController_trigger'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/workflows': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List workflows accessible via webhook */
+    get: operations['WebhooksController_listWorkflows'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/workflows/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a workflow by ID via webhook */
+    get: operations['WebhooksController_getWorkflow'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/workflows/{id}/run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Run a workflow via webhook */
+    post: operations['WebhooksController_runWorkflow'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/runs/{runId}/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run status */
+    get: operations['WebhooksController_getRunStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/runs/{runId}/result': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run result */
+    get: operations['WebhooksController_getRunResult'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/runs/{runId}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel a workflow run */
+    post: operations['WebhooksController_cancelRun'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/inbound/{path}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Receive inbound webhook
+     * @description Public endpoint for receiving webhook deliveries. No authentication required - security relies on the unguessable webhook path.
+     */
+    post: operations['InboundWebhookController_receive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/configurations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all webhook configurations */
+    get: operations['WebhooksAdminController_list'];
+    put?: never;
+    /** Create a new webhook configuration */
+    post: operations['WebhooksAdminController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/configurations/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a webhook configuration by ID */
+    get: operations['WebhooksAdminController_get'];
+    /** Update a webhook configuration */
+    put: operations['WebhooksAdminController_update'];
+    post?: never;
+    /** Delete a webhook configuration */
+    delete: operations['WebhooksAdminController_delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/configurations/{id}/regenerate-path': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Regenerate webhook path (creates new URL) */
+    post: operations['WebhooksAdminController_regeneratePath'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/configurations/{id}/url': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get the webhook URL for a configuration */
+    get: operations['WebhooksAdminController_getUrl'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/configurations/test-script': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Test a parsing script with sample data */
+    post: operations['WebhooksAdminController_testScript'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/configurations/{id}/deliveries': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List delivery history for a webhook */
+    get: operations['WebhooksAdminController_listDeliveries'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/configurations/{id}/deliveries/{deliveryId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get details of a specific delivery */
+    get: operations['WebhooksAdminController_getDelivery'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/human-inputs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List human input requests */
+    get: operations['HumanInputsController_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/human-inputs/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a human input request details */
+    get: operations['HumanInputsController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/human-inputs/{id}/resolve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resolve a human input request */
+    post: operations['HumanInputsController_resolve'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/human-inputs/resolve/{token}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resolve input via public token */
+    post: operations['HumanInputsController_resolveByToken'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all MCP servers */
+    get: operations['McpServersController_listServers'];
+    put?: never;
+    /** Create a new MCP server configuration */
+    post: operations['McpServersController_createServer'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/enabled': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List enabled MCP servers only */
+    get: operations['McpServersController_listEnabledServers'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/tools': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all tools from enabled MCP servers */
+    get: operations['McpServersController_getAllTools'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get health status of all enabled servers */
+    get: operations['McpServersController_getHealthStatuses'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a specific MCP server */
+    get: operations['McpServersController_getServer'];
+    put?: never;
+    post?: never;
+    /** Delete an MCP server configuration */
+    delete: operations['McpServersController_deleteServer'];
+    options?: never;
+    head?: never;
+    /** Update an MCP server configuration */
+    patch: operations['McpServersController_updateServer'];
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/{id}/tools': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List discovered tools from a server */
+    get: operations['McpServersController_getServerTools'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/{id}/toggle': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Toggle MCP server enabled/disabled status */
+    post: operations['McpServersController_toggleServer'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/test-enabled': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Test all enabled MCP server connections */
+    post: operations['McpServersController_testEnabledServers'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/{id}/test': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Test connection to an MCP server */
+    post: operations['McpServersController_testConnection'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/{serverId}/tools/{toolId}/toggle': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Toggle a tool enabled/disabled state */
+    post: operations['McpServersController_toggleToolEnabled'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-servers/{id}/resolve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get resolved MCP server configuration (with secrets resolved) */
+    get: operations['McpServersController_getResolvedConfig'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-groups': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all MCP groups */
+    get: operations['McpGroupsController_listGroups'];
+    put?: never;
+    /** Create a new MCP group (admin only) */
+    post: operations['McpGroupsController_createGroup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-groups/templates': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List available MCP group templates */
+    get: operations['McpGroupsController_listTemplates'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-groups/slug/{slug}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a group by slug */
+    get: operations['McpGroupsController_getGroupBySlug'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-groups/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a specific MCP group */
+    get: operations['McpGroupsController_getGroup'];
+    put?: never;
+    post?: never;
+    /** Delete an MCP group (admin only) */
+    delete: operations['McpGroupsController_deleteGroup'];
+    options?: never;
+    head?: never;
+    /** Update an MCP group */
+    patch: operations['McpGroupsController_updateGroup'];
+    trace?: never;
+  };
+  '/api/v1/mcp-groups/{id}/servers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get servers in a group */
+    get: operations['McpGroupsController_getServersInGroup'];
+    put?: never;
+    /** Add a server to a group (admin only) */
+    post: operations['McpGroupsController_addServerToGroup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-groups/{id}/servers/{serverId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Remove a server from a group (admin only) */
+    delete: operations['McpGroupsController_removeServerFromGroup'];
+    options?: never;
+    head?: never;
+    /** Update server metadata in a group (admin only) */
+    patch: operations['McpGroupsController_updateServerInGroup'];
+    trace?: never;
+  };
+  '/api/v1/mcp-groups/sync-templates': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Sync group templates from code (admin only) */
+    post: operations['McpGroupsController_syncTemplates'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-groups/templates/{slug}/import': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import a group template (admin only) */
+    post: operations['McpGroupsController_importTemplate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-registry/catalog': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Browse/search the Docker MCP Registry catalog */
+    get: operations['McpRegistryController_getCatalog'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-registry/catalog/{name}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get details for a single registry server */
+    get: operations['McpRegistryController_getCatalogEntry'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-registry/import': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import a registry server into the MCP Library */
+    post: operations['McpRegistryController_importServer'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-registry/sync': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Trigger a manual registry sync */
+    post: operations['McpRegistryController_triggerSync'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp-registry/sync/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get the current registry sync status */
+    get: operations['McpRegistryController_getSyncStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/channels': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all notification channels */
+    get: operations['NotificationsController_list'];
+    put?: never;
+    /** Create a notification channel */
+    post: operations['NotificationsController_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/channels/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a notification channel by ID */
+    get: operations['NotificationsController_get'];
+    /** Update a notification channel */
+    put: operations['NotificationsController_update'];
+    post?: never;
+    /** Delete a notification channel */
+    delete: operations['NotificationsController_delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/channels/{id}/test': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Send a test notification to a channel */
+    post: operations['NotificationsController_test'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/channels/{id}/deliveries': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List delivery history for a notification channel */
+    get: operations['NotificationsController_listDeliveries'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/channels/{id}/deliveries/{deliveryId}/resend': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resend a failed delivery */
+    post: operations['NotificationsController_resendDelivery'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp/gateway': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Unified MCP Gateway endpoint (Streamable HTTP) */
+    get: operations['McpGatewayController_handleGateway_get'];
+    /** Unified MCP Gateway endpoint (Streamable HTTP) */
+    put: operations['McpGatewayController_handleGateway_put'];
+    /** Unified MCP Gateway endpoint (Streamable HTTP) */
+    post: operations['McpGatewayController_handleGateway_post'];
+    /** Unified MCP Gateway endpoint (Streamable HTTP) */
+    delete: operations['McpGatewayController_handleGateway_delete'];
+    /** Unified MCP Gateway endpoint (Streamable HTTP) */
+    options: operations['McpGatewayController_handleGateway_options'];
+    /** Unified MCP Gateway endpoint (Streamable HTTP) */
+    head: operations['McpGatewayController_handleGateway_head'];
+    /** Unified MCP Gateway endpoint (Streamable HTTP) */
+    patch: operations['McpGatewayController_handleGateway_patch'];
+    trace?: never;
+  };
+  '/api/v1/mcp/discover': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start MCP tool discovery
+     * @description Initiates an asynchronous discovery workflow for an MCP server. Returns 202 ACCEPTED with a workflow ID for tracking progress.
+     */
+    post: operations['McpDiscoveryController_discover'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp/discover/{workflowId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get MCP discovery status
+     * @description Queries the status of an MCP discovery workflow by workflow ID. Returns current status and discovered tools if available.
+     */
+    get: operations['McpDiscoveryController_getStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp/discover-group': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start MCP group tool discovery
+     * @description Initiates an asynchronous discovery workflow for multiple MCP servers. Returns 202 ACCEPTED with a workflow ID for tracking progress.
+     */
+    post: operations['McpDiscoveryController_discoverGroup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp/discover-group/{workflowId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get MCP group discovery status
+     * @description Queries the status of an MCP group discovery workflow by workflow ID. Returns current status and discovered tools if available.
+     */
+    get: operations['McpDiscoveryController_getGroupStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/mcp/sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List active MCP sessions (admin only) */
+    get: operations['McpSessionsController_listSessions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/studio-mcp': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Studio MCP endpoint (Streamable HTTP) for external agents */
+    get: operations['StudioMcpController_handleMcp_get'];
+    /** Studio MCP endpoint (Streamable HTTP) for external agents */
+    put: operations['StudioMcpController_handleMcp_put'];
+    /** Studio MCP endpoint (Streamable HTTP) for external agents */
+    post: operations['StudioMcpController_handleMcp_post'];
+    /** Studio MCP endpoint (Streamable HTTP) for external agents */
+    delete: operations['StudioMcpController_handleMcp_delete'];
+    /** Studio MCP endpoint (Streamable HTTP) for external agents */
+    options: operations['StudioMcpController_handleMcp_options'];
+    /** Studio MCP endpoint (Streamable HTTP) for external agents */
+    head: operations['StudioMcpController_handleMcp_head'];
+    /** Studio MCP endpoint (Streamable HTTP) for external agents */
+    patch: operations['StudioMcpController_handleMcp_patch'];
+    trace?: never;
+  };
+  '/api/v1/templates': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List all templates */
+    get: operations['TemplatesController_listTemplates'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/categories': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List template categories */
+    get: operations['TemplatesController_getCategories'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/tags': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List template tags */
+    get: operations['TemplatesController_getTags'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/my': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get my submitted templates */
+    get: operations['TemplatesController_getMyTemplates'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/repo-info': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get template repository info */
+    get: operations['TemplatesController_getRepoInfo'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/submissions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get template submissions */
+    get: operations['TemplatesController_getSubmissions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/revalidations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List recent template live revalidations */
+    get: operations['TemplatesController_getRevalidationJobs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/revalidations/{auditId}/log': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get template live revalidation log tail */
+    get: operations['TemplatesController_getRevalidationJobLog'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/revalidations/{auditId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get template live revalidation status */
+    get: operations['TemplatesController_getRevalidationJob'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get template by ID */
+    get: operations['TemplatesController_getTemplate'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/community/import': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import a community template from the published catalog */
+    post: operations['TemplatesController_importCommunityTemplate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/publish': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Validate a workflow for template submission */
+    post: operations['TemplatesController_publishTemplate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/{id}/revalidate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start template live revalidation */
+    post: operations['TemplatesController_revalidateTemplate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/{id}/use': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Use a template to create a new workflow */
+    post: operations['TemplatesController_useTemplate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/templates/sync': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Sync templates from GitHub */
+    post: operations['TemplatesController_syncTemplates'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/audit-logs/export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Export audit log events as CSV */
+    get: operations['AuditLogsController_export'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/audit-logs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List audit log events */
+    get: operations['AuditLogsController_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['HealthController_liveness'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/health/ready': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['HealthController_readiness'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/internal/health/worker-ready': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['InternalHealthController_workerReady'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/agent-skills': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List agent skills for the current organization */
+    get: operations['AgentSkillsController_listSkills'];
+    put?: never;
+    /** Create an agent skill */
+    post: operations['AgentSkillsController_createSkill'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/agent-skills/discover': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Discover skill folders under .agents/skills, .claude/skills, .github/skills, .codex/skills, .kimi/skills, and .opencode/skills */
+    get: operations['AgentSkillsController_discoverSkills'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/agent-skills/import-discovered': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import discovered workspace skill folders into the org library */
+    post: operations['AgentSkillsController_importDiscoveredSkills'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/agent-skills/import-zip': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import one or more skill folders from a zip archive */
+    post: operations['AgentSkillsController_importSkillZip'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/agent-skills/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get an agent skill by id */
+    get: operations['AgentSkillsController_getSkill'];
+    put?: never;
+    post?: never;
+    /** Delete an agent skill */
+    delete: operations['AgentSkillsController_deleteSkill'];
+    options?: never;
+    head?: never;
+    /** Update an agent skill */
+    patch: operations['AgentSkillsController_updateSkill'];
+    trace?: never;
+  };
+  '/api/v1/scopes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List scopes for the current organization */
+    get: operations['ScopesController_listScopes'];
+    put?: never;
+    /** Create a scope */
+    post: operations['ScopesController_createScope'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/scopes/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a scope by id */
+    get: operations['ScopesController_getScope'];
+    put?: never;
+    post?: never;
+    /** Delete a scope */
+    delete: operations['ScopesController_deleteScope'];
+    options?: never;
+    head?: never;
+    /** Update a scope */
+    patch: operations['ScopesController_updateScope'];
+    trace?: never;
+  };
+  '/api/v1/scopes/{id}/findings-summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get finding counts for a scope */
+    get: operations['ScopeFindingsController_getSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/scopes/{scopeId}/assets/compare': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Compare asset observations and scanner coverage between two runs */
+    get: operations['AssetsController_compareRuns'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/scopes/{scopeId}/assets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List discovered assets for a scope */
+    get: operations['AssetsController_listAssets'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ai/anthropic/models': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** List Anthropic models accessible to a stored API key secret */
+    post: operations['AiController_listAnthropicModels'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/outbox/dead-letters': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List dead-lettered outbox events for the current organization */
+    get: operations['OutboxController_listDeadLetters'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/outbox/dead-letters/{eventId}/requeue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Requeue one dead-lettered outbox event */
+    post: operations['OutboxController_requeue'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/operator/sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Operator sessions owned by the current user */
+    get: operations['OperatorController_listSessions'];
+    put?: never;
+    /** Create an Operator session */
+    post: operations['OperatorController_createSession'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/operator/run-improvements/{runId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Locate the latest Operator improvement for one source run */
+    get: operations['OperatorController_getRunImprovement'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/operator/sessions/{id}/stream': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Stream one durable Operator session projection via SSE */
+    get: operations['OperatorController_streamSession'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/operator/sessions/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one durable Operator session projection */
+    get: operations['OperatorController_getSession'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update an Operator session mode or model */
+    patch: operations['OperatorController_updateSession'];
+    trace?: never;
+  };
+  '/api/v1/operator/sessions/{id}/workflow-drafts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List durable workflow drafts for one Operator session */
+    get: operations['OperatorController_listWorkflowDrafts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/operator/sessions/{id}/turns': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Submit a durable Operator turn */
+    post: operations['OperatorController_createTurn'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/operator/actions/{actionId}/decision': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve or reject a pending Operator action */
+    post: operations['OperatorController_decideAction'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        WorkflowRunResultResponseDto: {
-            runId: string;
-            result: {
-                outputs: {
-                    [key: string]: unknown;
-                };
-                /** @enum {boolean} */
-                success: true;
-            } | {
-                /** @enum {string} */
-                status: "FAILED";
-                result: null;
-            } | {
-                /** @enum {string} */
-                status: "CANCELLED";
-                result: null;
-            } | {
-                /** @enum {string} */
-                status: "TIMED_OUT";
-                result: null;
-            } | {
-                /** @enum {string} */
-                status: "TERMINATED";
-                result: null;
+  schemas: {
+    WorkflowRunResultResponseDto: {
+      runId: string;
+      result:
+        | {
+            outputs: {
+              [key: string]: unknown;
             };
-        };
-        CancelWorkflowRunResponseDto: {
+            /** @enum {boolean} */
+            success: true;
+          }
+        | {
             /** @enum {string} */
-            status: "cancelled";
-            runId: string;
-        };
-        RunArtifactsResponseDto: {
-            runId: string;
-            artifacts: {
-                /** Format: uuid */
-                id: string;
-                runId: string;
-                /** Format: uuid */
-                workflowId: string;
-                /** Format: uuid */
-                workflowVersionId?: string | null;
-                componentId?: string | null;
-                componentRef: string;
-                /** Format: uuid */
-                fileId: string;
-                name: string;
-                mimeType: string;
-                size: number;
-                destinations: ("run" | "library")[];
-                metadata?: ({
-                    remoteUploads?: {
-                        /** @enum {string} */
-                        type: "s3" | "gcs";
-                        bucket: string;
-                        key: string;
-                        uri: string;
-                        region?: string;
-                        size?: number;
-                        etag?: string;
-                        /** Format: uri */
-                        url?: string;
-                        metadata?: {
-                            [key: string]: unknown;
-                        };
-                    }[];
-                } & {
-                    [key: string]: unknown;
-                }) | null;
-                organizationId?: string | null;
-                /** Format: date-time */
-                createdAt: string;
-            }[];
-        };
-        TerminalArchiveRequestDto: {
-            nodeRef: string;
-            /**
-             * @default pty
-             * @enum {string}
-             */
-            stream: "stdout" | "stderr" | "pty";
-            width?: number;
-            height?: number;
-        };
-        TerminalRecordingDto: {
-            id: number;
-            runId: string;
-            nodeRef: string;
-            stream: string;
-            /** Format: uuid */
-            fileId: string;
-            chunkCount: number;
-            durationMs: number;
-            createdAt: string;
-        };
-        TerminalRecordListDto: {
-            runId: string;
-            records: {
-                id: number;
-                runId: string;
-                nodeRef: string;
-                stream: string;
-                /** Format: uuid */
-                fileId: string;
-                chunkCount: number;
-                durationMs: number;
-                createdAt: string;
-            }[];
-        };
-        AllTagsResponseDto: {
-            tags: {
-                name: string;
-                count: number;
-            }[];
-        };
-        CreateWorkflowRequestDto: {
-            id?: string;
-            name: string;
-            description?: string;
-            nodes: {
-                id: string;
-                type: string;
-                position: {
-                    x: number;
-                    y: number;
-                };
-                data: {
-                    label: string;
-                    /**
-                     * @default {
-                     *       "params": {},
-                     *       "inputOverrides": {}
-                     *     }
-                     */
-                    config: {
-                        /** @default {} */
-                        params: {
-                            [key: string]: unknown;
-                        };
-                        /** @default {} */
-                        inputOverrides: {
-                            [key: string]: unknown;
-                        };
-                        /** @enum {string} */
-                        joinStrategy?: "all" | "any" | "first";
-                        streamId?: string;
-                        groupId?: string;
-                        maxConcurrency?: number;
-                        /** @enum {string} */
-                        mode?: "normal" | "tool";
-                        toolConfig?: {
-                            /** @default [] */
-                            boundInputIds: string[];
-                            /** @default [] */
-                            exposedInputIds: string[];
-                        };
-                        connectedToolNodeIds?: string[];
-                    };
-                    dynamicInputs?: {
-                        [key: string]: unknown;
-                    }[];
-                    dynamicOutputs?: {
-                        [key: string]: unknown;
-                    }[];
-                };
-            }[];
-            edges: {
-                id: string;
-                source: string;
-                target: string;
-                sourceHandle?: string;
-                targetHandle?: string;
+            status: 'FAILED';
+            result: null;
+          }
+        | {
+            /** @enum {string} */
+            status: 'CANCELLED';
+            result: null;
+          }
+        | {
+            /** @enum {string} */
+            status: 'TIMED_OUT';
+            result: null;
+          }
+        | {
+            /** @enum {string} */
+            status: 'TERMINATED';
+            result: null;
+          };
+    };
+    CancelWorkflowRunResponseDto: {
+      /** @enum {string} */
+      status: 'cancelled';
+      runId: string;
+    };
+    RunArtifactsResponseDto: {
+      runId: string;
+      artifacts: {
+        /** Format: uuid */
+        id: string;
+        runId: string;
+        /** Format: uuid */
+        workflowId: string;
+        /** Format: uuid */
+        workflowVersionId?: string | null;
+        componentId?: string | null;
+        componentRef: string;
+        /** Format: uuid */
+        fileId: string;
+        name: string;
+        mimeType: string;
+        size: number;
+        destinations: ('run' | 'library')[];
+        metadata?:
+          | ({
+              remoteUploads?: {
                 /** @enum {string} */
-                kind?: "success" | "error";
-                /** @enum {string} */
-                type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
-            }[];
+                type: 's3' | 'gcs';
+                bucket: string;
+                key: string;
+                uri: string;
+                region?: string;
+                size?: number;
+                etag?: string;
+                /** Format: uri */
+                url?: string;
+                metadata?: {
+                  [key: string]: unknown;
+                };
+              }[];
+            } & {
+              [key: string]: unknown;
+            })
+          | null;
+        organizationId?: string | null;
+        /** Format: date-time */
+        createdAt: string;
+      }[];
+    };
+    TerminalArchiveRequestDto: {
+      nodeRef: string;
+      /**
+       * @default pty
+       * @enum {string}
+       */
+      stream: 'stdout' | 'stderr' | 'pty';
+      width?: number;
+      height?: number;
+    };
+    TerminalRecordingDto: {
+      id: number;
+      runId: string;
+      nodeRef: string;
+      stream: string;
+      /** Format: uuid */
+      fileId: string;
+      chunkCount: number;
+      durationMs: number;
+      createdAt: string;
+    };
+    TerminalRecordListDto: {
+      runId: string;
+      records: {
+        id: number;
+        runId: string;
+        nodeRef: string;
+        stream: string;
+        /** Format: uuid */
+        fileId: string;
+        chunkCount: number;
+        durationMs: number;
+        createdAt: string;
+      }[];
+    };
+    AllTagsResponseDto: {
+      tags: {
+        name: string;
+        count: number;
+      }[];
+    };
+    CreateWorkflowRequestDto: {
+      id?: string;
+      name: string;
+      description?: string;
+      nodes: {
+        id: string;
+        type: string;
+        position: {
+          x: number;
+          y: number;
+        };
+        data: {
+          label: string;
+          /**
+           * @default {
+           *       "params": {},
+           *       "inputOverrides": {}
+           *     }
+           */
+          config: {
+            /** @default {} */
+            params: {
+              [key: string]: unknown;
+            };
+            /** @default {} */
+            inputOverrides: {
+              [key: string]: unknown;
+            };
+            /** @enum {string} */
+            joinStrategy?: 'all' | 'any' | 'first';
+            streamId?: string;
+            groupId?: string;
+            maxConcurrency?: number;
+            /** @enum {string} */
+            mode?: 'normal' | 'tool';
+            toolConfig?: {
+              /** @default [] */
+              boundInputIds: string[];
+              /** @default [] */
+              exposedInputIds: string[];
+            };
+            connectedToolNodeIds?: string[];
+          };
+          dynamicInputs?: {
+            [key: string]: unknown;
+          }[];
+          dynamicOutputs?: {
+            [key: string]: unknown;
+          }[];
+        };
+      }[];
+      edges: {
+        id: string;
+        source: string;
+        target: string;
+        sourceHandle?: string;
+        targetHandle?: string;
+        /** @enum {string} */
+        kind?: 'success' | 'error';
+        /** @enum {string} */
+        type?: 'default' | 'smoothstep' | 'step' | 'straight' | 'bezier';
+      }[];
+      /**
+       * @default {
+       *       "x": 0,
+       *       "y": 0,
+       *       "zoom": 1
+       *     }
+       */
+      viewport: {
+        x: number;
+        y: number;
+        zoom: number;
+      };
+      successCriteria?: (
+        | {
+            id: string;
+            title: string;
+            /** @enum {string} */
+            kind: 'output_assertion';
+            nodeRef: string;
+            path: string;
+            /** @enum {string} */
+            operator: 'exists' | 'not_empty' | 'equals' | 'contains' | 'gte' | 'lte';
+            expected?: (string | null) | (number | null) | (boolean | null);
+          }
+        | {
+            id: string;
+            title: string;
+            /** @enum {string} */
+            kind: 'finding_count';
+            minimum?: number;
+            maximum?: number;
+          }
+      )[];
+    };
+    WorkflowResponseDto: {
+      id: string;
+      name: string;
+      description?: string | null;
+      graph: {
+        id?: string;
+        name: string;
+        description?: string;
+        nodes: {
+          id: string;
+          type: string;
+          position: {
+            x: number;
+            y: number;
+          };
+          data: {
+            label: string;
             /**
              * @default {
-             *       "x": 0,
-             *       "y": 0,
-             *       "zoom": 1
+             *       "params": {},
+             *       "inputOverrides": {}
              *     }
              */
-            viewport: {
-                x: number;
-                y: number;
-                zoom: number;
+            config: {
+              /** @default {} */
+              params: {
+                [key: string]: unknown;
+              };
+              /** @default {} */
+              inputOverrides: {
+                [key: string]: unknown;
+              };
+              /** @enum {string} */
+              joinStrategy?: 'all' | 'any' | 'first';
+              streamId?: string;
+              groupId?: string;
+              maxConcurrency?: number;
+              /** @enum {string} */
+              mode?: 'normal' | 'tool';
+              toolConfig?: {
+                /** @default [] */
+                boundInputIds: string[];
+                /** @default [] */
+                exposedInputIds: string[];
+              };
+              connectedToolNodeIds?: string[];
             };
-            successCriteria?: ({
-                id: string;
-                title: string;
-                /** @enum {string} */
-                kind: "output_assertion";
-                nodeRef: string;
-                path: string;
-                /** @enum {string} */
-                operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
-                expected?: (string | null) | (number | null) | (boolean | null);
-            } | {
-                id: string;
-                title: string;
-                /** @enum {string} */
-                kind: "finding_count";
-                minimum?: number;
-                maximum?: number;
-            })[];
+            dynamicInputs?: {
+              [key: string]: unknown;
+            }[];
+            dynamicOutputs?: {
+              [key: string]: unknown;
+            }[];
+          };
+        }[];
+        edges: {
+          id: string;
+          source: string;
+          target: string;
+          sourceHandle?: string;
+          targetHandle?: string;
+          /** @enum {string} */
+          kind?: 'success' | 'error';
+          /** @enum {string} */
+          type?: 'default' | 'smoothstep' | 'step' | 'straight' | 'bezier';
+        }[];
+        /**
+         * @default {
+         *       "x": 0,
+         *       "y": 0,
+         *       "zoom": 1
+         *     }
+         */
+        viewport: {
+          x: number;
+          y: number;
+          zoom: number;
         };
-        WorkflowResponseDto: {
+        successCriteria?: (
+          | {
+              id: string;
+              title: string;
+              /** @enum {string} */
+              kind: 'output_assertion';
+              nodeRef: string;
+              path: string;
+              /** @enum {string} */
+              operator: 'exists' | 'not_empty' | 'equals' | 'contains' | 'gte' | 'lte';
+              expected?: (string | null) | (number | null) | (boolean | null);
+            }
+          | {
+              id: string;
+              title: string;
+              /** @enum {string} */
+              kind: 'finding_count';
+              minimum?: number;
+              maximum?: number;
+            }
+        )[];
+      };
+      compiledDefinition: unknown;
+      lastRun: string | null;
+      runCount: number;
+      createdAt: string;
+      updatedAt: string;
+      /** Format: uuid */
+      currentVersionId: string | null;
+      currentVersion: number | null;
+    };
+    UpdateWorkflowRequestDto: {
+      id?: string;
+      name: string;
+      description?: string;
+      nodes: {
+        id: string;
+        type: string;
+        position: {
+          x: number;
+          y: number;
+        };
+        data: {
+          label: string;
+          /**
+           * @default {
+           *       "params": {},
+           *       "inputOverrides": {}
+           *     }
+           */
+          config: {
+            /** @default {} */
+            params: {
+              [key: string]: unknown;
+            };
+            /** @default {} */
+            inputOverrides: {
+              [key: string]: unknown;
+            };
+            /** @enum {string} */
+            joinStrategy?: 'all' | 'any' | 'first';
+            streamId?: string;
+            groupId?: string;
+            maxConcurrency?: number;
+            /** @enum {string} */
+            mode?: 'normal' | 'tool';
+            toolConfig?: {
+              /** @default [] */
+              boundInputIds: string[];
+              /** @default [] */
+              exposedInputIds: string[];
+            };
+            connectedToolNodeIds?: string[];
+          };
+          dynamicInputs?: {
+            [key: string]: unknown;
+          }[];
+          dynamicOutputs?: {
+            [key: string]: unknown;
+          }[];
+        };
+      }[];
+      edges: {
+        id: string;
+        source: string;
+        target: string;
+        sourceHandle?: string;
+        targetHandle?: string;
+        /** @enum {string} */
+        kind?: 'success' | 'error';
+        /** @enum {string} */
+        type?: 'default' | 'smoothstep' | 'step' | 'straight' | 'bezier';
+      }[];
+      /**
+       * @default {
+       *       "x": 0,
+       *       "y": 0,
+       *       "zoom": 1
+       *     }
+       */
+      viewport: {
+        x: number;
+        y: number;
+        zoom: number;
+      };
+      successCriteria?: (
+        | {
             id: string;
-            name: string;
-            description?: string | null;
-            graph: {
-                id?: string;
-                name: string;
-                description?: string;
-                nodes: {
-                    id: string;
-                    type: string;
-                    position: {
-                        x: number;
-                        y: number;
-                    };
-                    data: {
-                        label: string;
-                        /**
-                         * @default {
-                         *       "params": {},
-                         *       "inputOverrides": {}
-                         *     }
-                         */
-                        config: {
-                            /** @default {} */
-                            params: {
-                                [key: string]: unknown;
-                            };
-                            /** @default {} */
-                            inputOverrides: {
-                                [key: string]: unknown;
-                            };
-                            /** @enum {string} */
-                            joinStrategy?: "all" | "any" | "first";
-                            streamId?: string;
-                            groupId?: string;
-                            maxConcurrency?: number;
-                            /** @enum {string} */
-                            mode?: "normal" | "tool";
-                            toolConfig?: {
-                                /** @default [] */
-                                boundInputIds: string[];
-                                /** @default [] */
-                                exposedInputIds: string[];
-                            };
-                            connectedToolNodeIds?: string[];
-                        };
-                        dynamicInputs?: {
-                            [key: string]: unknown;
-                        }[];
-                        dynamicOutputs?: {
-                            [key: string]: unknown;
-                        }[];
-                    };
-                }[];
-                edges: {
-                    id: string;
-                    source: string;
-                    target: string;
-                    sourceHandle?: string;
-                    targetHandle?: string;
-                    /** @enum {string} */
-                    kind?: "success" | "error";
-                    /** @enum {string} */
-                    type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
-                }[];
-                /**
-                 * @default {
-                 *       "x": 0,
-                 *       "y": 0,
-                 *       "zoom": 1
-                 *     }
-                 */
-                viewport: {
-                    x: number;
-                    y: number;
-                    zoom: number;
-                };
-                successCriteria?: ({
-                    id: string;
-                    title: string;
-                    /** @enum {string} */
-                    kind: "output_assertion";
-                    nodeRef: string;
-                    path: string;
-                    /** @enum {string} */
-                    operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
-                    expected?: (string | null) | (number | null) | (boolean | null);
-                } | {
-                    id: string;
-                    title: string;
-                    /** @enum {string} */
-                    kind: "finding_count";
-                    minimum?: number;
-                    maximum?: number;
-                })[];
-            };
-            compiledDefinition: unknown;
-            lastRun: string | null;
-            runCount: number;
-            createdAt: string;
-            updatedAt: string;
-            /** Format: uuid */
-            currentVersionId: string | null;
-            currentVersion: number | null;
-        };
-        UpdateWorkflowRequestDto: {
-            id?: string;
-            name: string;
-            description?: string;
-            nodes: {
-                id: string;
-                type: string;
-                position: {
-                    x: number;
-                    y: number;
-                };
-                data: {
-                    label: string;
-                    /**
-                     * @default {
-                     *       "params": {},
-                     *       "inputOverrides": {}
-                     *     }
-                     */
-                    config: {
-                        /** @default {} */
-                        params: {
-                            [key: string]: unknown;
-                        };
-                        /** @default {} */
-                        inputOverrides: {
-                            [key: string]: unknown;
-                        };
-                        /** @enum {string} */
-                        joinStrategy?: "all" | "any" | "first";
-                        streamId?: string;
-                        groupId?: string;
-                        maxConcurrency?: number;
-                        /** @enum {string} */
-                        mode?: "normal" | "tool";
-                        toolConfig?: {
-                            /** @default [] */
-                            boundInputIds: string[];
-                            /** @default [] */
-                            exposedInputIds: string[];
-                        };
-                        connectedToolNodeIds?: string[];
-                    };
-                    dynamicInputs?: {
-                        [key: string]: unknown;
-                    }[];
-                    dynamicOutputs?: {
-                        [key: string]: unknown;
-                    }[];
-                };
-            }[];
-            edges: {
-                id: string;
-                source: string;
-                target: string;
-                sourceHandle?: string;
-                targetHandle?: string;
-                /** @enum {string} */
-                kind?: "success" | "error";
-                /** @enum {string} */
-                type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
-            }[];
+            title: string;
+            /** @enum {string} */
+            kind: 'output_assertion';
+            nodeRef: string;
+            path: string;
+            /** @enum {string} */
+            operator: 'exists' | 'not_empty' | 'equals' | 'contains' | 'gte' | 'lte';
+            expected?: (string | null) | (number | null) | (boolean | null);
+          }
+        | {
+            id: string;
+            title: string;
+            /** @enum {string} */
+            kind: 'finding_count';
+            minimum?: number;
+            maximum?: number;
+          }
+      )[];
+      /** Format: uuid */
+      expectedVersionId?: string;
+    };
+    UpdateWorkflowMetadataDto: {
+      name: string;
+      description?: string | null;
+    };
+    WorkflowRuntimeInputsResponseDto: {
+      workflowId: string;
+      inputs: {
+        /** @description Unique identifier for this input */
+        id: string;
+        /** @description Display label for the input field */
+        label: string;
+        /**
+         * @description Type of input data
+         * @enum {string}
+         */
+        type: 'file' | 'text' | 'number' | 'boolean' | 'json' | 'array' | 'secret';
+        /**
+         * @description Whether this input is required
+         * @default true
+         */
+        required: boolean;
+        /** @description Help text for the input */
+        description?: string;
+        /** @description Default value to use when input is omitted */
+        defaultValue?: unknown;
+      }[];
+    };
+    WorkflowVersionSummaryDto: {
+      id: string;
+      workflowId: string;
+      version: number;
+      createdAt: string;
+    };
+    WorkflowVersionResponseDto: {
+      id: string;
+      workflowId: string;
+      version: number;
+      graph: {
+        id?: string;
+        name: string;
+        description?: string;
+        nodes: {
+          id: string;
+          type: string;
+          position: {
+            x: number;
+            y: number;
+          };
+          data: {
+            label: string;
             /**
              * @default {
-             *       "x": 0,
-             *       "y": 0,
-             *       "zoom": 1
+             *       "params": {},
+             *       "inputOverrides": {}
              *     }
              */
-            viewport: {
-                x: number;
-                y: number;
-                zoom: number;
+            config: {
+              /** @default {} */
+              params: {
+                [key: string]: unknown;
+              };
+              /** @default {} */
+              inputOverrides: {
+                [key: string]: unknown;
+              };
+              /** @enum {string} */
+              joinStrategy?: 'all' | 'any' | 'first';
+              streamId?: string;
+              groupId?: string;
+              maxConcurrency?: number;
+              /** @enum {string} */
+              mode?: 'normal' | 'tool';
+              toolConfig?: {
+                /** @default [] */
+                boundInputIds: string[];
+                /** @default [] */
+                exposedInputIds: string[];
+              };
+              connectedToolNodeIds?: string[];
             };
-            successCriteria?: ({
-                id: string;
-                title: string;
-                /** @enum {string} */
-                kind: "output_assertion";
-                nodeRef: string;
-                path: string;
-                /** @enum {string} */
-                operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
-                expected?: (string | null) | (number | null) | (boolean | null);
-            } | {
-                id: string;
-                title: string;
-                /** @enum {string} */
-                kind: "finding_count";
-                minimum?: number;
-                maximum?: number;
-            })[];
-            /** Format: uuid */
-            expectedVersionId?: string;
-        };
-        UpdateWorkflowMetadataDto: {
-            name: string;
-            description?: string | null;
-        };
-        WorkflowRuntimeInputsResponseDto: {
-            workflowId: string;
-            inputs: {
-                /** @description Unique identifier for this input */
-                id: string;
-                /** @description Display label for the input field */
-                label: string;
-                /**
-                 * @description Type of input data
-                 * @enum {string}
-                 */
-                type: "file" | "text" | "number" | "boolean" | "json" | "array" | "secret";
-                /**
-                 * @description Whether this input is required
-                 * @default true
-                 */
-                required: boolean;
-                /** @description Help text for the input */
-                description?: string;
-                /** @description Default value to use when input is omitted */
-                defaultValue?: unknown;
+            dynamicInputs?: {
+              [key: string]: unknown;
             }[];
+            dynamicOutputs?: {
+              [key: string]: unknown;
+            }[];
+          };
+        }[];
+        edges: {
+          id: string;
+          source: string;
+          target: string;
+          sourceHandle?: string;
+          targetHandle?: string;
+          /** @enum {string} */
+          kind?: 'success' | 'error';
+          /** @enum {string} */
+          type?: 'default' | 'smoothstep' | 'step' | 'straight' | 'bezier';
+        }[];
+        /**
+         * @default {
+         *       "x": 0,
+         *       "y": 0,
+         *       "zoom": 1
+         *     }
+         */
+        viewport: {
+          x: number;
+          y: number;
+          zoom: number;
         };
-        WorkflowVersionSummaryDto: {
-            id: string;
-            workflowId: string;
-            version: number;
-            createdAt: string;
-        };
-        WorkflowVersionResponseDto: {
-            id: string;
-            workflowId: string;
-            version: number;
-            graph: {
-                id?: string;
-                name: string;
-                description?: string;
-                nodes: {
-                    id: string;
-                    type: string;
-                    position: {
-                        x: number;
-                        y: number;
-                    };
-                    data: {
-                        label: string;
-                        /**
-                         * @default {
-                         *       "params": {},
-                         *       "inputOverrides": {}
-                         *     }
-                         */
-                        config: {
-                            /** @default {} */
-                            params: {
-                                [key: string]: unknown;
-                            };
-                            /** @default {} */
-                            inputOverrides: {
-                                [key: string]: unknown;
-                            };
-                            /** @enum {string} */
-                            joinStrategy?: "all" | "any" | "first";
-                            streamId?: string;
-                            groupId?: string;
-                            maxConcurrency?: number;
-                            /** @enum {string} */
-                            mode?: "normal" | "tool";
-                            toolConfig?: {
-                                /** @default [] */
-                                boundInputIds: string[];
-                                /** @default [] */
-                                exposedInputIds: string[];
-                            };
-                            connectedToolNodeIds?: string[];
-                        };
-                        dynamicInputs?: {
-                            [key: string]: unknown;
-                        }[];
-                        dynamicOutputs?: {
-                            [key: string]: unknown;
-                        }[];
-                    };
-                }[];
-                edges: {
-                    id: string;
-                    source: string;
-                    target: string;
-                    sourceHandle?: string;
-                    targetHandle?: string;
-                    /** @enum {string} */
-                    kind?: "success" | "error";
-                    /** @enum {string} */
-                    type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
-                }[];
-                /**
-                 * @default {
-                 *       "x": 0,
-                 *       "y": 0,
-                 *       "zoom": 1
-                 *     }
-                 */
-                viewport: {
-                    x: number;
-                    y: number;
-                    zoom: number;
+        successCriteria?: (
+          | {
+              id: string;
+              title: string;
+              /** @enum {string} */
+              kind: 'output_assertion';
+              nodeRef: string;
+              path: string;
+              /** @enum {string} */
+              operator: 'exists' | 'not_empty' | 'equals' | 'contains' | 'gte' | 'lte';
+              expected?: (string | null) | (number | null) | (boolean | null);
+            }
+          | {
+              id: string;
+              title: string;
+              /** @enum {string} */
+              kind: 'finding_count';
+              minimum?: number;
+              maximum?: number;
+            }
+        )[];
+      };
+      createdAt: string;
+    };
+    RunWorkflowRequestDto: {
+      inputs?: {
+        [key: string]: unknown;
+      };
+      /** Format: uuid */
+      versionId?: string;
+      version?: number;
+      /** Format: uuid */
+      scopeId?: string;
+    };
+    WorkflowTagsResponseDto: {
+      tags: string[];
+    };
+    SetWorkflowTagsDto: {
+      tags: string[];
+    };
+    ArtifactListResponseDto: {
+      artifacts: {
+        /** Format: uuid */
+        id: string;
+        runId: string;
+        /** Format: uuid */
+        workflowId: string;
+        /** Format: uuid */
+        workflowVersionId?: string | null;
+        componentId?: string | null;
+        componentRef: string;
+        /** Format: uuid */
+        fileId: string;
+        name: string;
+        mimeType: string;
+        size: number;
+        destinations: ('run' | 'library')[];
+        metadata?:
+          | ({
+              remoteUploads?: {
+                /** @enum {string} */
+                type: 's3' | 'gcs';
+                bucket: string;
+                key: string;
+                uri: string;
+                region?: string;
+                size?: number;
+                etag?: string;
+                /** Format: uri */
+                url?: string;
+                metadata?: {
+                  [key: string]: unknown;
                 };
-                successCriteria?: ({
-                    id: string;
-                    title: string;
-                    /** @enum {string} */
-                    kind: "output_assertion";
-                    nodeRef: string;
-                    path: string;
-                    /** @enum {string} */
-                    operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
-                    expected?: (string | null) | (number | null) | (boolean | null);
-                } | {
-                    id: string;
-                    title: string;
-                    /** @enum {string} */
-                    kind: "finding_count";
-                    minimum?: number;
-                    maximum?: number;
-                })[];
+              }[];
+            } & {
+              [key: string]: unknown;
+            })
+          | null;
+        organizationId?: string | null;
+        /** Format: date-time */
+        createdAt: string;
+      }[];
+    };
+    AnalyticsQueryRequestDto: {
+      query?: {
+        [key: string]: unknown;
+      };
+      size?: number;
+      from?: number;
+      aggs?: {
+        [key: string]: unknown;
+      };
+    };
+    AnalyticsQueryResponseDto: {
+      total: number;
+      hits: {
+        _id: string;
+        _source: {
+          [key: string]: unknown;
+        };
+        _score?: number;
+      }[];
+      aggregations?: {
+        [key: string]: unknown;
+      };
+    };
+    AnalyticsSettingsResponseDto: {
+      organizationId: string;
+      /** @enum {string} */
+      subscriptionTier: 'free' | 'pro' | 'enterprise';
+      analyticsRetentionDays: number;
+      maxRetentionDays: number;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    UpdateAnalyticsSettingsDto: {
+      analyticsRetentionDays?: number;
+      /** @enum {string} */
+      subscriptionTier?: 'free' | 'pro' | 'enterprise';
+    };
+    EnsureTenantDto: {
+      organizationId: string;
+    };
+    FindingItemDto: {
+      id: string;
+      /** @enum {string} */
+      schemaCompatibility?: 'canonical' | 'legacy' | 'invalid';
+      timestamp: string;
+      severity?: string;
+      name?: string;
+      asset_key?: string;
+      workflow_name?: string;
+      workflow_id?: string;
+      run_id?: string;
+      scope_id?: string;
+      component_id?: string;
+      node_ref?: string;
+      raw?: {
+        [key: string]: unknown;
+      };
+      triage?: {
+        status: string;
+        assigneeUserId: string | null;
+        severityOverride: string | null;
+        notes: string | null;
+        updatedAt: string;
+        projectionVersion?: number;
+      } | null;
+    };
+    FindingsResponseDto: {
+      items: {
+        id: string;
+        /** @enum {string} */
+        schemaCompatibility?: 'canonical' | 'legacy' | 'invalid';
+        timestamp: string;
+        severity?: string;
+        name?: string;
+        asset_key?: string;
+        workflow_name?: string;
+        workflow_id?: string;
+        run_id?: string;
+        scope_id?: string;
+        component_id?: string;
+        node_ref?: string;
+        raw?: {
+          [key: string]: unknown;
+        };
+        triage?: {
+          status: string;
+          assigneeUserId: string | null;
+          severityOverride: string | null;
+          notes: string | null;
+          updatedAt: string;
+          projectionVersion?: number;
+        } | null;
+      }[];
+      total: number;
+      page: number;
+      pageSize: number;
+      /** @enum {string} */
+      availability: 'available' | 'degraded' | 'unavailable';
+      /**
+       * @default offset
+       * @enum {string}
+       */
+      paginationMode: 'offset' | 'cursor';
+      /** @default null */
+      currentCursor: string | null;
+      /** @default null */
+      nextCursor: string | null;
+      projectionHealth?: {
+        /** @enum {string} */
+        availability: 'available' | 'degraded';
+        /** Format: date-time */
+        completedAt: string | null;
+        /** Format: date-time */
+        reconciledThrough: string | null;
+        /** @enum {string|null} */
+        reason:
+          | 'not_reconciled'
+          | 'reconciliation_in_progress'
+          | 'reconciliation_failed'
+          | 'authoritative_updates_pending'
+          | 'watermark_missing'
+          | 'observation_index_rebuilt'
+          | 'watermark_mismatch'
+          | 'projection_events_pending'
+          | 'health_check_failed'
+          | null;
+      };
+      schemaCoverage: {
+        canonical: number;
+        legacy: number;
+        invalid: number;
+      };
+      /** @default [] */
+      degradedReasons: string[];
+    };
+    FindingsStatsResponseDto: {
+      severityCounts: {
+        severity: string;
+        count: number;
+      }[];
+      total: number;
+      /** @enum {string} */
+      availability: 'available' | 'degraded' | 'unavailable';
+      projectionHealth?: {
+        /** @enum {string} */
+        availability: 'available' | 'degraded';
+        /** Format: date-time */
+        completedAt: string | null;
+        /** Format: date-time */
+        reconciledThrough: string | null;
+        /** @enum {string|null} */
+        reason:
+          | 'not_reconciled'
+          | 'reconciliation_in_progress'
+          | 'reconciliation_failed'
+          | 'authoritative_updates_pending'
+          | 'watermark_missing'
+          | 'observation_index_rebuilt'
+          | 'watermark_mismatch'
+          | 'projection_events_pending'
+          | 'health_check_failed'
+          | null;
+      };
+      schemaCoverage: {
+        canonical: number;
+        legacy: number;
+        invalid: number;
+      };
+    };
+    FindingDetailResponseDto: {
+      id: string;
+      /** @enum {string} */
+      schemaCompatibility?: 'canonical' | 'legacy' | 'invalid';
+      timestamp: string;
+      severity?: string;
+      name?: string;
+      asset_key?: string;
+      workflow_name?: string;
+      workflow_id?: string;
+      run_id?: string;
+      scope_id?: string;
+      component_id?: string;
+      node_ref?: string;
+      raw: {
+        [key: string]: unknown;
+      };
+      triage?: {
+        status: string;
+        assigneeUserId: string | null;
+        severityOverride: string | null;
+        notes: string | null;
+        updatedAt: string;
+        projectionVersion?: number;
+      } | null;
+      /** @enum {string} */
+      availability: 'available' | 'degraded' | 'unavailable';
+    };
+    TicketLinkResponseDto:
+      | {
+          /** Format: uuid */
+          id: string;
+          /** Format: uuid */
+          findingTriageId: string;
+          /** @enum {string} */
+          provider: 'jira';
+          lastSyncedAt: string | null;
+          createdAt: string;
+          externalId: string;
+          /** Format: uri */
+          externalUrl: string;
+          /** @enum {string} */
+          syncStatus: 'synced' | 'error';
+          /** @constant */
+          reconciliationRequired: false;
+        }
+      | {
+          /** Format: uuid */
+          id: string;
+          /** Format: uuid */
+          findingTriageId: string;
+          /** @enum {string} */
+          provider: 'jira';
+          lastSyncedAt: string | null;
+          createdAt: string;
+          externalId: null;
+          externalUrl: null;
+          /** @enum {string} */
+          syncStatus: 'pending' | 'unknown';
+          /** @enum {boolean} */
+          reconciliationRequired: true;
+        };
+    TriageUpdateDto: {
+      /** @enum {string} */
+      status?:
+        | 'new'
+        | 'triaged'
+        | 'in_progress'
+        | 'fixed'
+        | 'verified'
+        | 'wont_fix'
+        | 'accepted_risk';
+      assigneeUserId?: string | null;
+      /** @enum {string|null} */
+      severityOverride?: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'none' | null;
+      notes?: string | null;
+      comment?: string;
+    };
+    BulkTriageDto: {
+      findingIds: string[];
+      /** @enum {string} */
+      status?:
+        | 'new'
+        | 'triaged'
+        | 'in_progress'
+        | 'fixed'
+        | 'verified'
+        | 'wont_fix'
+        | 'accepted_risk';
+      assigneeUserId?: string | null;
+      comment?: string;
+    };
+    UpsertSlaPoliciesDto: {
+      policies: {
+        /** @enum {string} */
+        severity: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'none';
+        deadlineHours: number;
+      }[];
+    };
+    TicketingConnectionResponseDto: {
+      /** Format: uuid */
+      id: string | null;
+      /** @enum {string} */
+      provider: 'jira';
+      isConnected: boolean;
+      cloudId: string | null;
+      config: {
+        projectKey: string;
+        issueTypeId: string;
+        statusMapping: {
+          [key: string]:
+            | string
+            | {
+                transitionName: string;
+                resultingStatus: string;
+              };
+        };
+        autoCreateOnStatuses: (
+          | 'new'
+          | 'triaged'
+          | 'in_progress'
+          | 'fixed'
+          | 'verified'
+          | 'wont_fix'
+          | 'accepted_risk'
+        )[];
+      } | null;
+      createdAt: string | null;
+      webhookRegistration: {
+        /** @enum {string} */
+        status: 'unregistered' | 'pending' | 'registered' | 'dead';
+        version: number;
+        lastError: string | null;
+      } | null;
+    };
+    ConnectJiraDto: {
+      /** Format: uri */
+      redirectUri: string;
+    };
+    OAuthConnectResponseDto: {
+      /** Format: uri */
+      authorizationUrl: string;
+      /** Format: uuid */
+      state: string;
+    };
+    OperationSuccessResponseDto: {
+      /** @enum {boolean} */
+      success: true;
+    };
+    TicketingErrorResponseDto: {
+      statusCode: number;
+      message: string | string[];
+      error?: string;
+    };
+    UpdateTicketingConfigDto: {
+      projectKey: string;
+      issueTypeId: string;
+      statusMapping: {
+        [key: string]:
+          | string
+          | {
+              transitionName: string;
+              resultingStatus: string;
             };
-            createdAt: string;
+      };
+      autoCreateOnStatuses: (
+        | 'new'
+        | 'triaged'
+        | 'in_progress'
+        | 'fixed'
+        | 'verified'
+        | 'wont_fix'
+        | 'accepted_risk'
+      )[];
+    };
+    JiraProjectDto: {
+      id: string;
+      key: string;
+      name: string;
+      avatarUrl: string | null;
+    };
+    JiraIssueTypeDto: {
+      id: string;
+      name: string;
+      description: string | null;
+      iconUrl: string | null;
+    };
+    ReconcileTicketCreationDto:
+      | {
+          /** @enum {string} */
+          action: 'attach';
+          issueKey: string;
+        }
+      | {
+          /** @enum {string} */
+          action: 'clear_and_retry';
+          /** @enum {boolean} */
+          confirmedNoIssueExists: true;
         };
-        RunWorkflowRequestDto: {
-            inputs?: {
-                [key: string]: unknown;
-            };
-            /** Format: uuid */
-            versionId?: string;
-            version?: number;
-            /** Format: uuid */
-            scopeId?: string;
-        };
-        WorkflowTagsResponseDto: {
-            tags: string[];
-        };
-        SetWorkflowTagsDto: {
-            tags: string[];
-        };
-        ArtifactListResponseDto: {
-            artifacts: {
-                /** Format: uuid */
-                id: string;
-                runId: string;
-                /** Format: uuid */
-                workflowId: string;
-                /** Format: uuid */
-                workflowVersionId?: string | null;
-                componentId?: string | null;
-                componentRef: string;
-                /** Format: uuid */
-                fileId: string;
-                name: string;
-                mimeType: string;
-                size: number;
-                destinations: ("run" | "library")[];
-                metadata?: ({
-                    remoteUploads?: {
-                        /** @enum {string} */
-                        type: "s3" | "gcs";
-                        bucket: string;
-                        key: string;
-                        uri: string;
-                        region?: string;
-                        size?: number;
-                        etag?: string;
-                        /** Format: uri */
-                        url?: string;
-                        metadata?: {
-                            [key: string]: unknown;
-                        };
-                    }[];
-                } & {
-                    [key: string]: unknown;
-                }) | null;
-                organizationId?: string | null;
-                /** Format: date-time */
-                createdAt: string;
-            }[];
-        };
-        AnalyticsQueryRequestDto: {
-            query?: {
-                [key: string]: unknown;
-            };
-            size?: number;
-            from?: number;
-            aggs?: {
-                [key: string]: unknown;
-            };
-        };
-        AnalyticsQueryResponseDto: {
-            total: number;
-            hits: {
-                _id: string;
-                _source: {
-                    [key: string]: unknown;
-                };
-                _score?: number;
-            }[];
-            aggregations?: {
-                [key: string]: unknown;
-            };
-        };
-        AnalyticsSettingsResponseDto: {
-            organizationId: string;
-            /** @enum {string} */
-            subscriptionTier: "free" | "pro" | "enterprise";
-            analyticsRetentionDays: number;
-            maxRetentionDays: number;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        UpdateAnalyticsSettingsDto: {
-            analyticsRetentionDays?: number;
-            /** @enum {string} */
-            subscriptionTier?: "free" | "pro" | "enterprise";
-        };
-        EnsureTenantDto: {
-            organizationId: string;
-        };
-        FindingItemDto: {
-            id: string;
-            /** @enum {string} */
-            schemaCompatibility?: "canonical" | "legacy" | "invalid";
-            timestamp: string;
-            severity?: string;
-            name?: string;
-            asset_key?: string;
-            workflow_name?: string;
-            workflow_id?: string;
-            run_id?: string;
-            scope_id?: string;
-            component_id?: string;
-            node_ref?: string;
-            raw?: {
-                [key: string]: unknown;
-            };
-            triage?: {
-                status: string;
-                assigneeUserId: string | null;
-                severityOverride: string | null;
-                notes: string | null;
-                updatedAt: string;
-                projectionVersion?: number;
-            } | null;
-        };
-        FindingsResponseDto: {
-            items: {
-                id: string;
-                /** @enum {string} */
-                schemaCompatibility?: "canonical" | "legacy" | "invalid";
-                timestamp: string;
-                severity?: string;
-                name?: string;
-                asset_key?: string;
-                workflow_name?: string;
-                workflow_id?: string;
-                run_id?: string;
-                scope_id?: string;
-                component_id?: string;
-                node_ref?: string;
-                raw?: {
-                    [key: string]: unknown;
-                };
-                triage?: {
-                    status: string;
-                    assigneeUserId: string | null;
-                    severityOverride: string | null;
-                    notes: string | null;
-                    updatedAt: string;
-                    projectionVersion?: number;
-                } | null;
-            }[];
-            total: number;
-            page: number;
-            pageSize: number;
-            /** @enum {string} */
-            availability: "available" | "degraded" | "unavailable";
-            /**
-             * @default offset
-             * @enum {string}
-             */
-            paginationMode: "offset" | "cursor";
-            /** @default null */
-            currentCursor: string | null;
-            /** @default null */
-            nextCursor: string | null;
-            projectionHealth?: {
-                /** @enum {string} */
-                availability: "available" | "degraded";
-                /** Format: date-time */
-                completedAt: string | null;
-                /** Format: date-time */
-                reconciledThrough: string | null;
-                /** @enum {string|null} */
-                reason: "not_reconciled" | "reconciliation_in_progress" | "reconciliation_failed" | "authoritative_updates_pending" | "watermark_missing" | "observation_index_rebuilt" | "watermark_mismatch" | "projection_events_pending" | "health_check_failed" | null;
-            };
-            schemaCoverage: {
-                canonical: number;
-                legacy: number;
-                invalid: number;
-            };
-            /** @default [] */
-            degradedReasons: string[];
-        };
-        FindingsStatsResponseDto: {
-            severityCounts: {
-                severity: string;
-                count: number;
-            }[];
-            total: number;
-            /** @enum {string} */
-            availability: "available" | "degraded" | "unavailable";
-            projectionHealth?: {
-                /** @enum {string} */
-                availability: "available" | "degraded";
-                /** Format: date-time */
-                completedAt: string | null;
-                /** Format: date-time */
-                reconciledThrough: string | null;
-                /** @enum {string|null} */
-                reason: "not_reconciled" | "reconciliation_in_progress" | "reconciliation_failed" | "authoritative_updates_pending" | "watermark_missing" | "observation_index_rebuilt" | "watermark_mismatch" | "projection_events_pending" | "health_check_failed" | null;
-            };
-            schemaCoverage: {
-                canonical: number;
-                legacy: number;
-                invalid: number;
-            };
-        };
-        FindingDetailResponseDto: {
-            id: string;
-            /** @enum {string} */
-            schemaCompatibility?: "canonical" | "legacy" | "invalid";
-            timestamp: string;
-            severity?: string;
-            name?: string;
-            asset_key?: string;
-            workflow_name?: string;
-            workflow_id?: string;
-            run_id?: string;
-            scope_id?: string;
-            component_id?: string;
-            node_ref?: string;
-            raw: {
-                [key: string]: unknown;
-            };
-            triage?: {
-                status: string;
-                assigneeUserId: string | null;
-                severityOverride: string | null;
-                notes: string | null;
-                updatedAt: string;
-                projectionVersion?: number;
-            } | null;
-            /** @enum {string} */
-            availability: "available" | "degraded" | "unavailable";
-        };
-        TicketLinkResponseDto: {
+    ReconcileTicketCreationResponseDto:
+      | {
+          /** @enum {string} */
+          action: 'attach';
+          /** @enum {string} */
+          status: 'attached';
+          /** Format: uuid */
+          findingTriageId: string;
+          ticket: {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
             findingTriageId: string;
             /** @enum {string} */
-            provider: "jira";
+            provider: 'jira';
             lastSyncedAt: string | null;
             createdAt: string;
             externalId: string;
             /** Format: uri */
             externalUrl: string;
             /** @enum {string} */
-            syncStatus: "synced" | "error";
+            syncStatus: 'synced' | 'error';
             /** @constant */
             reconciliationRequired: false;
-        } | {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            findingTriageId: string;
-            /** @enum {string} */
-            provider: "jira";
-            lastSyncedAt: string | null;
-            createdAt: string;
-            externalId: null;
-            externalUrl: null;
-            /** @enum {string} */
-            syncStatus: "pending" | "unknown";
-            /** @enum {boolean} */
-            reconciliationRequired: true;
-        };
-        TriageUpdateDto: {
-            /** @enum {string} */
-            status?: "new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk";
-            assigneeUserId?: string | null;
-            /** @enum {string|null} */
-            severityOverride?: "critical" | "high" | "medium" | "low" | "info" | "none" | null;
-            notes?: string | null;
-            comment?: string;
-        };
-        BulkTriageDto: {
-            findingIds: string[];
-            /** @enum {string} */
-            status?: "new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk";
-            assigneeUserId?: string | null;
-            comment?: string;
-        };
-        UpsertSlaPoliciesDto: {
-            policies: {
-                /** @enum {string} */
-                severity: "critical" | "high" | "medium" | "low" | "info" | "none";
-                deadlineHours: number;
-            }[];
-        };
-        TicketingConnectionResponseDto: {
-            /** Format: uuid */
-            id: string | null;
-            /** @enum {string} */
-            provider: "jira";
-            isConnected: boolean;
-            cloudId: string | null;
-            config: {
-                projectKey: string;
-                issueTypeId: string;
-                statusMapping: {
-                    [key: string]: string | {
-                        transitionName: string;
-                        resultingStatus: string;
-                    };
-                };
-                autoCreateOnStatuses: ("new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk")[];
-            } | null;
-            createdAt: string | null;
-            webhookRegistration: {
-                /** @enum {string} */
-                status: "unregistered" | "pending" | "registered" | "dead";
-                version: number;
-                lastError: string | null;
-            } | null;
-        };
-        ConnectJiraDto: {
-            /** Format: uri */
-            redirectUri: string;
-        };
-        OAuthConnectResponseDto: {
-            /** Format: uri */
-            authorizationUrl: string;
-            /** Format: uuid */
-            state: string;
-        };
-        OperationSuccessResponseDto: {
-            /** @enum {boolean} */
-            success: true;
-        };
-        TicketingErrorResponseDto: {
-            statusCode: number;
-            message: string | string[];
-            error?: string;
-        };
-        UpdateTicketingConfigDto: {
-            projectKey: string;
-            issueTypeId: string;
-            statusMapping: {
-                [key: string]: string | {
-                    transitionName: string;
-                    resultingStatus: string;
-                };
-            };
-            autoCreateOnStatuses: ("new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk")[];
-        };
-        JiraProjectDto: {
-            id: string;
-            key: string;
-            name: string;
-            avatarUrl: string | null;
-        };
-        JiraIssueTypeDto: {
-            id: string;
-            name: string;
-            description: string | null;
-            iconUrl: string | null;
-        };
-        ReconcileTicketCreationDto: {
-            /** @enum {string} */
-            action: "attach";
-            issueKey: string;
-        } | {
-            /** @enum {string} */
-            action: "clear_and_retry";
-            /** @enum {boolean} */
-            confirmedNoIssueExists: true;
-        };
-        ReconcileTicketCreationResponseDto: {
-            /** @enum {string} */
-            action: "attach";
-            /** @enum {string} */
-            status: "attached";
-            /** Format: uuid */
-            findingTriageId: string;
-            ticket: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                findingTriageId: string;
-                /** @enum {string} */
-                provider: "jira";
-                lastSyncedAt: string | null;
-                createdAt: string;
-                externalId: string;
-                /** Format: uri */
-                externalUrl: string;
-                /** @enum {string} */
-                syncStatus: "synced" | "error";
-                /** @constant */
-                reconciliationRequired: false;
-            };
-        } | {
-            /** @enum {string} */
-            action: "clear_and_retry";
-            /** @enum {string} */
-            status: "retry_queued";
-            /** Format: uuid */
-            findingTriageId: string;
-            ticket: null;
-        };
-        JiraWebhookResponseDto: {
-            /** @enum {string} */
-            status: "ignored" | "unmapped_status" | "no_change" | "synced" | "error";
-        };
-        IntegrationProviderResponse: {
-            id: string;
-            name: string;
-            description: string;
-            docsUrl?: string;
-            defaultScopes: string[];
-            supportsRefresh: boolean;
-            /** @description Indicates whether the provider has been configured with client credentials */
-            isConfigured: boolean;
-        };
-        ProviderConfigurationResponse: {
-            provider: string;
-            /** @description Stored OAuth client identifier */
-            clientId?: string;
-            /** @description True when a client secret has been stored for this provider */
-            hasClientSecret: boolean;
-            /**
-             * @description Origin of the credential configuration
-             * @enum {string}
-             */
-            configuredBy: "environment" | "user";
-            /** @description Last update timestamp in ISO 8601 format */
-            updatedAt?: string;
-        };
-        UpsertProviderConfigDto: {
-            clientId: string;
-            clientSecret?: string;
-        };
-        IntegrationConnectionResponse: {
-            id: string;
-            provider: string;
-            providerName: string;
-            userId: string;
-            scopes: string[];
-            tokenType: string;
-            expiresAt?: string;
-            createdAt: string;
-            updatedAt: string;
-            /** @enum {string} */
-            status: "active" | "expired";
-            supportsRefresh: boolean;
-            hasRefreshToken: boolean;
-            /** @description Provider-specific metadata saved alongside the connection */
-            metadata?: Record<string, never>;
-        };
-        StartOAuthDto: {
-            /** Format: uri */
-            redirectUri: string;
-            scopes?: string[];
-        };
-        OAuthStartResponseDto: {
-            provider: string;
-            authorizationUrl: string;
-            state: string;
-            /**
-             * @description Suggested client-side TTL for the authorization URL
-             * @example 300
-             */
-            expiresIn: number;
-        };
-        CompleteOAuthDto: {
-            state: string;
-            code: string;
-            /** Format: uri */
-            redirectUri: string;
-            scopes?: string[];
-        };
-        ConnectionTokenResponseDto: {
-            provider: string;
-            userId: string;
-            accessToken: string;
-            tokenType: string;
-            scopes: string[];
-            expiresAt?: string;
-        };
-        ApiKeyResponseDto: {
-            id: string;
-            name: string;
-            description: string | null;
-            keyPrefix: string;
-            keyHint: string;
-            permissions: {
-                workflows: {
-                    run: boolean;
-                    list: boolean;
-                    read: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                runs: {
-                    read: boolean;
-                    cancel: boolean;
-                };
-                audit: {
-                    read: boolean;
-                };
-                artifacts?: {
-                    read?: boolean;
-                    delete?: boolean;
-                };
-                schedules?: {
-                    list?: boolean;
-                    read?: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                secrets?: {
-                    list?: boolean;
-                    read?: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                "human-inputs"?: {
-                    read?: boolean;
-                    resolve?: boolean;
-                };
-            };
-            isActive: boolean;
-            /** Format: date-time */
-            expiresAt: string | null;
-            /** Format: date-time */
-            lastUsedAt: string | null;
-            usageCount: number;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        CreateApiKeyDto: {
-            name: string;
-            description?: string;
-            permissions: {
-                workflows: {
-                    run: boolean;
-                    list: boolean;
-                    read: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                runs: {
-                    read: boolean;
-                    cancel: boolean;
-                };
-                audit: {
-                    read: boolean;
-                };
-                artifacts?: {
-                    read?: boolean;
-                    delete?: boolean;
-                };
-                schedules?: {
-                    list?: boolean;
-                    read?: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                secrets?: {
-                    list?: boolean;
-                    read?: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                "human-inputs"?: {
-                    read?: boolean;
-                    resolve?: boolean;
-                };
-            };
-            /** Format: date-time */
-            expiresAt?: string;
-            rateLimit?: number;
-        };
-        CreateApiKeyResponseDto: {
-            id: string;
-            name: string;
-            description: string | null;
-            keyPrefix: string;
-            keyHint: string;
-            permissions: {
-                workflows: {
-                    run: boolean;
-                    list: boolean;
-                    read: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                runs: {
-                    read: boolean;
-                    cancel: boolean;
-                };
-                audit: {
-                    read: boolean;
-                };
-                artifacts?: {
-                    read?: boolean;
-                    delete?: boolean;
-                };
-                schedules?: {
-                    list?: boolean;
-                    read?: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                secrets?: {
-                    list?: boolean;
-                    read?: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                "human-inputs"?: {
-                    read?: boolean;
-                    resolve?: boolean;
-                };
-            };
-            isActive: boolean;
-            /** Format: date-time */
-            expiresAt: string | null;
-            /** Format: date-time */
-            lastUsedAt: string | null;
-            usageCount: number;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description The plaintext API key (only returned on creation) */
-            plainKey: string;
-        };
-        UpdateApiKeyDto: {
-            name?: string;
-            description?: string;
-            permissions?: {
-                workflows: {
-                    run: boolean;
-                    list: boolean;
-                    read: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                runs: {
-                    read: boolean;
-                    cancel: boolean;
-                };
-                audit: {
-                    read: boolean;
-                };
-                artifacts?: {
-                    read?: boolean;
-                    delete?: boolean;
-                };
-                schedules?: {
-                    list?: boolean;
-                    read?: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                secrets?: {
-                    list?: boolean;
-                    read?: boolean;
-                    create?: boolean;
-                    update?: boolean;
-                    delete?: boolean;
-                };
-                "human-inputs"?: {
-                    read?: boolean;
-                    resolve?: boolean;
-                };
-            };
-            isActive?: boolean;
-            rateLimit?: number | null;
-        };
-        DeleteApiKeyResponseDto: {
-            success: boolean;
-        };
-        ResolvePortsDto: {
-            [key: string]: unknown;
-        };
-        SecretVersionResponse: {
-            id: string;
-            version: number;
-            /** Format: date-time */
-            createdAt: string;
-            createdBy?: string;
-        };
-        SecretSummaryResponse: {
-            id: string;
-            name: string;
-            description?: string;
-            tags?: string[];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description Metadata about the active version (value is never returned) */
-            activeVersion?: components["schemas"]["SecretVersionResponse"];
-        };
-        SecretValueResponse: {
-            secretId: string;
-            version: number;
-            /** @description Decrypted secret value */
-            value: string;
-        };
-        CreateSecretDto: {
-            name: string;
-            value: string;
-            description?: string;
-            tags?: string[];
-        };
-        RotateSecretDto: {
-            value: string;
-        };
-        UpdateSecretDto: {
-            name?: string;
-            description?: string | null;
-            tags?: string[] | null;
-        };
-        ScheduleResponseDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            workflowId: string;
-            /** Format: uuid */
-            workflowVersionId: string | null;
-            workflowVersion: number | null;
-            name: string;
-            description: string | null;
-            cronExpression: string;
-            timezone: string;
-            humanLabel: string | null;
-            /** @enum {string} */
-            overlapPolicy: "skip" | "buffer" | "allow";
-            /** @default 0 */
-            catchupWindowSeconds: number;
-            /** @enum {string} */
-            status: "active" | "paused" | "error";
-            /** Format: date-time */
-            lastRunAt: string | null;
-            /** Format: date-time */
-            nextRunAt: string | null;
-            inputPayload: {
-                /** @default {} */
-                runtimeInputs: {
-                    [key: string]: unknown;
-                };
-                /** @default {} */
-                nodeOverrides: {
-                    [key: string]: {
-                        /** @default {} */
-                        params: {
-                            [key: string]: unknown;
-                        };
-                        /** @default {} */
-                        inputOverrides: {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-            temporalScheduleId: string | null;
-            /** @default {} */
-            temporalSnapshot: {
-                [key: string]: unknown;
-            };
-            organizationId: string | null;
-            createdAt: string;
-            updatedAt: string;
-        };
-        CreateScheduleRequestDto: {
-            /** Format: uuid */
-            workflowId: string;
-            /** Format: uuid */
-            workflowVersionId?: string;
-            name: string;
-            description?: string | null;
-            cronExpression: string;
-            timezone: string;
-            humanLabel?: string | null;
-            /**
-             * @default skip
-             * @enum {string}
-             */
-            overlapPolicy: "skip" | "buffer" | "allow";
-            /** @default 0 */
-            catchupWindowSeconds: number;
-            /**
-             * @default {
-             *       "runtimeInputs": {},
-             *       "nodeOverrides": {}
-             *     }
-             */
-            inputPayload: {
-                /** @default {} */
-                runtimeInputs: {
-                    [key: string]: unknown;
-                };
-                /** @default {} */
-                nodeOverrides: {
-                    [key: string]: {
-                        /** @default {} */
-                        params: {
-                            [key: string]: unknown;
-                        };
-                        /** @default {} */
-                        inputOverrides: {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
-        UpdateScheduleRequestDto: {
-            /** Format: uuid */
-            workflowId?: string;
-            /** Format: uuid */
-            workflowVersionId?: string;
-            name?: string;
-            description?: string | null;
-            cronExpression?: string;
-            timezone?: string;
-            humanLabel?: string | null;
-            /**
-             * @default skip
-             * @enum {string}
-             */
-            overlapPolicy: "skip" | "buffer" | "allow";
-            /** @default 0 */
-            catchupWindowSeconds: number;
-            /**
-             * @default {
-             *       "runtimeInputs": {},
-             *       "nodeOverrides": {}
-             *     }
-             */
-            inputPayload: {
-                /** @default {} */
-                runtimeInputs: {
-                    [key: string]: unknown;
-                };
-                /** @default {} */
-                nodeOverrides: {
-                    [key: string]: {
-                        /** @default {} */
-                        params: {
-                            [key: string]: unknown;
-                        };
-                        /** @default {} */
-                        inputOverrides: {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-            /** @enum {string} */
-            status?: "active" | "paused" | "error";
-        };
-        WebhookRunWorkflowDto: {
-            inputs?: {
-                [key: string]: unknown;
-            };
-            versionId?: string;
-            version?: number;
-        };
-        WebhookConfigurationResponseDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            workflowId: string;
-            /** Format: uuid */
-            workflowVersionId: string | null;
-            workflowVersion: number | null;
-            name: string;
-            description: string | null;
-            webhookPath: string;
-            parsingScript: string;
-            expectedInputs: {
-                id: string;
-                label: string;
-                /** @enum {string} */
-                type: "text" | "number" | "boolean" | "json" | "array" | "file";
-                /** @default true */
-                required: boolean;
-                description?: string;
-            }[];
-            /** @enum {string} */
-            status: "active" | "inactive";
-            organizationId: string | null;
-            createdBy: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        CreateWebhookRequestDto: {
-            /** Format: uuid */
-            workflowId: string;
-            /** Format: uuid */
-            workflowVersionId?: string;
-            name: string;
-            description?: string;
-            parsingScript: string;
-            /** @default [] */
-            expectedInputs: {
-                id: string;
-                label: string;
-                /** @enum {string} */
-                type: "text" | "number" | "boolean" | "json" | "array" | "file";
-                /** @default true */
-                required: boolean;
-                description?: string;
-            }[];
-        };
-        UpdateWebhookRequestDto: {
-            /** Format: uuid */
-            workflowId?: string;
-            /** Format: uuid */
-            workflowVersionId?: string;
-            name?: string;
-            description?: string;
-            parsingScript?: string;
-            expectedInputs?: {
-                id: string;
-                label: string;
-                /** @enum {string} */
-                type: "text" | "number" | "boolean" | "json" | "array" | "file";
-                /** @default true */
-                required: boolean;
-                description?: string;
-            }[];
-            /** @enum {string} */
-            status?: "active" | "inactive";
-        };
-        RegeneratePathResponseDto: {
-            /** Format: uuid */
-            id: string;
-            webhookPath: string;
-            /** Format: uri */
-            url: string;
-        };
-        GetWebhookUrlResponseDto: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            webhookPath: string;
-            /** Format: uri */
-            url: string;
-        };
-        TestWebhookScriptRequestDto: {
-            parsingScript: string;
-            testPayload: {
-                [key: string]: unknown;
-            };
-            testHeaders?: {
-                [key: string]: string;
-            };
-        };
-        TestWebhookScriptResponseDto: {
-            success: boolean;
-            parsedData: {
-                [key: string]: unknown;
-            } | null;
-            errorMessage: string | null;
-            validationErrors?: {
-                inputId: string;
-                message: string;
-            }[];
-        };
-        WebhookDeliveryResponseDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            webhookId: string;
-            workflowRunId: string | null;
-            /** @enum {string} */
-            status: "processing" | "delivered" | "failed";
-            payload: {
-                [key: string]: unknown;
-            };
-            headers?: {
-                [key: string]: string;
-            };
-            parsedData: {
-                [key: string]: unknown;
-            } | null;
-            errorMessage: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            completedAt: string | null;
-        };
-        HumanInputResponseDto: {
-            /** Format: uuid */
-            id: string;
-            runId: string;
-            /** Format: uuid */
-            workflowId: string;
-            nodeRef: string;
-            /** @enum {string} */
-            status: "pending" | "resolved" | "expired" | "cancelled";
-            /** @enum {string} */
-            inputType: "approval" | "form" | "selection" | "review" | "acknowledge";
-            inputSchema: unknown;
-            title: string;
-            description: string | null;
-            context: unknown;
-            resolveToken: string;
-            timeoutAt: string | null;
-            responseData: unknown;
-            respondedAt: string | null;
-            respondedBy: string | null;
-            organizationId: string | null;
-            createdAt: string;
-            updatedAt: string;
-        };
-        ResolveHumanInputDto: {
-            /** @description The response data from the human */
-            responseData?: {
-                [key: string]: unknown;
-            };
-        };
-        ResolveByTokenDto: {
-            /**
-             * @default resolve
-             * @enum {string}
-             */
-            action: "approve" | "reject" | "resolve";
-            data?: {
-                [key: string]: unknown;
-            };
-        };
-        PublicResolveResultDto: {
-            success: boolean;
-            message: string;
-            input: {
-                /** Format: uuid */
-                id: string;
-                title: string;
-                /** @enum {string} */
-                inputType: "approval" | "form" | "selection" | "review" | "acknowledge";
-                /** @enum {string} */
-                status: "pending" | "resolved" | "expired" | "cancelled";
-                respondedAt: string | null;
-            };
-        };
-        McpServerResponseDto: {
-            id: string;
-            name: string;
-            description: string | null;
-            /** @enum {string} */
-            transportType: "http" | "stdio";
-            endpoint: string | null;
-            command: string | null;
-            args: string[] | null;
-            hasHeaders: boolean;
-            headerKeys: string[] | null;
-            enabled: boolean;
-            healthCheckUrl: string | null;
-            /** Format: date-time */
-            lastHealthCheck: string | null;
-            /** @enum {string|null} */
-            lastHealthStatus: "healthy" | "unhealthy" | "unknown" | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            groupId: string | null;
-        };
-        McpToolResponseDto: {
-            id: string;
-            toolName: string;
-            description: string | null;
-            inputSchema: {
-                [key: string]: unknown;
-            } | null;
-            serverId: string;
-            serverName: string;
-            enabled: boolean;
-            /** Format: date-time */
-            discoveredAt: string;
-        };
-        HealthStatusResponseDto: {
-            serverId: string;
-            /** @enum {string} */
-            status: "healthy" | "unhealthy" | "unknown";
-            /** Format: date-time */
-            checkedAt: string | null;
-        };
-        CreateMcpServerDto: {
-            name: string;
-            description?: string;
-            /** @enum {string} */
-            transportType: "http" | "stdio";
-            /** Format: uri */
-            endpoint?: string;
-            command?: string;
-            args?: string[];
-            headers?: {
-                [key: string]: string;
-            };
-            /** Format: uri */
-            healthCheckUrl?: string;
-            enabled?: boolean;
-            groupId?: string;
-            cacheToken?: string;
-        };
-        UpdateMcpServerDto: {
-            name?: string;
-            description?: string | null;
-            /** @enum {string} */
-            transportType?: "http" | "stdio";
-            /** Format: uri */
-            endpoint?: string | null;
-            command?: string | null;
-            args?: string[] | null;
-            headers?: {
-                [key: string]: string;
-            } | null;
-            /** Format: uri */
-            healthCheckUrl?: string | null;
-            enabled?: boolean;
-        };
-        TestEnabledServerResponseDto: {
-            serverId: string;
-            serverName: string;
-            success: boolean;
-            message?: string;
-            toolCount?: number;
-        };
-        TestConnectionResponseDto: {
-            success: boolean;
-            message?: string;
-            toolCount?: number;
-            protocolVersion?: string;
-            responseTimeMs?: number;
-        };
-        McpGroupResponseDto: {
-            id: string;
-            slug: string;
-            name: string;
-            description: string | null;
-            credentialContractName: string;
-            credentialMapping: {
-                [key: string]: string;
-            } | null;
-            defaultDockerImage: string | null;
-            enabled: boolean;
-            templateHash?: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        GroupTemplateDto: {
-            slug: string;
-            name: string;
-            description?: string;
-            credentialContractName: string;
-            credentialMapping?: {
-                [key: string]: string;
-            };
-            defaultDockerImage: string;
-            version: {
-                major: number;
-                minor: number;
-                patch: number;
-            };
-            servers: {
-                name: string;
-                description?: string;
-                /** @enum {string} */
-                transportType: "http" | "stdio" | "sse" | "websocket";
-                endpoint?: string;
-                command?: string;
-                args?: string[];
-                recommended: boolean;
-                defaultSelected: boolean;
-            }[];
-            templateHash: string;
-        };
-        CreateMcpGroupDto: {
-            slug: string;
-            name: string;
-            description?: string | null;
-            credentialContractName: string;
-            credentialMapping?: {
-                [key: string]: string;
-            } | null;
-            defaultDockerImage?: string | null;
-            enabled?: boolean;
-        };
-        UpdateMcpGroupDto: {
-            name?: string;
-            description?: string | null;
-            credentialContractName?: string;
-            credentialMapping?: {
-                [key: string]: string;
-            } | null;
-            defaultDockerImage?: string | null;
-            enabled?: boolean;
-        };
-        McpGroupServerResponseDto: {
-            id: string;
-            name: string;
-            serverName: string;
-            description: string | null;
-            /** @enum {string} */
-            transportType: "http" | "stdio" | "sse" | "websocket";
-            endpoint: string | null;
-            command: string | null;
-            args: string[] | null;
-            enabled: boolean;
-            /** @enum {string} */
-            healthStatus: "healthy" | "unhealthy" | "unknown";
-            toolCount: number;
-            recommended: boolean;
-            defaultSelected: boolean;
-        };
-        AddServerToGroupDto: {
-            /** Format: uuid */
-            serverId: string;
-            recommended?: boolean;
-            defaultSelected?: boolean;
-        };
-        UpdateServerInGroupDto: {
-            recommended?: boolean;
-            defaultSelected?: boolean;
-        };
-        SyncTemplatesResponseDto: {
-            syncedCount: number;
-            createdCount: number;
-            updatedCount: number;
-            templates: string[];
-        };
-        ImportTemplateRequestDto: {
-            serverCacheTokens?: {
-                [key: string]: string;
-            };
-        };
-        ImportGroupTemplateResponseDto: {
-            /** @enum {string} */
-            action: "created" | "updated" | "skipped";
-            group: {
-                id: string;
-                slug: string;
-                name: string;
-                description: string | null;
-                credentialContractName: string;
-                credentialMapping: {
-                    [key: string]: string;
-                } | null;
-                defaultDockerImage: string | null;
-                enabled: boolean;
-                templateHash?: string | null;
-                /** Format: date-time */
-                createdAt: string;
-                /** Format: date-time */
-                updatedAt: string;
-            };
-        };
-        RegistryCatalogListResponseDto: {
-            data: {
-                name: string;
-                displayName: string;
-                description: string | null;
-                /** @enum {string} */
-                serverType: "server" | "remote";
-                category: string | null;
-                tags: string[];
-                iconUrl: string | null;
-                sourceUrl: string | null;
-                isFeatured: boolean;
-                hasSecrets: boolean;
-                hasOAuth: boolean;
-                isImported: boolean;
-            }[];
-            pagination: {
-                total: number;
-                limit: number;
-                offset: number;
-            };
-            categories: string[];
-        };
-        RegistryCatalogDetailDto: {
-            name: string;
-            displayName: string;
-            description: string | null;
-            /** @enum {string} */
-            serverType: "server" | "remote";
-            category: string | null;
-            tags: string[];
-            iconUrl: string | null;
-            sourceUrl: string | null;
-            isFeatured: boolean;
-            hasSecrets: boolean;
-            hasOAuth: boolean;
-            isImported: boolean;
-            dockerImage: string | null;
-            remoteConfig: {
-                /** @enum {string} */
-                transportType: "streamable-http" | "sse";
-                url: string;
-                headers?: {
-                    [key: string]: string;
-                };
-            } | null;
-            configRequirements: {
-                /** @default [] */
-                secrets: {
-                    name: string;
-                    env: string;
-                    example?: string;
-                }[];
-                /** @default [] */
-                env: {
-                    name: string;
-                    example?: string;
-                    value?: string;
-                }[];
-            };
-            /** @default [] */
-            oauthProviders: {
-                provider: string;
-                secret?: string;
-                env?: string;
-            }[];
-            runConfig: {
-                command?: string[];
-                volumes?: string[];
-                env?: {
-                    [key: string]: string;
-                };
-            } | null;
-        };
-        RegistryImportRequestDto: {
-            registryName: string;
-            /** @default {} */
-            secrets: {
-                [key: string]: string;
-            };
-            /** @default {} */
-            envVars: {
-                [key: string]: string;
-            };
-            /** @default true */
-            enabled: boolean;
-            /** Format: uuid */
-            groupId?: string;
-        };
-        RegistryImportResponseDto: {
-            /** Format: uuid */
-            serverId: string;
-            serverName: string;
-            /** @enum {string} */
-            transportType: "http" | "stdio";
-            /** @enum {string} */
-            status: "imported" | "already_exists";
-        };
-        NotificationChannelResponseDto: {
-            /** Format: uuid */
-            id: string;
-            organizationId: string;
-            name: string;
-            /** @enum {string} */
-            type: "slack" | "discord" | "email" | "pagerduty";
-            config: {
-                [key: string]: unknown;
-            };
-            /** @enum {string} */
-            status: "active" | "inactive";
-            events: ("run.completed" | "run.failed" | "run.cancelled" | "run.timed_out")[];
-            createdBy: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        CreateNotificationChannelDto: {
-            name: string;
-            /** @enum {string} */
-            type: "slack" | "discord" | "email" | "pagerduty";
-            config: {
-                [key: string]: unknown;
-            };
-            events: ("run.completed" | "run.failed" | "run.cancelled" | "run.timed_out")[];
-        };
-        UpdateNotificationChannelDto: {
-            name?: string;
-            config?: {
-                [key: string]: unknown;
-            };
-            /** @enum {string} */
-            status?: "active" | "inactive";
-            events?: ("run.completed" | "run.failed" | "run.cancelled" | "run.timed_out")[];
-        };
-        NotificationDeliveryResponseDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            channelId: string;
-            runId: string | null;
-            eventType: string;
-            /** @enum {string} */
-            status: "pending" | "sending" | "sent" | "failed" | "unknown";
-            payload: {
-                [key: string]: unknown;
-            };
-            errorMessage: string | null;
-            durationMs: number | null;
-            responseStatus: number | null;
-            responseBody: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            sentAt: string | null;
-        };
-        DiscoveryInputDto: {
-            /**
-             * @description Transport type for MCP server
-             * @enum {string}
-             */
-            transport: "http" | "stdio";
-            /** @description Human-readable name for the MCP server */
-            name: string;
-            /**
-             * Format: uri
-             * @description HTTP endpoint for HTTP transport
-             */
-            endpoint?: string;
-            /** @description HTTP headers for authentication */
-            headers?: {
-                [key: string]: string;
-            };
-            /** @description Command to run for stdio transport */
-            command?: string;
-            /** @description Arguments for stdio command */
-            args?: string[];
-            /** @description Deprecated for single discovery; trusted-local stdio uses a same-worker loopback host proxy */
-            image?: string;
-            /**
-             * Format: uuid
-             * @description Cache token for storing/retrieving discovery results
-             */
-            cacheToken?: string;
-        };
-        DiscoveryStartResponseDto: {
-            /**
-             * Format: uuid
-             * @description Unique ID for tracking the discovery workflow
-             */
-            workflowId: string;
-            /**
-             * Format: uuid
-             * @description Cache token for retrieving cached discovery results
-             */
-            cacheToken?: string;
-            /**
-             * @description Status indicating workflow has started
-             * @enum {string}
-             */
-            status: "started";
-        };
-        DiscoveryStatusDto: {
-            /**
-             * Format: uuid
-             * @description Workflow ID
-             */
-            workflowId: string;
-            /**
-             * @description Current status of discovery
-             * @enum {string}
-             */
-            status: "running" | "completed" | "failed";
-            /** @description Discovered tools (available when completed) */
-            tools?: {
-                /** @description Tool name */
-                name: string;
-                /** @description Tool description */
-                description?: string;
-                /** @description JSON Schema for tool input */
-                inputSchema?: {
-                    [key: string]: unknown;
-                };
-            }[];
-            /** @description Number of tools discovered */
-            toolCount?: number;
-            /** @description Error message if discovery failed */
-            error?: string;
-            /** @description Error code for categorizing failures */
-            errorCode?: string;
-        };
-        GroupDiscoveryInputDto: {
-            /** @description Docker image for stdio transport */
-            image?: string;
-            /** @description Servers to discover */
-            servers: {
-                /** @description Server name */
-                name: string;
-                /**
-                 * @description Transport type for MCP server
-                 * @enum {string}
-                 */
-                transport: "http" | "stdio";
-                /**
-                 * Format: uri
-                 * @description HTTP endpoint for HTTP transport
-                 */
-                endpoint?: string;
-                /** @description HTTP headers for authentication */
-                headers?: {
-                    [key: string]: string;
-                };
-                /** @description Command to run for stdio transport */
-                command?: string;
-                /** @description Arguments for stdio command */
-                args?: string[];
-            }[];
-        };
-        GroupDiscoveryStartResponseDto: {
-            /**
-             * Format: uuid
-             * @description Unique ID for tracking the discovery workflow
-             */
-            workflowId: string;
-            /** @description Map of server name to cache token */
-            cacheTokens: {
-                [key: string]: string;
-            };
-            /**
-             * @description Status indicating workflow has started
-             * @enum {string}
-             */
-            status: "started";
-        };
-        GroupDiscoveryStatusDto: {
-            /**
-             * Format: uuid
-             * @description Workflow ID
-             */
-            workflowId: string;
-            /**
-             * @description Current status of discovery
-             * @enum {string}
-             */
-            status: "running" | "completed" | "failed";
-            results?: {
-                name: string;
-                /** @enum {string} */
-                status: "running" | "completed" | "failed";
-                tools?: {
-                    /** @description Tool name */
-                    name: string;
-                    /** @description Tool description */
-                    description?: string;
-                    /** @description JSON Schema for tool input */
-                    inputSchema?: {
-                        [key: string]: unknown;
-                    };
-                }[];
-                toolCount?: number;
-                error?: string;
-                /** Format: uuid */
-                cacheToken?: string;
-            }[];
-            error?: string;
-            errorCode?: string;
-        };
-        ImportCommunityTemplateDto: {
-            id?: string;
-            templatePath?: string;
-        };
-        PublishTemplateDto: {
-            workflowId: string;
-            name: string;
-            description: string;
-            category: string;
-            tags: string[];
-            author: string;
-        };
-        UseTemplateDto: {
-            workflowName: string;
-            secretMappings?: {
-                [key: string]: string;
-            };
-        };
-        ListAuditLogsResponseDto: {
-            items: {
-                /** Format: uuid */
-                id: string;
-                organizationId: string | null;
-                actorId: string | null;
-                /** @enum {string} */
-                actorType: "user" | "api-key" | "internal" | "unknown";
-                actorDisplay: string | null;
-                action: string;
-                /** @enum {string} */
-                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input" | "notification_channel" | "notification_delivery" | "finding_triage" | "outbox_event" | "integration" | "file" | "ticketing_connection" | "operator_session" | "operator_action";
-                resourceId: string | null;
-                resourceName: string | null;
-                metadata: {
-                    [key: string]: unknown;
-                } | null;
-                ip: string | null;
-                userAgent: string | null;
-                correlationId: string | null;
-                /** Format: date-time */
-                createdAt: string;
-            }[];
-            nextCursor: string | null;
-        };
-        AgentSkillResponse: {
-            /** Format: uuid */
-            id: string;
-            organizationId: string;
-            name: string;
-            slug: string;
-            description: string | null;
-            content: string;
-            files: {
-                [key: string]: string;
-            };
-            fileCount: number;
-            tags: string[];
-            enabled: boolean;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        DiscoveredAgentSkillResponse: {
-            slug: string;
-            name: string;
-            description: string | null;
-            sourceRoot: string;
-            relativePath: string;
-            fileCount: number;
-            imported: boolean;
-            /** Format: uuid */
-            existingSkillId?: string;
-        };
-        ImportDiscoveredAgentSkillsDto: {
-            items: {
-                slug: string;
-                sourceRoot: string;
-            }[];
-            overwrite?: boolean;
-        };
-        ImportAgentSkillsResultResponse: {
-            imported: {
-                /** Format: uuid */
-                id: string;
-                organizationId: string;
-                name: string;
-                slug: string;
-                description: string | null;
-                content: string;
-                files: {
-                    [key: string]: string;
-                };
-                fileCount: number;
-                tags: string[];
-                enabled: boolean;
-                /** Format: date-time */
-                createdAt: string;
-                /** Format: date-time */
-                updatedAt: string;
-            }[];
-            skipped: {
-                slug: string;
-                reason: string;
-            }[];
-        };
-        CreateAgentSkillDto: {
-            name: string;
-            slug: string;
-            description?: string;
-            content?: string;
-            files?: {
-                [key: string]: string;
-            };
-            tags?: string[];
-            enabled?: boolean;
-        };
-        UpdateAgentSkillDto: {
-            name?: string;
-            slug?: string;
-            description?: string | null;
-            content?: string;
-            files?: {
-                [key: string]: string;
-            };
-            tags?: string[];
-            enabled?: boolean;
-        };
-        ScopeResponse: {
-            /** Format: uuid */
-            id: string;
-            organizationId: string;
-            name: string;
-            description: string | null;
-            domains: string[];
-            repos: string[];
-            ipRanges: string[];
-            runtimeValues: {
-                [key: string]: unknown;
-            };
-            createdBy: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        CreateScopeDto: {
-            name: string;
-            description?: string | null;
-            /** @default [] */
-            domains: string[];
-            /** @default [] */
-            repos: string[];
-            /** @default [] */
-            ipRanges: string[];
-            /** @default {} */
-            runtimeValues: {
-                [key: string]: unknown;
-            };
-        };
-        UpdateScopeDto: {
-            name?: string;
-            description?: string | null;
-            domains?: string[];
-            repos?: string[];
-            ipRanges?: string[];
-            runtimeValues?: {
-                [key: string]: unknown;
-            };
-        };
-        ScopeFindingsSummaryResponse: {
-            /** @enum {string} */
-            availability: "available" | "degraded" | "unavailable";
-            total: number;
-            bySeverity: {
-                critical: number;
-                high: number;
-                medium: number;
-                low: number;
-                info: number;
-                none: number;
-            };
-        };
-        AssetRunComparisonResponse: {
-            /** Format: uuid */
-            scopeId: string;
-            /** Format: uuid */
-            workflowId: string;
-            baselineRunId: string;
-            currentRunId: string;
-            baselineCoverage: {
-                completedComponents: string[];
-                failedComponents: string[];
-            };
-            currentCoverage: {
-                completedComponents: string[];
-                failedComponents: string[];
-            };
-            summary: {
-                observed: number;
-                notObserved: number;
-                notScanned: number;
-            };
-            items: {
-                /** @enum {string} */
-                assetType: "subdomain" | "host" | "ip-address" | "open-port" | "http-probe" | "dns-record" | "crawled-url" | "url";
-                assetValue: string;
-                sourceComponentIds: string[];
-                baselineObserved: boolean;
-                currentObserved: boolean;
-                /** @enum {string} */
-                observationStatus: "observed" | "not-observed" | "not-scanned";
-                /** @enum {string} */
-                change: "new" | "unchanged" | "missing";
-            }[];
-        };
-        AssetResponse: {
-            /** Format: uuid */
-            id: string;
-            organizationId: string;
-            /** Format: uuid */
-            scopeId: string;
-            /** @enum {string} */
-            assetType: "subdomain" | "host" | "ip-address" | "open-port" | "http-probe" | "dns-record" | "crawled-url" | "url";
-            assetValue: string;
-            /** Format: date-time */
-            firstSeenAt: string;
-            /** Format: date-time */
-            lastSeenAt: string;
-            firstSeenRunId: string | null;
-            lastSeenRunId: string | null;
-            sourceComponentId: string | null;
-            metadata: {
-                [key: string]: unknown;
-            };
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        ListAnthropicModelsDto: {
-            apiKeySecretId: string;
-        };
-        AnthropicModelOption: {
-            id: string;
-            label: string;
-        };
-        ListAnthropicModelsResponse: {
-            models: components["schemas"]["AnthropicModelOption"][];
-            /** @enum {string} */
-            source: "live" | "error";
-            error?: string | null;
-        };
-        ListDeadLettersResponseDto: {
-            items: {
-                /** Format: uuid */
-                id: string;
-                eventType: string;
-                organizationId: string | null;
-                aggregateType: string;
-                aggregateId: string;
-                dedupeKey: string;
-                payload: {
-                    [key: string]: unknown;
-                };
-                /** @enum {string} */
-                status: "dead";
-                attempts: number;
-                maxAttempts: number;
-                /** Format: date-time */
-                availableAt: string;
-                /** Format: date-time */
-                lockedAt: string | null;
-                lockedBy: string | null;
-                lastError: string | null;
-                /** Format: date-time */
-                processedAt: string | null;
-                /** Format: date-time */
-                createdAt: string;
-                /** Format: date-time */
-                updatedAt: string;
-            }[];
-            nextCursor: string | null;
-        };
-        RequeueDeadLetterResponseDto: {
-            /** Format: uuid */
-            eventId: string;
-            /** @enum {string} */
-            status: "pending";
-        };
-        CreateOperatorSessionDto: {
-            /**
-             * @default ask
-             * @enum {string}
-             */
-            approvalMode: "ask" | "auto";
-            model: {
-                /** @enum {string} */
-                provider: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan";
-                modelId: string;
-                /** Format: uuid */
-                apiKeySecretId: string;
-                /** Format: uri */
-                baseUrl?: string | null;
-            };
-        };
-        OperatorWorkflowDraftDetailDto: {
-            /** @enum {string} */
-            kind: "workflow-draft";
-            /** Format: uuid */
-            draftId: string;
-            /** @enum {string} */
-            mode: "create" | "update";
-            /** Format: uuid */
-            workflowId: string | null;
-            /** Format: uuid */
-            baseVersionId: string | null;
-            sourceRunId?: string;
-            name: string;
-            digest: string;
-            validation: {
-                valid: boolean;
-                errors: string[];
-            };
-            diff: {
-                metadataChanged: ("name" | "description")[];
-                /** @default false */
-                successCriteriaChanged: boolean;
-                addedNodeIds: string[];
-                removedNodeIds: string[];
-                changedNodeIds: string[];
-                addedEdgeIds: string[];
-                removedEdgeIds: string[];
-                changedEdgeIds: string[];
-            };
-            /** Format: uuid */
-            proposalActionId: string;
-            /** Format: uuid */
-            sessionId: string;
-            proposedGraph: {
-                id?: string;
-                name: string;
-                description?: string;
-                nodes: {
-                    id: string;
-                    type: string;
-                    position: {
-                        x: number;
-                        y: number;
-                    };
-                    data: {
-                        label: string;
-                        /**
-                         * @default {
-                         *       "params": {},
-                         *       "inputOverrides": {}
-                         *     }
-                         */
-                        config: {
-                            /** @default {} */
-                            params: {
-                                [key: string]: unknown;
-                            };
-                            /** @default {} */
-                            inputOverrides: {
-                                [key: string]: unknown;
-                            };
-                            /** @enum {string} */
-                            joinStrategy?: "all" | "any" | "first";
-                            streamId?: string;
-                            groupId?: string;
-                            maxConcurrency?: number;
-                            /** @enum {string} */
-                            mode?: "normal" | "tool";
-                            toolConfig?: {
-                                /** @default [] */
-                                boundInputIds: string[];
-                                /** @default [] */
-                                exposedInputIds: string[];
-                            };
-                            connectedToolNodeIds?: string[];
-                        };
-                        dynamicInputs?: {
-                            [key: string]: unknown;
-                        }[];
-                        dynamicOutputs?: {
-                            [key: string]: unknown;
-                        }[];
-                    };
-                }[];
-                edges: {
-                    id: string;
-                    source: string;
-                    target: string;
-                    sourceHandle?: string;
-                    targetHandle?: string;
-                    /** @enum {string} */
-                    kind?: "success" | "error";
-                    /** @enum {string} */
-                    type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
-                }[];
-                /**
-                 * @default {
-                 *       "x": 0,
-                 *       "y": 0,
-                 *       "zoom": 1
-                 *     }
-                 */
-                viewport: {
-                    x: number;
-                    y: number;
-                    zoom: number;
-                };
-                successCriteria?: ({
-                    id: string;
-                    title: string;
-                    /** @enum {string} */
-                    kind: "output_assertion";
-                    nodeRef: string;
-                    path: string;
-                    /** @enum {string} */
-                    operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
-                    expected?: (string | null) | (number | null) | (boolean | null);
-                } | {
-                    id: string;
-                    title: string;
-                    /** @enum {string} */
-                    kind: "finding_count";
-                    minimum?: number;
-                    maximum?: number;
-                })[];
-            };
-            baseGraph: {
-                id?: string;
-                name: string;
-                description?: string;
-                nodes: {
-                    id: string;
-                    type: string;
-                    position: {
-                        x: number;
-                        y: number;
-                    };
-                    data: {
-                        label: string;
-                        /**
-                         * @default {
-                         *       "params": {},
-                         *       "inputOverrides": {}
-                         *     }
-                         */
-                        config: {
-                            /** @default {} */
-                            params: {
-                                [key: string]: unknown;
-                            };
-                            /** @default {} */
-                            inputOverrides: {
-                                [key: string]: unknown;
-                            };
-                            /** @enum {string} */
-                            joinStrategy?: "all" | "any" | "first";
-                            streamId?: string;
-                            groupId?: string;
-                            maxConcurrency?: number;
-                            /** @enum {string} */
-                            mode?: "normal" | "tool";
-                            toolConfig?: {
-                                /** @default [] */
-                                boundInputIds: string[];
-                                /** @default [] */
-                                exposedInputIds: string[];
-                            };
-                            connectedToolNodeIds?: string[];
-                        };
-                        dynamicInputs?: {
-                            [key: string]: unknown;
-                        }[];
-                        dynamicOutputs?: {
-                            [key: string]: unknown;
-                        }[];
-                    };
-                }[];
-                edges: {
-                    id: string;
-                    source: string;
-                    target: string;
-                    sourceHandle?: string;
-                    targetHandle?: string;
-                    /** @enum {string} */
-                    kind?: "success" | "error";
-                    /** @enum {string} */
-                    type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
-                }[];
-                /**
-                 * @default {
-                 *       "x": 0,
-                 *       "y": 0,
-                 *       "zoom": 1
-                 *     }
-                 */
-                viewport: {
-                    x: number;
-                    y: number;
-                    zoom: number;
-                };
-                successCriteria?: ({
-                    id: string;
-                    title: string;
-                    /** @enum {string} */
-                    kind: "output_assertion";
-                    nodeRef: string;
-                    path: string;
-                    /** @enum {string} */
-                    operator: "exists" | "not_empty" | "equals" | "contains" | "gte" | "lte";
-                    expected?: (string | null) | (number | null) | (boolean | null);
-                } | {
-                    id: string;
-                    title: string;
-                    /** @enum {string} */
-                    kind: "finding_count";
-                    minimum?: number;
-                    maximum?: number;
-                })[];
-            } | null;
-        };
-        UpdateOperatorSessionDto: {
-            /** @enum {string} */
-            approvalMode?: "ask" | "auto";
-            model?: {
-                /** @enum {string} */
-                provider: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan";
-                modelId: string;
-                /** Format: uuid */
-                apiKeySecretId: string;
-                /** Format: uri */
-                baseUrl?: string | null;
-            };
-            title?: string;
-        };
-        CreateOperatorTurnDto: {
-            /** Format: uuid */
-            clientTurnId: string;
-            message: string;
-            context?: {
-                path: string;
-                /** Format: uuid */
-                workflowId?: string;
-                runId?: string;
-            };
-            directCommand?: {
-                /** @enum {string} */
-                commandName: "apply_workflow_draft";
-                arguments: {
-                    /** Format: uuid */
-                    draftId: string;
-                };
-            } | {
-                /** @enum {string} */
-                commandName: "get_run";
-                arguments: {
-                    runId: string;
-                };
-            } | {
-                /** @enum {string} */
-                commandName: "compare_runs";
-                arguments: {
-                    sourceRunId: string;
-                    candidateRunId: string;
-                };
-            } | {
-                /** @enum {string} */
-                commandName: "run_workflow";
-                arguments: {
-                    /** Format: uuid */
-                    workflowId: string;
-                    /** Format: uuid */
-                    versionId: string;
-                    /** @default {} */
-                    inputs: {
-                        [key: string]: unknown;
-                    };
-                    /** Format: uuid */
-                    scopeId?: string;
-                    sourceRunId?: string;
-                };
-            } | {
-                /** @enum {string} */
-                commandName: "cancel_run";
-                arguments: {
-                    runId: string;
-                };
-            } | {
-                /** @enum {string} */
-                commandName: "retry_run";
-                arguments: {
-                    runId: string;
-                };
-            };
-            journey?: {
-                /** @enum {string} */
-                kind: "improve_run";
-                sourceRunId: string;
-            };
-        };
-        OperatorActionDecisionDto: {
-            /** @enum {string} */
-            decision: "approved" | "rejected";
-            expectedVersion: number;
-        };
+          };
+        }
+      | {
+          /** @enum {string} */
+          action: 'clear_and_retry';
+          /** @enum {string} */
+          status: 'retry_queued';
+          /** Format: uuid */
+          findingTriageId: string;
+          ticket: null;
+        };
+    JiraWebhookResponseDto: {
+      /** @enum {string} */
+      status: 'ignored' | 'unmapped_status' | 'no_change' | 'synced' | 'error';
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    IntegrationProviderResponse: {
+      id: string;
+      name: string;
+      description: string;
+      docsUrl?: string;
+      defaultScopes: string[];
+      supportsRefresh: boolean;
+      /** @description Indicates whether the provider has been configured with client credentials */
+      isConfigured: boolean;
+    };
+    ProviderConfigurationResponse: {
+      provider: string;
+      /** @description Stored OAuth client identifier */
+      clientId?: string;
+      /** @description True when a client secret has been stored for this provider */
+      hasClientSecret: boolean;
+      /**
+       * @description Origin of the credential configuration
+       * @enum {string}
+       */
+      configuredBy: 'environment' | 'user';
+      /** @description Last update timestamp in ISO 8601 format */
+      updatedAt?: string;
+    };
+    UpsertProviderConfigDto: {
+      clientId: string;
+      clientSecret?: string;
+    };
+    IntegrationConnectionResponse: {
+      id: string;
+      provider: string;
+      providerName: string;
+      userId: string;
+      scopes: string[];
+      tokenType: string;
+      expiresAt?: string;
+      createdAt: string;
+      updatedAt: string;
+      /** @enum {string} */
+      status: 'active' | 'expired';
+      supportsRefresh: boolean;
+      hasRefreshToken: boolean;
+      /** @description Provider-specific metadata saved alongside the connection */
+      metadata?: Record<string, never>;
+    };
+    StartOAuthDto: {
+      /** Format: uri */
+      redirectUri: string;
+      scopes?: string[];
+    };
+    OAuthStartResponseDto: {
+      provider: string;
+      authorizationUrl: string;
+      state: string;
+      /**
+       * @description Suggested client-side TTL for the authorization URL
+       * @example 300
+       */
+      expiresIn: number;
+    };
+    CompleteOAuthDto: {
+      state: string;
+      code: string;
+      /** Format: uri */
+      redirectUri: string;
+      scopes?: string[];
+    };
+    ConnectionTokenResponseDto: {
+      provider: string;
+      userId: string;
+      accessToken: string;
+      tokenType: string;
+      scopes: string[];
+      expiresAt?: string;
+    };
+    ApiKeyResponseDto: {
+      id: string;
+      name: string;
+      description: string | null;
+      keyPrefix: string;
+      keyHint: string;
+      permissions: {
+        workflows: {
+          run: boolean;
+          list: boolean;
+          read: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        runs: {
+          read: boolean;
+          cancel: boolean;
+        };
+        audit: {
+          read: boolean;
+        };
+        artifacts?: {
+          read?: boolean;
+          delete?: boolean;
+        };
+        schedules?: {
+          list?: boolean;
+          read?: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        secrets?: {
+          list?: boolean;
+          read?: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        'human-inputs'?: {
+          read?: boolean;
+          resolve?: boolean;
+        };
+      };
+      isActive: boolean;
+      /** Format: date-time */
+      expiresAt: string | null;
+      /** Format: date-time */
+      lastUsedAt: string | null;
+      usageCount: number;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CreateApiKeyDto: {
+      name: string;
+      description?: string;
+      permissions: {
+        workflows: {
+          run: boolean;
+          list: boolean;
+          read: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        runs: {
+          read: boolean;
+          cancel: boolean;
+        };
+        audit: {
+          read: boolean;
+        };
+        artifacts?: {
+          read?: boolean;
+          delete?: boolean;
+        };
+        schedules?: {
+          list?: boolean;
+          read?: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        secrets?: {
+          list?: boolean;
+          read?: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        'human-inputs'?: {
+          read?: boolean;
+          resolve?: boolean;
+        };
+      };
+      /** Format: date-time */
+      expiresAt?: string;
+      rateLimit?: number;
+    };
+    CreateApiKeyResponseDto: {
+      id: string;
+      name: string;
+      description: string | null;
+      keyPrefix: string;
+      keyHint: string;
+      permissions: {
+        workflows: {
+          run: boolean;
+          list: boolean;
+          read: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        runs: {
+          read: boolean;
+          cancel: boolean;
+        };
+        audit: {
+          read: boolean;
+        };
+        artifacts?: {
+          read?: boolean;
+          delete?: boolean;
+        };
+        schedules?: {
+          list?: boolean;
+          read?: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        secrets?: {
+          list?: boolean;
+          read?: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        'human-inputs'?: {
+          read?: boolean;
+          resolve?: boolean;
+        };
+      };
+      isActive: boolean;
+      /** Format: date-time */
+      expiresAt: string | null;
+      /** Format: date-time */
+      lastUsedAt: string | null;
+      usageCount: number;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** @description The plaintext API key (only returned on creation) */
+      plainKey: string;
+    };
+    UpdateApiKeyDto: {
+      name?: string;
+      description?: string;
+      permissions?: {
+        workflows: {
+          run: boolean;
+          list: boolean;
+          read: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        runs: {
+          read: boolean;
+          cancel: boolean;
+        };
+        audit: {
+          read: boolean;
+        };
+        artifacts?: {
+          read?: boolean;
+          delete?: boolean;
+        };
+        schedules?: {
+          list?: boolean;
+          read?: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        secrets?: {
+          list?: boolean;
+          read?: boolean;
+          create?: boolean;
+          update?: boolean;
+          delete?: boolean;
+        };
+        'human-inputs'?: {
+          read?: boolean;
+          resolve?: boolean;
+        };
+      };
+      isActive?: boolean;
+      rateLimit?: number | null;
+    };
+    DeleteApiKeyResponseDto: {
+      success: boolean;
+    };
+    ResolvePortsDto: {
+      [key: string]: unknown;
+    };
+    SecretVersionResponse: {
+      id: string;
+      version: number;
+      /** Format: date-time */
+      createdAt: string;
+      createdBy?: string;
+    };
+    SecretSummaryResponse: {
+      id: string;
+      name: string;
+      description?: string;
+      tags?: string[];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** @description Metadata about the active version (value is never returned) */
+      activeVersion?: components['schemas']['SecretVersionResponse'];
+    };
+    SecretValueResponse: {
+      secretId: string;
+      version: number;
+      /** @description Decrypted secret value */
+      value: string;
+    };
+    CreateSecretDto: {
+      name: string;
+      value: string;
+      description?: string;
+      tags?: string[];
+    };
+    RotateSecretDto: {
+      value: string;
+    };
+    UpdateSecretDto: {
+      name?: string;
+      description?: string | null;
+      tags?: string[] | null;
+    };
+    ScheduleResponseDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      workflowId: string;
+      /** Format: uuid */
+      workflowVersionId: string | null;
+      workflowVersion: number | null;
+      name: string;
+      description: string | null;
+      cronExpression: string;
+      timezone: string;
+      humanLabel: string | null;
+      /** @enum {string} */
+      overlapPolicy: 'skip' | 'buffer' | 'allow';
+      /** @default 0 */
+      catchupWindowSeconds: number;
+      /** @enum {string} */
+      status: 'active' | 'paused' | 'error';
+      /** Format: date-time */
+      lastRunAt: string | null;
+      /** Format: date-time */
+      nextRunAt: string | null;
+      inputPayload: {
+        /** @default {} */
+        runtimeInputs: {
+          [key: string]: unknown;
+        };
+        /** @default {} */
+        nodeOverrides: {
+          [key: string]: {
+            /** @default {} */
+            params: {
+              [key: string]: unknown;
+            };
+            /** @default {} */
+            inputOverrides: {
+              [key: string]: unknown;
+            };
+          };
+        };
+      };
+      temporalScheduleId: string | null;
+      /** @default {} */
+      temporalSnapshot: {
+        [key: string]: unknown;
+      };
+      organizationId: string | null;
+      createdAt: string;
+      updatedAt: string;
+    };
+    CreateScheduleRequestDto: {
+      /** Format: uuid */
+      workflowId: string;
+      /** Format: uuid */
+      workflowVersionId?: string;
+      name: string;
+      description?: string | null;
+      cronExpression: string;
+      timezone: string;
+      humanLabel?: string | null;
+      /**
+       * @default skip
+       * @enum {string}
+       */
+      overlapPolicy: 'skip' | 'buffer' | 'allow';
+      /** @default 0 */
+      catchupWindowSeconds: number;
+      /**
+       * @default {
+       *       "runtimeInputs": {},
+       *       "nodeOverrides": {}
+       *     }
+       */
+      inputPayload: {
+        /** @default {} */
+        runtimeInputs: {
+          [key: string]: unknown;
+        };
+        /** @default {} */
+        nodeOverrides: {
+          [key: string]: {
+            /** @default {} */
+            params: {
+              [key: string]: unknown;
+            };
+            /** @default {} */
+            inputOverrides: {
+              [key: string]: unknown;
+            };
+          };
+        };
+      };
+    };
+    UpdateScheduleRequestDto: {
+      /** Format: uuid */
+      workflowId?: string;
+      /** Format: uuid */
+      workflowVersionId?: string;
+      name?: string;
+      description?: string | null;
+      cronExpression?: string;
+      timezone?: string;
+      humanLabel?: string | null;
+      /**
+       * @default skip
+       * @enum {string}
+       */
+      overlapPolicy: 'skip' | 'buffer' | 'allow';
+      /** @default 0 */
+      catchupWindowSeconds: number;
+      /**
+       * @default {
+       *       "runtimeInputs": {},
+       *       "nodeOverrides": {}
+       *     }
+       */
+      inputPayload: {
+        /** @default {} */
+        runtimeInputs: {
+          [key: string]: unknown;
+        };
+        /** @default {} */
+        nodeOverrides: {
+          [key: string]: {
+            /** @default {} */
+            params: {
+              [key: string]: unknown;
+            };
+            /** @default {} */
+            inputOverrides: {
+              [key: string]: unknown;
+            };
+          };
+        };
+      };
+      /** @enum {string} */
+      status?: 'active' | 'paused' | 'error';
+    };
+    WebhookRunWorkflowDto: {
+      inputs?: {
+        [key: string]: unknown;
+      };
+      versionId?: string;
+      version?: number;
+    };
+    WebhookConfigurationResponseDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      workflowId: string;
+      /** Format: uuid */
+      workflowVersionId: string | null;
+      workflowVersion: number | null;
+      name: string;
+      description: string | null;
+      webhookPath: string;
+      parsingScript: string;
+      expectedInputs: {
+        id: string;
+        label: string;
+        /** @enum {string} */
+        type: 'text' | 'number' | 'boolean' | 'json' | 'array' | 'file';
+        /** @default true */
+        required: boolean;
+        description?: string;
+      }[];
+      /** @enum {string} */
+      status: 'active' | 'inactive';
+      organizationId: string | null;
+      createdBy: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CreateWebhookRequestDto: {
+      /** Format: uuid */
+      workflowId: string;
+      /** Format: uuid */
+      workflowVersionId?: string;
+      name: string;
+      description?: string;
+      parsingScript: string;
+      /** @default [] */
+      expectedInputs: {
+        id: string;
+        label: string;
+        /** @enum {string} */
+        type: 'text' | 'number' | 'boolean' | 'json' | 'array' | 'file';
+        /** @default true */
+        required: boolean;
+        description?: string;
+      }[];
+    };
+    UpdateWebhookRequestDto: {
+      /** Format: uuid */
+      workflowId?: string;
+      /** Format: uuid */
+      workflowVersionId?: string;
+      name?: string;
+      description?: string;
+      parsingScript?: string;
+      expectedInputs?: {
+        id: string;
+        label: string;
+        /** @enum {string} */
+        type: 'text' | 'number' | 'boolean' | 'json' | 'array' | 'file';
+        /** @default true */
+        required: boolean;
+        description?: string;
+      }[];
+      /** @enum {string} */
+      status?: 'active' | 'inactive';
+    };
+    RegeneratePathResponseDto: {
+      /** Format: uuid */
+      id: string;
+      webhookPath: string;
+      /** Format: uri */
+      url: string;
+    };
+    GetWebhookUrlResponseDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      webhookPath: string;
+      /** Format: uri */
+      url: string;
+    };
+    TestWebhookScriptRequestDto: {
+      parsingScript: string;
+      testPayload: {
+        [key: string]: unknown;
+      };
+      testHeaders?: {
+        [key: string]: string;
+      };
+    };
+    TestWebhookScriptResponseDto: {
+      success: boolean;
+      parsedData: {
+        [key: string]: unknown;
+      } | null;
+      errorMessage: string | null;
+      validationErrors?: {
+        inputId: string;
+        message: string;
+      }[];
+    };
+    WebhookDeliveryResponseDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      webhookId: string;
+      workflowRunId: string | null;
+      /** @enum {string} */
+      status: 'processing' | 'delivered' | 'failed';
+      payload: {
+        [key: string]: unknown;
+      };
+      headers?: {
+        [key: string]: string;
+      };
+      parsedData: {
+        [key: string]: unknown;
+      } | null;
+      errorMessage: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      completedAt: string | null;
+    };
+    HumanInputResponseDto: {
+      /** Format: uuid */
+      id: string;
+      runId: string;
+      /** Format: uuid */
+      workflowId: string;
+      nodeRef: string;
+      /** @enum {string} */
+      status: 'pending' | 'resolved' | 'expired' | 'cancelled';
+      /** @enum {string} */
+      inputType: 'approval' | 'form' | 'selection' | 'review' | 'acknowledge';
+      inputSchema: unknown;
+      title: string;
+      description: string | null;
+      context: unknown;
+      resolveToken: string;
+      timeoutAt: string | null;
+      responseData: unknown;
+      respondedAt: string | null;
+      respondedBy: string | null;
+      organizationId: string | null;
+      createdAt: string;
+      updatedAt: string;
+    };
+    ResolveHumanInputDto: {
+      /** @description The response data from the human */
+      responseData?: {
+        [key: string]: unknown;
+      };
+    };
+    ResolveByTokenDto: {
+      /**
+       * @default resolve
+       * @enum {string}
+       */
+      action: 'approve' | 'reject' | 'resolve';
+      data?: {
+        [key: string]: unknown;
+      };
+    };
+    PublicResolveResultDto: {
+      success: boolean;
+      message: string;
+      input: {
+        /** Format: uuid */
+        id: string;
+        title: string;
+        /** @enum {string} */
+        inputType: 'approval' | 'form' | 'selection' | 'review' | 'acknowledge';
+        /** @enum {string} */
+        status: 'pending' | 'resolved' | 'expired' | 'cancelled';
+        respondedAt: string | null;
+      };
+    };
+    McpServerResponseDto: {
+      id: string;
+      name: string;
+      description: string | null;
+      /** @enum {string} */
+      transportType: 'http' | 'stdio';
+      endpoint: string | null;
+      command: string | null;
+      args: string[] | null;
+      hasHeaders: boolean;
+      headerKeys: string[] | null;
+      enabled: boolean;
+      healthCheckUrl: string | null;
+      /** Format: date-time */
+      lastHealthCheck: string | null;
+      /** @enum {string|null} */
+      lastHealthStatus: 'healthy' | 'unhealthy' | 'unknown' | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      groupId: string | null;
+    };
+    McpToolResponseDto: {
+      id: string;
+      toolName: string;
+      description: string | null;
+      inputSchema: {
+        [key: string]: unknown;
+      } | null;
+      serverId: string;
+      serverName: string;
+      enabled: boolean;
+      /** Format: date-time */
+      discoveredAt: string;
+    };
+    HealthStatusResponseDto: {
+      serverId: string;
+      /** @enum {string} */
+      status: 'healthy' | 'unhealthy' | 'unknown';
+      /** Format: date-time */
+      checkedAt: string | null;
+    };
+    CreateMcpServerDto: {
+      name: string;
+      description?: string;
+      /** @enum {string} */
+      transportType: 'http' | 'stdio';
+      /** Format: uri */
+      endpoint?: string;
+      command?: string;
+      args?: string[];
+      headers?: {
+        [key: string]: string;
+      };
+      /** Format: uri */
+      healthCheckUrl?: string;
+      enabled?: boolean;
+      groupId?: string;
+      cacheToken?: string;
+    };
+    UpdateMcpServerDto: {
+      name?: string;
+      description?: string | null;
+      /** @enum {string} */
+      transportType?: 'http' | 'stdio';
+      /** Format: uri */
+      endpoint?: string | null;
+      command?: string | null;
+      args?: string[] | null;
+      headers?: {
+        [key: string]: string;
+      } | null;
+      /** Format: uri */
+      healthCheckUrl?: string | null;
+      enabled?: boolean;
+    };
+    TestEnabledServerResponseDto: {
+      serverId: string;
+      serverName: string;
+      success: boolean;
+      message?: string;
+      toolCount?: number;
+    };
+    TestConnectionResponseDto: {
+      success: boolean;
+      message?: string;
+      toolCount?: number;
+      protocolVersion?: string;
+      responseTimeMs?: number;
+    };
+    McpGroupResponseDto: {
+      id: string;
+      slug: string;
+      name: string;
+      description: string | null;
+      credentialContractName: string;
+      credentialMapping: {
+        [key: string]: string;
+      } | null;
+      defaultDockerImage: string | null;
+      enabled: boolean;
+      templateHash?: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    GroupTemplateDto: {
+      slug: string;
+      name: string;
+      description?: string;
+      credentialContractName: string;
+      credentialMapping?: {
+        [key: string]: string;
+      };
+      defaultDockerImage: string;
+      version: {
+        major: number;
+        minor: number;
+        patch: number;
+      };
+      servers: {
+        name: string;
+        description?: string;
+        /** @enum {string} */
+        transportType: 'http' | 'stdio' | 'sse' | 'websocket';
+        endpoint?: string;
+        command?: string;
+        args?: string[];
+        recommended: boolean;
+        defaultSelected: boolean;
+      }[];
+      templateHash: string;
+    };
+    CreateMcpGroupDto: {
+      slug: string;
+      name: string;
+      description?: string | null;
+      credentialContractName: string;
+      credentialMapping?: {
+        [key: string]: string;
+      } | null;
+      defaultDockerImage?: string | null;
+      enabled?: boolean;
+    };
+    UpdateMcpGroupDto: {
+      name?: string;
+      description?: string | null;
+      credentialContractName?: string;
+      credentialMapping?: {
+        [key: string]: string;
+      } | null;
+      defaultDockerImage?: string | null;
+      enabled?: boolean;
+    };
+    McpGroupServerResponseDto: {
+      id: string;
+      name: string;
+      serverName: string;
+      description: string | null;
+      /** @enum {string} */
+      transportType: 'http' | 'stdio' | 'sse' | 'websocket';
+      endpoint: string | null;
+      command: string | null;
+      args: string[] | null;
+      enabled: boolean;
+      /** @enum {string} */
+      healthStatus: 'healthy' | 'unhealthy' | 'unknown';
+      toolCount: number;
+      recommended: boolean;
+      defaultSelected: boolean;
+    };
+    AddServerToGroupDto: {
+      /** Format: uuid */
+      serverId: string;
+      recommended?: boolean;
+      defaultSelected?: boolean;
+    };
+    UpdateServerInGroupDto: {
+      recommended?: boolean;
+      defaultSelected?: boolean;
+    };
+    SyncTemplatesResponseDto: {
+      syncedCount: number;
+      createdCount: number;
+      updatedCount: number;
+      templates: string[];
+    };
+    ImportTemplateRequestDto: {
+      serverCacheTokens?: {
+        [key: string]: string;
+      };
+    };
+    ImportGroupTemplateResponseDto: {
+      /** @enum {string} */
+      action: 'created' | 'updated' | 'skipped';
+      group: {
+        id: string;
+        slug: string;
+        name: string;
+        description: string | null;
+        credentialContractName: string;
+        credentialMapping: {
+          [key: string]: string;
+        } | null;
+        defaultDockerImage: string | null;
+        enabled: boolean;
+        templateHash?: string | null;
+        /** Format: date-time */
+        createdAt: string;
+        /** Format: date-time */
+        updatedAt: string;
+      };
+    };
+    RegistryCatalogListResponseDto: {
+      data: {
+        name: string;
+        displayName: string;
+        description: string | null;
+        /** @enum {string} */
+        serverType: 'server' | 'remote';
+        category: string | null;
+        tags: string[];
+        iconUrl: string | null;
+        sourceUrl: string | null;
+        isFeatured: boolean;
+        hasSecrets: boolean;
+        hasOAuth: boolean;
+        isImported: boolean;
+      }[];
+      pagination: {
+        total: number;
+        limit: number;
+        offset: number;
+      };
+      categories: string[];
+    };
+    RegistryCatalogDetailDto: {
+      name: string;
+      displayName: string;
+      description: string | null;
+      /** @enum {string} */
+      serverType: 'server' | 'remote';
+      category: string | null;
+      tags: string[];
+      iconUrl: string | null;
+      sourceUrl: string | null;
+      isFeatured: boolean;
+      hasSecrets: boolean;
+      hasOAuth: boolean;
+      isImported: boolean;
+      dockerImage: string | null;
+      remoteConfig: {
+        /** @enum {string} */
+        transportType: 'streamable-http' | 'sse';
+        url: string;
+        headers?: {
+          [key: string]: string;
+        };
+      } | null;
+      configRequirements: {
+        /** @default [] */
+        secrets: {
+          name: string;
+          env: string;
+          example?: string;
+        }[];
+        /** @default [] */
+        env: {
+          name: string;
+          example?: string;
+          value?: string;
+        }[];
+      };
+      /** @default [] */
+      oauthProviders: {
+        provider: string;
+        secret?: string;
+        env?: string;
+      }[];
+      runConfig: {
+        command?: string[];
+        volumes?: string[];
+        env?: {
+          [key: string]: string;
+        };
+      } | null;
+    };
+    RegistryImportRequestDto: {
+      registryName: string;
+      /** @default {} */
+      secrets: {
+        [key: string]: string;
+      };
+      /** @default {} */
+      envVars: {
+        [key: string]: string;
+      };
+      /** @default true */
+      enabled: boolean;
+      /** Format: uuid */
+      groupId?: string;
+    };
+    RegistryImportResponseDto: {
+      /** Format: uuid */
+      serverId: string;
+      serverName: string;
+      /** @enum {string} */
+      transportType: 'http' | 'stdio';
+      /** @enum {string} */
+      status: 'imported' | 'already_exists';
+    };
+    NotificationChannelResponseDto: {
+      /** Format: uuid */
+      id: string;
+      organizationId: string;
+      name: string;
+      /** @enum {string} */
+      type: 'slack' | 'discord' | 'email' | 'pagerduty';
+      config: {
+        [key: string]: unknown;
+      };
+      /** @enum {string} */
+      status: 'active' | 'inactive';
+      events: ('run.completed' | 'run.failed' | 'run.cancelled' | 'run.timed_out')[];
+      createdBy: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CreateNotificationChannelDto: {
+      name: string;
+      /** @enum {string} */
+      type: 'slack' | 'discord' | 'email' | 'pagerduty';
+      config: {
+        [key: string]: unknown;
+      };
+      events: ('run.completed' | 'run.failed' | 'run.cancelled' | 'run.timed_out')[];
+    };
+    UpdateNotificationChannelDto: {
+      name?: string;
+      config?: {
+        [key: string]: unknown;
+      };
+      /** @enum {string} */
+      status?: 'active' | 'inactive';
+      events?: ('run.completed' | 'run.failed' | 'run.cancelled' | 'run.timed_out')[];
+    };
+    NotificationDeliveryResponseDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      channelId: string;
+      runId: string | null;
+      eventType: string;
+      /** @enum {string} */
+      status: 'pending' | 'sending' | 'sent' | 'failed' | 'unknown';
+      payload: {
+        [key: string]: unknown;
+      };
+      errorMessage: string | null;
+      durationMs: number | null;
+      responseStatus: number | null;
+      responseBody: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      sentAt: string | null;
+    };
+    DiscoveryInputDto: {
+      /**
+       * @description Transport type for MCP server
+       * @enum {string}
+       */
+      transport: 'http' | 'stdio';
+      /** @description Human-readable name for the MCP server */
+      name: string;
+      /**
+       * Format: uri
+       * @description HTTP endpoint for HTTP transport
+       */
+      endpoint?: string;
+      /** @description HTTP headers for authentication */
+      headers?: {
+        [key: string]: string;
+      };
+      /** @description Command to run for stdio transport */
+      command?: string;
+      /** @description Arguments for stdio command */
+      args?: string[];
+      /** @description Deprecated for single discovery; trusted-local stdio uses a same-worker loopback host proxy */
+      image?: string;
+      /**
+       * Format: uuid
+       * @description Cache token for storing/retrieving discovery results
+       */
+      cacheToken?: string;
+    };
+    DiscoveryStartResponseDto: {
+      /**
+       * Format: uuid
+       * @description Unique ID for tracking the discovery workflow
+       */
+      workflowId: string;
+      /**
+       * Format: uuid
+       * @description Cache token for retrieving cached discovery results
+       */
+      cacheToken?: string;
+      /**
+       * @description Status indicating workflow has started
+       * @enum {string}
+       */
+      status: 'started';
+    };
+    DiscoveryStatusDto: {
+      /**
+       * Format: uuid
+       * @description Workflow ID
+       */
+      workflowId: string;
+      /**
+       * @description Current status of discovery
+       * @enum {string}
+       */
+      status: 'running' | 'completed' | 'failed';
+      /** @description Discovered tools (available when completed) */
+      tools?: {
+        /** @description Tool name */
+        name: string;
+        /** @description Tool description */
+        description?: string;
+        /** @description JSON Schema for tool input */
+        inputSchema?: {
+          [key: string]: unknown;
+        };
+      }[];
+      /** @description Number of tools discovered */
+      toolCount?: number;
+      /** @description Error message if discovery failed */
+      error?: string;
+      /** @description Error code for categorizing failures */
+      errorCode?: string;
+    };
+    GroupDiscoveryInputDto: {
+      /** @description Docker image for stdio transport */
+      image?: string;
+      /** @description Servers to discover */
+      servers: {
+        /** @description Server name */
+        name: string;
+        /**
+         * @description Transport type for MCP server
+         * @enum {string}
+         */
+        transport: 'http' | 'stdio';
+        /**
+         * Format: uri
+         * @description HTTP endpoint for HTTP transport
+         */
+        endpoint?: string;
+        /** @description HTTP headers for authentication */
+        headers?: {
+          [key: string]: string;
+        };
+        /** @description Command to run for stdio transport */
+        command?: string;
+        /** @description Arguments for stdio command */
+        args?: string[];
+      }[];
+    };
+    GroupDiscoveryStartResponseDto: {
+      /**
+       * Format: uuid
+       * @description Unique ID for tracking the discovery workflow
+       */
+      workflowId: string;
+      /** @description Map of server name to cache token */
+      cacheTokens: {
+        [key: string]: string;
+      };
+      /**
+       * @description Status indicating workflow has started
+       * @enum {string}
+       */
+      status: 'started';
+    };
+    GroupDiscoveryStatusDto: {
+      /**
+       * Format: uuid
+       * @description Workflow ID
+       */
+      workflowId: string;
+      /**
+       * @description Current status of discovery
+       * @enum {string}
+       */
+      status: 'running' | 'completed' | 'failed';
+      results?: {
+        name: string;
+        /** @enum {string} */
+        status: 'running' | 'completed' | 'failed';
+        tools?: {
+          /** @description Tool name */
+          name: string;
+          /** @description Tool description */
+          description?: string;
+          /** @description JSON Schema for tool input */
+          inputSchema?: {
+            [key: string]: unknown;
+          };
+        }[];
+        toolCount?: number;
+        error?: string;
+        /** Format: uuid */
+        cacheToken?: string;
+      }[];
+      error?: string;
+      errorCode?: string;
+    };
+    ImportCommunityTemplateDto: {
+      id?: string;
+      templatePath?: string;
+    };
+    PublishTemplateDto: {
+      workflowId: string;
+      name: string;
+      description: string;
+      category: string;
+      tags: string[];
+      author: string;
+    };
+    UseTemplateDto: {
+      workflowName: string;
+      secretMappings?: {
+        [key: string]: string;
+      };
+    };
+    ListAuditLogsResponseDto: {
+      items: {
+        /** Format: uuid */
+        id: string;
+        organizationId: string | null;
+        actorId: string | null;
+        /** @enum {string} */
+        actorType: 'user' | 'api-key' | 'internal' | 'unknown';
+        actorDisplay: string | null;
+        action: string;
+        /** @enum {string} */
+        resourceType:
+          | 'workflow'
+          | 'secret'
+          | 'api_key'
+          | 'webhook'
+          | 'artifact'
+          | 'analytics'
+          | 'schedule'
+          | 'mcp_server'
+          | 'mcp_group'
+          | 'human_input'
+          | 'notification_channel'
+          | 'notification_delivery'
+          | 'finding_triage'
+          | 'outbox_event'
+          | 'integration'
+          | 'file'
+          | 'ticketing_connection'
+          | 'operator_session'
+          | 'operator_action';
+        resourceId: string | null;
+        resourceName: string | null;
+        metadata: {
+          [key: string]: unknown;
+        } | null;
+        ip: string | null;
+        userAgent: string | null;
+        correlationId: string | null;
+        /** Format: date-time */
+        createdAt: string;
+      }[];
+      nextCursor: string | null;
+    };
+    AgentSkillResponse: {
+      /** Format: uuid */
+      id: string;
+      organizationId: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      content: string;
+      files: {
+        [key: string]: string;
+      };
+      fileCount: number;
+      tags: string[];
+      enabled: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    DiscoveredAgentSkillResponse: {
+      slug: string;
+      name: string;
+      description: string | null;
+      sourceRoot: string;
+      relativePath: string;
+      fileCount: number;
+      imported: boolean;
+      /** Format: uuid */
+      existingSkillId?: string;
+    };
+    ImportDiscoveredAgentSkillsDto: {
+      items: {
+        slug: string;
+        sourceRoot: string;
+      }[];
+      overwrite?: boolean;
+    };
+    ImportAgentSkillsResultResponse: {
+      imported: {
+        /** Format: uuid */
+        id: string;
+        organizationId: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        content: string;
+        files: {
+          [key: string]: string;
+        };
+        fileCount: number;
+        tags: string[];
+        enabled: boolean;
+        /** Format: date-time */
+        createdAt: string;
+        /** Format: date-time */
+        updatedAt: string;
+      }[];
+      skipped: {
+        slug: string;
+        reason: string;
+      }[];
+    };
+    CreateAgentSkillDto: {
+      name: string;
+      slug: string;
+      description?: string;
+      content?: string;
+      files?: {
+        [key: string]: string;
+      };
+      tags?: string[];
+      enabled?: boolean;
+    };
+    UpdateAgentSkillDto: {
+      name?: string;
+      slug?: string;
+      description?: string | null;
+      content?: string;
+      files?: {
+        [key: string]: string;
+      };
+      tags?: string[];
+      enabled?: boolean;
+    };
+    ScopeResponse: {
+      /** Format: uuid */
+      id: string;
+      organizationId: string;
+      name: string;
+      description: string | null;
+      domains: string[];
+      repos: string[];
+      ipRanges: string[];
+      runtimeValues: {
+        [key: string]: unknown;
+      };
+      createdBy: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CreateScopeDto: {
+      name: string;
+      description?: string | null;
+      /** @default [] */
+      domains: string[];
+      /** @default [] */
+      repos: string[];
+      /** @default [] */
+      ipRanges: string[];
+      /** @default {} */
+      runtimeValues: {
+        [key: string]: unknown;
+      };
+    };
+    UpdateScopeDto: {
+      name?: string;
+      description?: string | null;
+      domains?: string[];
+      repos?: string[];
+      ipRanges?: string[];
+      runtimeValues?: {
+        [key: string]: unknown;
+      };
+    };
+    ScopeFindingsSummaryResponse: {
+      /** @enum {string} */
+      availability: 'available' | 'degraded' | 'unavailable';
+      total: number;
+      bySeverity: {
+        critical: number;
+        high: number;
+        medium: number;
+        low: number;
+        info: number;
+        none: number;
+      };
+    };
+    AssetRunComparisonResponse: {
+      /** Format: uuid */
+      scopeId: string;
+      /** Format: uuid */
+      workflowId: string;
+      baselineRunId: string;
+      currentRunId: string;
+      baselineCoverage: {
+        completedComponents: string[];
+        failedComponents: string[];
+      };
+      currentCoverage: {
+        completedComponents: string[];
+        failedComponents: string[];
+      };
+      summary: {
+        observed: number;
+        notObserved: number;
+        notScanned: number;
+      };
+      items: {
+        /** @enum {string} */
+        assetType:
+          | 'subdomain'
+          | 'host'
+          | 'ip-address'
+          | 'open-port'
+          | 'http-probe'
+          | 'dns-record'
+          | 'crawled-url'
+          | 'url';
+        assetValue: string;
+        sourceComponentIds: string[];
+        baselineObserved: boolean;
+        currentObserved: boolean;
+        /** @enum {string} */
+        observationStatus: 'observed' | 'not-observed' | 'not-scanned';
+        /** @enum {string} */
+        change: 'new' | 'unchanged' | 'missing';
+      }[];
+    };
+    AssetResponse: {
+      /** Format: uuid */
+      id: string;
+      organizationId: string;
+      /** Format: uuid */
+      scopeId: string;
+      /** @enum {string} */
+      assetType:
+        | 'subdomain'
+        | 'host'
+        | 'ip-address'
+        | 'open-port'
+        | 'http-probe'
+        | 'dns-record'
+        | 'crawled-url'
+        | 'url';
+      assetValue: string;
+      /** Format: date-time */
+      firstSeenAt: string;
+      /** Format: date-time */
+      lastSeenAt: string;
+      firstSeenRunId: string | null;
+      lastSeenRunId: string | null;
+      sourceComponentId: string | null;
+      metadata: {
+        [key: string]: unknown;
+      };
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ListAnthropicModelsDto: {
+      apiKeySecretId: string;
+    };
+    AnthropicModelOption: {
+      id: string;
+      label: string;
+    };
+    ListAnthropicModelsResponse: {
+      models: components['schemas']['AnthropicModelOption'][];
+      /** @enum {string} */
+      source: 'live' | 'error';
+      error?: string | null;
+    };
+    ListDeadLettersResponseDto: {
+      items: {
+        /** Format: uuid */
+        id: string;
+        eventType: string;
+        organizationId: string | null;
+        aggregateType: string;
+        aggregateId: string;
+        dedupeKey: string;
+        payload: {
+          [key: string]: unknown;
+        };
+        /** @enum {string} */
+        status: 'dead';
+        attempts: number;
+        maxAttempts: number;
+        /** Format: date-time */
+        availableAt: string;
+        /** Format: date-time */
+        lockedAt: string | null;
+        lockedBy: string | null;
+        lastError: string | null;
+        /** Format: date-time */
+        processedAt: string | null;
+        /** Format: date-time */
+        createdAt: string;
+        /** Format: date-time */
+        updatedAt: string;
+      }[];
+      nextCursor: string | null;
+    };
+    RequeueDeadLetterResponseDto: {
+      /** Format: uuid */
+      eventId: string;
+      /** @enum {string} */
+      status: 'pending';
+    };
+    OperatorRunImprovementLookupDto: {
+      improvement: {
+        sourceRunId: string;
+        /** Format: uuid */
+        sessionId: string;
+        /** Format: uuid */
+        turnId: string;
+        /** Format: date-time */
+        createdAt: string;
+      } | null;
+    };
+    CreateOperatorSessionDto: {
+      /**
+       * @default ask
+       * @enum {string}
+       */
+      approvalMode: 'ask' | 'auto';
+      model: {
+        /** @enum {string} */
+        provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan';
+        modelId: string;
+        /** Format: uuid */
+        apiKeySecretId: string;
+        /** Format: uri */
+        baseUrl?: string | null;
+      };
+    };
+    OperatorWorkflowDraftDetailDto: {
+      /** @enum {string} */
+      kind: 'workflow-draft';
+      /** Format: uuid */
+      draftId: string;
+      /** @enum {string} */
+      mode: 'create' | 'update';
+      /** Format: uuid */
+      workflowId: string | null;
+      /** Format: uuid */
+      baseVersionId: string | null;
+      sourceRunId?: string;
+      name: string;
+      digest: string;
+      validation: {
+        valid: boolean;
+        errors: string[];
+      };
+      diff: {
+        metadataChanged: ('name' | 'description')[];
+        /** @default false */
+        successCriteriaChanged: boolean;
+        addedNodeIds: string[];
+        removedNodeIds: string[];
+        changedNodeIds: string[];
+        addedEdgeIds: string[];
+        removedEdgeIds: string[];
+        changedEdgeIds: string[];
+      };
+      /** Format: uuid */
+      proposalActionId: string;
+      /** Format: uuid */
+      sessionId: string;
+      proposedGraph: {
+        id?: string;
+        name: string;
+        description?: string;
+        nodes: {
+          id: string;
+          type: string;
+          position: {
+            x: number;
+            y: number;
+          };
+          data: {
+            label: string;
+            /**
+             * @default {
+             *       "params": {},
+             *       "inputOverrides": {}
+             *     }
+             */
+            config: {
+              /** @default {} */
+              params: {
+                [key: string]: unknown;
+              };
+              /** @default {} */
+              inputOverrides: {
+                [key: string]: unknown;
+              };
+              /** @enum {string} */
+              joinStrategy?: 'all' | 'any' | 'first';
+              streamId?: string;
+              groupId?: string;
+              maxConcurrency?: number;
+              /** @enum {string} */
+              mode?: 'normal' | 'tool';
+              toolConfig?: {
+                /** @default [] */
+                boundInputIds: string[];
+                /** @default [] */
+                exposedInputIds: string[];
+              };
+              connectedToolNodeIds?: string[];
+            };
+            dynamicInputs?: {
+              [key: string]: unknown;
+            }[];
+            dynamicOutputs?: {
+              [key: string]: unknown;
+            }[];
+          };
+        }[];
+        edges: {
+          id: string;
+          source: string;
+          target: string;
+          sourceHandle?: string;
+          targetHandle?: string;
+          /** @enum {string} */
+          kind?: 'success' | 'error';
+          /** @enum {string} */
+          type?: 'default' | 'smoothstep' | 'step' | 'straight' | 'bezier';
+        }[];
+        /**
+         * @default {
+         *       "x": 0,
+         *       "y": 0,
+         *       "zoom": 1
+         *     }
+         */
+        viewport: {
+          x: number;
+          y: number;
+          zoom: number;
+        };
+        successCriteria?: (
+          | {
+              id: string;
+              title: string;
+              /** @enum {string} */
+              kind: 'output_assertion';
+              nodeRef: string;
+              path: string;
+              /** @enum {string} */
+              operator: 'exists' | 'not_empty' | 'equals' | 'contains' | 'gte' | 'lte';
+              expected?: (string | null) | (number | null) | (boolean | null);
+            }
+          | {
+              id: string;
+              title: string;
+              /** @enum {string} */
+              kind: 'finding_count';
+              minimum?: number;
+              maximum?: number;
+            }
+        )[];
+      };
+      baseGraph: {
+        id?: string;
+        name: string;
+        description?: string;
+        nodes: {
+          id: string;
+          type: string;
+          position: {
+            x: number;
+            y: number;
+          };
+          data: {
+            label: string;
+            /**
+             * @default {
+             *       "params": {},
+             *       "inputOverrides": {}
+             *     }
+             */
+            config: {
+              /** @default {} */
+              params: {
+                [key: string]: unknown;
+              };
+              /** @default {} */
+              inputOverrides: {
+                [key: string]: unknown;
+              };
+              /** @enum {string} */
+              joinStrategy?: 'all' | 'any' | 'first';
+              streamId?: string;
+              groupId?: string;
+              maxConcurrency?: number;
+              /** @enum {string} */
+              mode?: 'normal' | 'tool';
+              toolConfig?: {
+                /** @default [] */
+                boundInputIds: string[];
+                /** @default [] */
+                exposedInputIds: string[];
+              };
+              connectedToolNodeIds?: string[];
+            };
+            dynamicInputs?: {
+              [key: string]: unknown;
+            }[];
+            dynamicOutputs?: {
+              [key: string]: unknown;
+            }[];
+          };
+        }[];
+        edges: {
+          id: string;
+          source: string;
+          target: string;
+          sourceHandle?: string;
+          targetHandle?: string;
+          /** @enum {string} */
+          kind?: 'success' | 'error';
+          /** @enum {string} */
+          type?: 'default' | 'smoothstep' | 'step' | 'straight' | 'bezier';
+        }[];
+        /**
+         * @default {
+         *       "x": 0,
+         *       "y": 0,
+         *       "zoom": 1
+         *     }
+         */
+        viewport: {
+          x: number;
+          y: number;
+          zoom: number;
+        };
+        successCriteria?: (
+          | {
+              id: string;
+              title: string;
+              /** @enum {string} */
+              kind: 'output_assertion';
+              nodeRef: string;
+              path: string;
+              /** @enum {string} */
+              operator: 'exists' | 'not_empty' | 'equals' | 'contains' | 'gte' | 'lte';
+              expected?: (string | null) | (number | null) | (boolean | null);
+            }
+          | {
+              id: string;
+              title: string;
+              /** @enum {string} */
+              kind: 'finding_count';
+              minimum?: number;
+              maximum?: number;
+            }
+        )[];
+      } | null;
+    };
+    UpdateOperatorSessionDto: {
+      /** @enum {string} */
+      approvalMode?: 'ask' | 'auto';
+      model?: {
+        /** @enum {string} */
+        provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan';
+        modelId: string;
+        /** Format: uuid */
+        apiKeySecretId: string;
+        /** Format: uri */
+        baseUrl?: string | null;
+      };
+      title?: string;
+    };
+    CreateOperatorTurnDto: {
+      /** Format: uuid */
+      clientTurnId: string;
+      message: string;
+      context?: {
+        path: string;
+        /** Format: uuid */
+        workflowId?: string;
+        runId?: string;
+      };
+      directCommand?:
+        | {
+            /** @enum {string} */
+            commandName: 'apply_workflow_draft';
+            arguments: {
+              /** Format: uuid */
+              draftId: string;
+            };
+          }
+        | {
+            /** @enum {string} */
+            commandName: 'promote_workflow_version';
+            arguments: {
+              /** Format: uuid */
+              workflowId: string;
+              /** Format: uuid */
+              versionId: string;
+              /** Format: uuid */
+              baseVersionId: string;
+              candidateRunId: string;
+            };
+          }
+        | {
+            /** @enum {string} */
+            commandName: 'get_run';
+            arguments: {
+              runId: string;
+            };
+          }
+        | {
+            /** @enum {string} */
+            commandName: 'compare_runs';
+            arguments: {
+              sourceRunId: string;
+              candidateRunId: string;
+            };
+          }
+        | {
+            /** @enum {string} */
+            commandName: 'run_workflow';
+            arguments: {
+              /** Format: uuid */
+              workflowId: string;
+              /** Format: uuid */
+              versionId: string;
+              /** @default {} */
+              inputs: {
+                [key: string]: unknown;
+              };
+              /** Format: uuid */
+              scopeId?: string;
+              sourceRunId?: string;
+            };
+          }
+        | {
+            /** @enum {string} */
+            commandName: 'cancel_run';
+            arguments: {
+              runId: string;
+            };
+          }
+        | {
+            /** @enum {string} */
+            commandName: 'retry_run';
+            arguments: {
+              runId: string;
+            };
+          };
+      journey?: {
+        /** @enum {string} */
+        kind: 'improve_run';
+        sourceRunId: string;
+      };
+    };
+    OperatorActionDecisionDto: {
+      /** @enum {string} */
+      decision: 'approved' | 'rejected';
+      expectedVersion: number;
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    AppController_validateAuth: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AppController_login: {
-        parameters: {
-            query?: never;
-            header: {
-                authorization: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AppController_logout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AdminInstancesController_listInstances: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns all alive backend instances with metadata */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AdminInstancesController_detectStaleSessions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns sessions whose owning instance is no longer alive */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AdminInstancesController_cleanupStaleSessions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Removes stale session registry entries and returns removed count */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AgentsController_parts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                agentRunId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns stored agent trace parts */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AgentsController_chat: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                agentRunId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description AI SDK-compatible SSE for agent run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowRunsController_listRuns: {
-        parameters: {
-            query?: {
-                workflowId?: string;
-                status?: string;
-                limit?: number;
-                offset?: number;
-                scopeId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List all workflow runs with metadata */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runs?: {
-                            id?: string;
-                            workflowId?: string;
-                            organizationId?: string;
-                            /** @enum {string} */
-                            status?: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "CONTINUED_AS_NEW" | "TIMED_OUT" | "UNKNOWN";
-                            /** Format: date-time */
-                            startTime?: string;
-                            /** Format: date-time */
-                            endTime?: string | null;
-                            temporalRunId?: string;
-                            workflowVersionId?: string | null;
-                            workflowVersion?: number | null;
-                            workflowName?: string;
-                            eventCount?: number;
-                            nodeCount?: number;
-                            duration?: number;
-                            /** @enum {string} */
-                            triggerType?: "manual" | "schedule" | "api";
-                            triggerSource?: string | null;
-                            triggerLabel?: string | null;
-                            inputPreview?: {
-                                runtimeInputs?: {
-                                    [key: string]: unknown;
-                                };
-                                nodeOverrides?: {
-                                    [key: string]: {
-                                        [key: string]: unknown;
-                                    };
-                                };
-                            };
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunsController_getRun: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Metadata for a single workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id?: string;
-                        workflowId?: string;
-                        organizationId?: string;
-                        /** @enum {string} */
-                        status?: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "CONTINUED_AS_NEW" | "TIMED_OUT" | "UNKNOWN";
-                        /** Format: date-time */
-                        startTime?: string;
-                        /** Format: date-time */
-                        endTime?: string | null;
-                        temporalRunId?: string | null;
-                        workflowVersionId?: string | null;
-                        workflowVersion?: number | null;
-                        workflowName?: string;
-                        eventCount?: number;
-                        nodeCount?: number;
-                        duration?: number;
-                        /** @enum {string} */
-                        triggerType?: "manual" | "schedule" | "api";
-                        triggerSource?: string | null;
-                        triggerLabel?: string | null;
-                        inputPreview?: {
-                            runtimeInputs?: {
-                                [key: string]: unknown;
-                            };
-                            nodeOverrides?: {
-                                [key: string]: {
-                                    [key: string]: unknown;
-                                };
-                            };
-                        };
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunsController_listChildRuns: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List direct child workflow runs spawned by a parent run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runs?: {
-                            runId?: string;
-                            workflowId?: string;
-                            workflowName?: string;
-                            parentNodeRef?: string | null;
-                            status?: string;
-                            /** Format: date-time */
-                            startedAt?: string;
-                            /** Format: date-time */
-                            completedAt?: string | null;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunsController_status: {
-        parameters: {
-            query?: {
-                temporalRunId?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Current Temporal execution status */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowRunsController_result: {
-        parameters: {
-            query?: {
-                temporalRunId?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Resolved workflow result payload */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowRunResultResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowRunsController_config: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Inputs and version metadata captured for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        workflowId?: string;
-                        workflowVersionId?: string | null;
-                        workflowVersion?: number | null;
-                        inputs?: {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunsController_cancel: {
-        parameters: {
-            query?: {
-                temporalRunId?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cancellation request accepted by Temporal */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CancelWorkflowRunResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowRunObservabilityController_trace: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Trace events for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        events?: {
-                            id?: string;
-                            runId?: string;
-                            nodeId?: string;
-                            /** @enum {string} */
-                            type?: "STARTED" | "PROGRESS" | "COMPLETED" | "FAILED";
-                            /** @enum {string} */
-                            level?: "info" | "warn" | "error" | "debug";
-                            /** Format: date-time */
-                            timestamp?: string;
-                            message?: string | null;
-                            error?: {
-                                message?: string;
-                                stack?: string;
-                                code?: string;
-                                type?: string;
-                                details?: {
-                                    [key: string]: unknown;
-                                };
-                                fieldErrors?: {
-                                    [key: string]: string[];
-                                };
-                            } | null;
-                            outputSummary?: {
-                                [key: string]: unknown;
-                            } | null;
-                            data?: {
-                                [key: string]: unknown;
-                            } | null;
-                            metadata?: {
-                                activityId?: string;
-                                attempt?: number;
-                                correlationId?: string;
-                                streamId?: string;
-                                /** @enum {string} */
-                                joinStrategy?: "all" | "any" | "first";
-                                triggeredBy?: string;
-                                failure?: {
-                                    /** Format: date-time */
-                                    at?: string;
-                                    reason?: {
-                                        message?: string;
-                                        name?: string;
-                                    };
-                                } | null;
-                                retryPolicy?: {
-                                    maxAttempts?: number;
-                                    initialIntervalSeconds?: number;
-                                    maximumIntervalSeconds?: number;
-                                    backoffCoefficient?: number;
-                                    nonRetryableErrorTypes?: string[];
-                                } | null;
-                            } | null;
-                        }[];
-                        cursor?: string | null;
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunObservabilityController_events: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Full event timeline for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        events?: {
-                            id?: string;
-                            runId?: string;
-                            nodeId?: string;
-                            /** @enum {string} */
-                            type?: "STARTED" | "PROGRESS" | "COMPLETED" | "FAILED";
-                            /** @enum {string} */
-                            level?: "info" | "warn" | "error" | "debug";
-                            /** Format: date-time */
-                            timestamp?: string;
-                            message?: string | null;
-                            error?: {
-                                message?: string;
-                                stack?: string;
-                                code?: string;
-                                type?: string;
-                                details?: {
-                                    [key: string]: unknown;
-                                };
-                                fieldErrors?: {
-                                    [key: string]: string[];
-                                };
-                            } | null;
-                            outputSummary?: {
-                                [key: string]: unknown;
-                            } | null;
-                            data?: {
-                                [key: string]: unknown;
-                            } | null;
-                            metadata?: {
-                                activityId?: string;
-                                attempt?: number;
-                                correlationId?: string;
-                                streamId?: string;
-                                /** @enum {string} */
-                                joinStrategy?: "all" | "any" | "first";
-                                triggeredBy?: string;
-                                failure?: {
-                                    /** Format: date-time */
-                                    at?: string;
-                                    reason?: {
-                                        message?: string;
-                                        name?: string;
-                                    };
-                                } | null;
-                                retryPolicy?: {
-                                    maxAttempts?: number;
-                                    initialIntervalSeconds?: number;
-                                    maximumIntervalSeconds?: number;
-                                    backoffCoefficient?: number;
-                                    nonRetryableErrorTypes?: string[];
-                                } | null;
-                            } | null;
-                        }[];
-                        cursor?: string | null;
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunObservabilityController_dataflows: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Derived data flow packets for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        packets?: {
-                            id?: string;
-                            runId?: string;
-                            sourceNode?: string;
-                            targetNode?: string;
-                            inputKey?: string | null;
-                            payload?: {
-                                [key: string]: unknown;
-                            } | null;
-                            timestamp?: number;
-                            visualTime?: number;
-                            size?: number;
-                            /** @enum {string} */
-                            type?: "file" | "json" | "text" | "binary";
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunObservabilityController_runArtifacts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Artifacts generated for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RunArtifactsResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowRunObservabilityController_downloadRunArtifact: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-                artifactId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Download artifact for a specific run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowRunObservabilityController_getNodeIO: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Node inputs/outputs for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        nodes?: {
-                            nodeRef?: string;
-                            componentId?: string;
-                            /** @enum {string} */
-                            status?: "running" | "completed" | "failed" | "skipped";
-                            /** Format: date-time */
-                            startedAt?: string | null;
-                            /** Format: date-time */
-                            completedAt?: string | null;
-                            durationMs?: number | null;
-                            inputs?: {
-                                [key: string]: unknown;
-                            } | null;
-                            outputs?: {
-                                [key: string]: unknown;
-                            } | null;
-                            inputsSize?: number;
-                            outputsSize?: number;
-                            inputsSpilled?: boolean;
-                            outputsSpilled?: boolean;
-                            errorMessage?: string | null;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunObservabilityController_getNodeIODetail: {
-        parameters: {
-            query?: {
-                /** @description Request full node I/O data instead of a preview */
-                full?: boolean;
-            };
-            header?: never;
-            path: {
-                runId: string;
-                nodeRef: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Specific node input/output for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        nodeRef?: string;
-                        componentId?: string;
-                        /** @enum {string} */
-                        status?: "running" | "completed" | "failed" | "skipped";
-                        /** Format: date-time */
-                        startedAt?: string | null;
-                        /** Format: date-time */
-                        completedAt?: string | null;
-                        durationMs?: number | null;
-                        inputs?: {
-                            [key: string]: unknown;
-                        } | null;
-                        outputs?: {
-                            [key: string]: unknown;
-                        } | null;
-                        inputsSize?: number;
-                        outputsSize?: number;
-                        inputsSpilled?: boolean;
-                        outputsSpilled?: boolean;
-                        inputsTruncated?: boolean;
-                        outputsTruncated?: boolean;
-                        errorMessage?: string | null;
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunObservabilityController_logs: {
-        parameters: {
-            query?: {
-                nodeRef?: string;
-                stream?: "stdout" | "stderr" | "console";
-                level?: "debug" | "info" | "warn" | "error";
-                limit?: number;
-                cursor?: string;
-                startTime?: string;
-                endTime?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Logs for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        logs?: {
-                            id?: string;
-                            runId?: string;
-                            nodeId?: string;
-                            /** @enum {string} */
-                            level?: "debug" | "info" | "warn" | "error";
-                            message?: string;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        }[];
-                        totalCount?: number;
-                        hasMore?: boolean;
-                        nextCursor?: string | null;
-                    };
-                };
-            };
-        };
-    };
-    WorkflowRunStreamController_stream: {
-        parameters: {
-            query?: {
-                temporalRunId?: string;
-                cursor?: string;
-                terminalCursor?: string;
-                logCursor?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Server-sent events stream for workflow run updates */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowRunStreamController_terminalChunks: {
-        parameters: {
-            query?: {
-                nodeRef?: string;
-                stream?: "stdout" | "stderr" | "pty";
-                cursor?: string;
-                startTime?: string;
-                endTime?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Terminal chunks for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowRunStreamController_listTerminalArchives: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TerminalRecordListDto"];
-                };
-            };
-        };
-    };
-    WorkflowRunStreamController_archiveTerminal: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TerminalArchiveRequestDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TerminalRecordingDto"];
-                };
-            };
-        };
-    };
-    WorkflowRunStreamController_downloadTerminalArchive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-                recordId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Download terminal recording */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowTagsController_listAllTags: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description All tags across workflows, sorted alphabetically */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AllTagsResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_findAll: {
-        parameters: {
-            query?: {
-                /** @description Comma-separated tag names to filter by (intersection — workflows must have ALL tags) */
-                tags?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowResponseDto"][];
-                };
-            };
-        };
-    };
-    WorkflowsController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateWorkflowRequestDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_findOne: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateWorkflowRequestDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_remove: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Workflow deleted successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowsController_updateMetadata: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateWorkflowMetadataDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_listSummary: {
-        parameters: {
-            query?: {
-                /** @description Comma-separated tag names to filter by (intersection — workflows must have ALL tags) */
-                tags?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Lightweight workflow list without graph data */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        name?: string;
-                        description?: string | null;
-                        isSystem?: boolean;
-                        /** Format: uuid */
-                        templateId?: string | null;
-                        /** Format: date-time */
-                        lastRun?: string | null;
-                        runCount?: number;
-                        nodeCount?: number;
-                        /** Format: date-time */
-                        createdAt?: string;
-                        /** Format: date-time */
-                        updatedAt?: string;
-                        tags?: string[];
-                    }[];
-                };
-            };
-        };
-    };
-    WorkflowsController_getRuntimeInputs: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Get the runtime inputs defined in the workflow Entry Point */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowRuntimeInputsResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_listVersions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflowId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowVersionSummaryDto"][];
-                };
-            };
-        };
-    };
-    WorkflowsController_findVersion: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflowId: string;
-                versionId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowVersionResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_commit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Compiled workflow definition */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        title?: string;
-                        description?: string | null;
-                        entrypoint?: {
-                            ref?: string;
-                        };
-                        actions?: {
-                            ref?: string;
-                            componentId?: string;
-                            params?: {
-                                [key: string]: unknown;
-                            };
-                            dependsOn?: string[];
-                        }[];
-                        config?: {
-                            environment?: string;
-                            timeoutSeconds?: number;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_run: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RunWorkflowRequestDto"];
-            };
-        };
-        responses: {
-            /** @description Workflow execution result */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @description Temporal workflow identifier */
-                        runId?: string;
-                        /** @description Workflow record id */
-                        workflowId?: string;
-                        /** @description Temporal first execution run id */
-                        temporalRunId?: string;
-                        /** @description Temporal task queue used for execution */
-                        taskQueue?: string;
-                        /** @description Workflow version identifier used for execution */
-                        workflowVersionId?: string;
-                        /** @description Workflow version number used for execution */
-                        workflowVersion?: number;
-                        /** @enum {string} */
-                        status?: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "CONTINUED_AS_NEW" | "TIMED_OUT" | "UNKNOWN";
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_getWorkflowTags: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowTagsResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_setWorkflowTags: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetWorkflowTagsDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowTagsResponseDto"];
-                };
-            };
-        };
-    };
-    FilesController_uploadFile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": {
-                    /**
-                     * Format: binary
-                     * @description File to upload
-                     */
-                    file?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description File uploaded successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        fileName?: string;
-                        mimeType?: string;
-                        size?: number;
-                        storageKey?: string;
-                        /** Format: date-time */
-                        uploadedAt?: string;
-                    };
-                };
-            };
-        };
-    };
-    FilesController_listFiles: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List all uploaded files */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        fileName?: string;
-                        mimeType?: string;
-                        size?: number;
-                        /** Format: date-time */
-                        uploadedAt?: string;
-                    }[];
-                };
-            };
-        };
-    };
-    FilesController_getFile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Get file metadata */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    FilesController_deleteFile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Delete file */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    FilesController_downloadFile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Download file */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/octet-stream": string;
-                };
-            };
-        };
-    };
-    ArtifactsController_listArtifacts: {
-        parameters: {
-            query?: {
-                limit?: number;
-                workflowId?: string;
-                componentId?: string;
-                destination?: "run" | "library";
-                search?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List workspace artifacts */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ArtifactListResponseDto"];
-                };
-            };
-        };
-    };
-    ArtifactsController_downloadArtifact: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Download artifact binary */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/octet-stream": string;
-                };
-            };
-        };
-    };
-    ArtifactsController_deleteArtifact: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Artifact deleted successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AnalyticsController_queryAnalytics: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Number of requests remaining in the current time window */
-                "X-RateLimit-Remaining"?: number;
-                /** @description Maximum number of requests allowed per minute */
-                "X-RateLimit-Limit"?: number;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AnalyticsQueryRequestDto"];
-            };
-        };
-        responses: {
-            /** @description Query analytics data for the authenticated organization */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AnalyticsQueryResponseDto"];
-                };
-            };
-        };
-    };
-    AnalyticsController_getAnalyticsSettings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Get analytics settings for the authenticated organization */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AnalyticsSettingsResponseDto"];
-                };
-            };
-        };
-    };
-    AnalyticsController_updateAnalyticsSettings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateAnalyticsSettingsDto"];
-            };
-        };
-        responses: {
-            /** @description Update analytics settings for the authenticated organization */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AnalyticsSettingsResponseDto"];
-                };
-            };
-        };
-    };
-    AnalyticsController_ensureTenant: {
-        parameters: {
-            query?: never;
-            header: {
-                "x-internal-token": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EnsureTenantDto"];
-            };
-        };
-        responses: {
-            /** @description Ensure tenant resources exist for organization */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        success?: boolean;
-                        securityEnabled?: boolean;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    FindingsController_listFindings: {
-        parameters: {
-            query?: {
-                severity?: "critical" | "high" | "medium" | "low" | "info" | "none";
-                search?: string;
-                workflowId?: string;
-                runId?: string;
-                scopeId?: string;
-                componentId?: string;
-                dateFrom?: string;
-                dateTo?: string;
-                triageStatus?: string;
-                assigneeUserId?: string;
-                page?: number;
-                pageSize?: number;
-                sortOrder?: "asc" | "desc";
-                paginationMode?: "offset" | "cursor";
-                cursor?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Paginated list of security findings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FindingsResponseDto"];
-                };
-            };
-        };
-    };
-    FindingsController_getStats: {
-        parameters: {
-            query?: {
-                severity?: "critical" | "high" | "medium" | "low" | "info" | "none";
-                search?: string;
-                workflowId?: string;
-                runId?: string;
-                scopeId?: string;
-                componentId?: string;
-                dateFrom?: string;
-                dateTo?: string;
-                triageStatus?: string;
-                assigneeUserId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Severity counts and total for security findings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FindingsStatsResponseDto"];
-                };
-            };
-        };
-    };
-    FindingsController_exportFindings: {
-        parameters: {
-            query?: {
-                severity?: "critical" | "high" | "medium" | "low" | "info" | "none";
-                search?: string;
-                workflowId?: string;
-                runId?: string;
-                scopeId?: string;
-                componentId?: string;
-                dateFrom?: string;
-                dateTo?: string;
-                triageStatus?: string;
-                assigneeUserId?: string;
-                sortOrder?: "asc" | "desc";
-                format?: "csv" | "json";
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Finding export in the requested format */
-            200: {
-                headers: {
-                    /** @description Attachment filename */
-                    "Content-Disposition"?: string;
-                    /** @description Trust state for the exported finding data */
-                    "X-Sentris-Availability"?: "available" | "degraded";
-                    /** @description Comma-separated reasons the export is degraded, when present */
-                    "X-Sentris-Degraded-Reasons"?: string;
-                    /** @description Projection degradation reason, when present */
-                    "X-Sentris-Projection-Health-Reason"?: string;
-                    /** @description Latest reconciled projection timestamp, when present */
-                    "X-Sentris-Projection-Reconciled-Through"?: string;
-                    /** @description Canonical observations included in the export */
-                    "X-Sentris-Schema-Canonical"?: number;
-                    /** @description Legacy observations included in the export */
-                    "X-Sentris-Schema-Legacy"?: number;
-                    /** @description Invalid versioned observations included in the export */
-                    "X-Sentris-Schema-Invalid"?: number;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FindingItemDto"][];
-                    "text/csv": string;
-                };
-            };
-        };
-    };
-    FindingsController_getFinding: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description OpenSearch finding document identifier */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Single security finding detail */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FindingDetailResponseDto"];
-                };
-            };
-        };
-    };
-    FindingTriageController_updateTriage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description OpenSearch finding document identifier */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TriageUpdateDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    FindingTriageController_bulkTriage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BulkTriageDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    FindingTriageController_getHistory: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                /** @description OpenSearch finding document identifier */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    FindingTriageController_getTicket: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description OpenSearch finding document identifier */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TicketLinkResponseDto"] | null;
-                };
-            };
-        };
-    };
-    TriageAnalyticsController_getPostureTrend: {
-        parameters: {
-            query: {
-                period: "7d" | "30d" | "90d";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TriageAnalyticsController_getTriageVelocity: {
-        parameters: {
-            query: {
-                period: "7d" | "30d" | "90d";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TriageAnalyticsController_getMttr: {
-        parameters: {
-            query: {
-                period: "7d" | "30d" | "90d";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TriageAnalyticsController_getSlaCompliance: {
-        parameters: {
-            query: {
-                period: "7d" | "30d" | "90d";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TriageAnalyticsController_getStatusDistribution: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TriageAnalyticsController_getTopAssignees: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TriageAnalyticsController_getSlaPolicies: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TriageAnalyticsController_upsertSlaPolicies: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpsertSlaPoliciesDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OrgMembersController_listMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TicketingController_getConnection: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TicketingConnectionResponseDto"];
-                };
-            };
-        };
-    };
-    TicketingController_connect: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConnectJiraDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OAuthConnectResponseDto"];
-                };
-            };
-        };
-    };
-    TicketingController_callback: {
-        parameters: {
-            query: {
-                code: string;
-                state: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OperationSuccessResponseDto"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TicketingErrorResponseDto"];
-                };
-            };
-        };
-    };
-    TicketingController_disconnect: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OperationSuccessResponseDto"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TicketingErrorResponseDto"];
-                };
-            };
-        };
-    };
-    TicketingController_updateConfig: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateTicketingConfigDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TicketingConnectionResponseDto"];
-                };
-            };
-        };
-    };
-    TicketingController_listProjects: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JiraProjectDto"][];
-                };
-            };
-        };
-    };
-    TicketingController_listIssueTypes: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectKey: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JiraIssueTypeDto"][];
-                };
-            };
-        };
-    };
-    TicketingController_reconcileTicketCreation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                findingTriageId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReconcileTicketCreationDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReconcileTicketCreationResponseDto"];
-                };
-            };
-        };
-    };
-    JiraWebhookController_receive: {
-        parameters: {
-            query?: never;
-            header: {
-                "x-hub-signature": string;
-            };
-            path: {
-                /** @description The webhook secret included in the registered callback URL */
-                secret: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Webhook processed */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JiraWebhookResponseDto"];
-                };
-            };
-            /** @description Invalid webhook signature */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TicketingErrorResponseDto"];
-                };
-            };
-            /** @description Webhook processing failed; Jira should retry the delivery */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TicketingErrorResponseDto"];
-                };
-            };
-        };
-    };
-    IntegrationsController_listProviders: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntegrationProviderResponse"][];
-                };
-            };
-        };
-    };
-    IntegrationsController_getProviderConfiguration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderConfigurationResponse"];
-                };
-            };
-        };
-    };
-    IntegrationsController_upsertProviderConfiguration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpsertProviderConfigDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderConfigurationResponse"];
-                };
-            };
-        };
-    };
-    IntegrationsController_deleteProviderConfiguration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Provider configuration deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    IntegrationsController_listConnections: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntegrationConnectionResponse"][];
-                };
-            };
-        };
-    };
-    IntegrationsController_startOAuth: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StartOAuthDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OAuthStartResponseDto"];
-                };
-            };
-        };
-    };
-    IntegrationsController_completeOAuth: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CompleteOAuthDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntegrationConnectionResponse"];
-                };
-            };
-        };
-    };
-    IntegrationsController_refreshConnection: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntegrationConnectionResponse"];
-                };
-            };
-        };
-    };
-    IntegrationsController_disconnectConnection: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Connection removed */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    IntegrationsController_issueConnectionToken: {
-        parameters: {
-            query?: never;
-            header: {
-                "x-internal-token": string;
-                "x-organization-id": string;
-                "x-run-id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConnectionTokenResponseDto"];
-                };
-            };
-        };
-    };
-    ApiKeysController_list: {
-        parameters: {
-            query?: {
-                limit?: string;
-                offset?: string;
-                isActive?: "true" | "false";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyResponseDto"][];
-                };
-            };
-        };
-    };
-    ApiKeysController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateApiKeyDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CreateApiKeyResponseDto"];
-                };
-            };
-        };
-    };
-    ApiKeysController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyResponseDto"];
-                };
-            };
-        };
-    };
-    ApiKeysController_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeleteApiKeyResponseDto"];
-                };
-            };
-        };
-    };
-    ApiKeysController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateApiKeyDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyResponseDto"];
-                };
-            };
-        };
-    };
-    ApiKeysController_revoke: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyResponseDto"];
-                };
-            };
-        };
-    };
-    ComponentsController_listComponents: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List all registered components */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example core.file.loader */
-                        id?: string;
-                        /** @example file-loader */
-                        slug?: string;
-                        /** @example File Loader */
-                        name?: string;
-                        /** @example 1.0.0 */
-                        version?: string;
-                        /** @example input */
-                        type?: string;
-                        /** @example input */
-                        category?: string;
-                        categoryConfig?: {
-                            /** @example Input */
-                            label?: string;
-                            /** @example text-blue-600 */
-                            color?: string;
-                            /** @example Data sources, triggers, and credential access */
-                            description?: string;
-                            /** @example 📥 */
-                            emoji?: string;
-                            /** @example Download */
-                            icon?: string;
-                        };
-                        /** @example Load files from filesystem */
-                        description?: string;
-                        documentation?: string | null;
-                        documentationUrl?: string | null;
-                        /** @example FileUp */
-                        icon?: string;
-                        logo?: string | null;
-                        isLatest?: boolean | null;
-                        deprecated?: boolean | null;
-                        example?: string | null;
-                        author?: {
-                            name?: string;
-                            /** @enum {string} */
-                            type?: "sentris" | "community";
-                            url?: string | null;
-                        } | null;
-                        runner?: {
-                            /**
-                             * @example inline
-                             * @enum {string}
-                             */
-                            kind?: "inline" | "docker" | "remote";
-                            image?: string | null;
-                            command?: string[] | null;
-                        };
-                        inputs?: {
-                            id?: string;
-                            label?: string;
-                            connectionType?: {
-                                /** @enum {string} */
-                                kind: "primitive" | "list" | "map" | "contract" | "any";
-                                name?: string | null;
-                                element?: Record<string, never> | null;
-                                credential?: boolean | null;
-                                acceptedProviderIds?: ("anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan")[] | null;
-                                /** @enum {string|null} */
-                                producedProviderId?: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan" | null;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                            /** @enum {string|null} */
-                            editor?: "text" | "textarea" | "number" | "boolean" | "select" | "multi-select" | "json" | "secret" | "llm-provider" | null;
-                            hidden?: boolean | null;
-                            required?: boolean;
-                            description?: string | null;
-                            /** @enum {string|null} */
-                            valuePriority?: "manual-first" | "connection-first" | null;
-                        }[];
-                        outputs?: {
-                            id?: string;
-                            label?: string;
-                            connectionType?: {
-                                /** @enum {string} */
-                                kind: "primitive" | "list" | "map" | "contract" | "any";
-                                name?: string | null;
-                                element?: Record<string, never> | null;
-                                credential?: boolean | null;
-                                acceptedProviderIds?: ("anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan")[] | null;
-                                /** @enum {string|null} */
-                                producedProviderId?: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan" | null;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                            description?: string | null;
-                        }[];
-                        parameters?: {
-                            id?: string;
-                            label?: string;
-                            /** @enum {string} */
-                            type?: "text" | "textarea" | "number" | "boolean" | "select" | "multi-select" | "json" | "secret";
-                            required?: boolean;
-                            default?: unknown;
-                            placeholder?: string | null;
-                            description?: string | null;
-                            helpText?: string | null;
-                            options?: {
-                                label?: string;
-                                value?: unknown;
-                            }[] | null;
-                            min?: number | null;
-                            max?: number | null;
-                            rows?: number | null;
-                        }[];
-                        examples?: string[];
-                        toolProvider?: {
-                            /** @enum {string} */
-                            kind?: "component" | "mcp-server" | "mcp-group";
-                            name?: string;
-                            description?: string;
-                        } | null;
-                    }[];
-                };
-            };
-        };
-    };
-    ComponentsController_getComponent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Get a specific component by ID */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id?: string;
-                        slug?: string;
-                        name?: string;
-                        version?: string;
-                        type?: string;
-                        category?: string;
-                        categoryConfig?: {
-                            label?: string;
-                            color?: string;
-                            description?: string;
-                            emoji?: string;
-                            icon?: string;
-                        };
-                        description?: string | null;
-                        documentation?: string | null;
-                        documentationUrl?: string | null;
-                        icon?: string | null;
-                        logo?: string | null;
-                        author?: {
-                            name?: string;
-                            type?: string;
-                            url?: string | null;
-                        } | null;
-                        runner?: Record<string, never>;
-                        inputs?: {
-                            id?: string;
-                            label?: string;
-                            connectionType?: {
-                                /** @enum {string} */
-                                kind: "primitive" | "list" | "map" | "contract" | "any";
-                                name?: string | null;
-                                element?: Record<string, never> | null;
-                                credential?: boolean | null;
-                                acceptedProviderIds?: ("anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan")[] | null;
-                                /** @enum {string|null} */
-                                producedProviderId?: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan" | null;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                            /** @enum {string|null} */
-                            editor?: "text" | "textarea" | "number" | "boolean" | "select" | "multi-select" | "json" | "secret" | "llm-provider" | null;
-                            hidden?: boolean | null;
-                            required?: boolean;
-                            description?: string | null;
-                            /** @enum {string|null} */
-                            valuePriority?: "manual-first" | "connection-first" | null;
-                        }[];
-                        outputs?: {
-                            id?: string;
-                            label?: string;
-                            connectionType?: {
-                                /** @enum {string} */
-                                kind: "primitive" | "list" | "map" | "contract" | "any";
-                                name?: string | null;
-                                element?: Record<string, never> | null;
-                                credential?: boolean | null;
-                                acceptedProviderIds?: ("anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan")[] | null;
-                                /** @enum {string|null} */
-                                producedProviderId?: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan" | null;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                            description?: string | null;
-                        }[];
-                        parameters?: unknown[];
-                        examples?: unknown[];
-                        deprecated?: boolean | null;
-                        example?: string | null;
-                        agentTool?: {
-                            enabled?: boolean;
-                            toolName?: string | null;
-                            toolDescription?: string | null;
-                        } | null;
-                    };
-                };
-            };
-        };
-    };
-    ComponentsController_resolvePorts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResolvePortsDto"];
-            };
-        };
-        responses: {
-            /** @description Resolve dynamic ports based on parameters */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    SecretsController_listSecrets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SecretSummaryResponse"][];
-                };
-            };
-        };
-    };
-    SecretsController_createSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateSecretDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SecretSummaryResponse"];
-                };
-            };
-        };
-    };
-    SecretsController_getSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SecretSummaryResponse"];
-                };
-            };
-        };
-    };
-    SecretsController_deleteSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Secret deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    SecretsController_updateSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateSecretDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SecretSummaryResponse"];
-                };
-            };
-        };
-    };
-    SecretsController_getSecretValue: {
-        parameters: {
-            query?: {
-                /** @description Optional secret version to retrieve (defaults to active version) */
-                version?: number;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SecretValueResponse"];
-                };
-            };
-        };
-    };
-    SecretsController_rotateSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RotateSecretDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SecretSummaryResponse"];
-                };
-            };
-        };
-    };
-    SchedulesController_list: {
-        parameters: {
-            query?: {
-                workflowId?: string;
-                status?: "active" | "paused" | "error";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScheduleResponseDto"][];
-                };
-            };
-        };
-    };
-    SchedulesController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateScheduleRequestDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScheduleResponseDto"];
-                };
-            };
-        };
-    };
-    SchedulesController_getOne: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScheduleResponseDto"];
-                };
-            };
-        };
-    };
-    SchedulesController_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Schedule deleted */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    SchedulesController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateScheduleRequestDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScheduleResponseDto"];
-                };
-            };
-        };
-    };
-    SchedulesController_pause: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScheduleResponseDto"];
-                };
-            };
-        };
-    };
-    SchedulesController_resume: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScheduleResponseDto"];
-                };
-            };
-        };
-    };
-    SchedulesController_trigger: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WebhooksController_listWorkflows: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WebhooksController_getWorkflow: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WebhooksController_runWorkflow: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WebhookRunWorkflowDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WebhooksController_getRunStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WebhooksController_getRunResult: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WebhooksController_cancelRun: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InboundWebhookController_receive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                path: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Webhook processed successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example delivered */
-                        status?: string;
-                        /** @example sentris-run-123 */
-                        runId?: string;
-                    };
-                };
-            };
-            /** @description Invalid payload or parsing failed */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Webhook not found or inactive */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WebhooksAdminController_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebhookConfigurationResponseDto"][];
-                };
-            };
-        };
-    };
-    WebhooksAdminController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateWebhookRequestDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebhookConfigurationResponseDto"];
-                };
-            };
-        };
-    };
-    WebhooksAdminController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebhookConfigurationResponseDto"];
-                };
-            };
-        };
-    };
-    WebhooksAdminController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateWebhookRequestDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebhookConfigurationResponseDto"];
-                };
-            };
-        };
-    };
-    WebhooksAdminController_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WebhooksAdminController_regeneratePath: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegeneratePathResponseDto"];
-                };
-            };
-        };
-    };
-    WebhooksAdminController_getUrl: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GetWebhookUrlResponseDto"];
-                };
-            };
-        };
-    };
-    WebhooksAdminController_testScript: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TestWebhookScriptRequestDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TestWebhookScriptResponseDto"];
-                };
-            };
-        };
-    };
-    WebhooksAdminController_listDeliveries: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebhookDeliveryResponseDto"][];
-                };
-            };
-        };
-    };
-    WebhooksAdminController_getDelivery: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                deliveryId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebhookDeliveryResponseDto"];
-                };
-            };
-        };
-    };
-    HumanInputsController_list: {
-        parameters: {
-            query?: {
-                status?: "pending" | "resolved" | "expired" | "cancelled";
-                inputType?: "approval" | "form" | "selection" | "review" | "acknowledge";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HumanInputResponseDto"][];
-                };
-            };
-        };
-    };
-    HumanInputsController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HumanInputResponseDto"];
-                };
-            };
-        };
-    };
-    HumanInputsController_resolve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResolveHumanInputDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HumanInputResponseDto"];
-                };
-            };
-        };
-    };
-    HumanInputsController_resolveByToken: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResolveByTokenDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublicResolveResultDto"];
-                };
-            };
-        };
-    };
-    McpServersController_listServers: {
-        parameters: {
-            query: {
-                groupId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpServerResponseDto"][];
-                };
-            };
-        };
-    };
-    McpServersController_createServer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateMcpServerDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpServerResponseDto"];
-                };
-            };
-        };
-    };
-    McpServersController_listEnabledServers: {
-        parameters: {
-            query: {
-                groupId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpServerResponseDto"][];
-                };
-            };
-        };
-    };
-    McpServersController_getAllTools: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpToolResponseDto"][];
-                };
-            };
-        };
-    };
-    McpServersController_getHealthStatuses: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthStatusResponseDto"][];
-                };
-            };
-        };
-    };
-    McpServersController_getServer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpServerResponseDto"];
-                };
-            };
-        };
-    };
-    McpServersController_deleteServer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpServersController_updateServer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateMcpServerDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpServerResponseDto"];
-                };
-            };
-        };
-    };
-    McpServersController_getServerTools: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpToolResponseDto"][];
-                };
-            };
-        };
-    };
-    McpServersController_toggleServer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpServerResponseDto"];
-                };
-            };
-        };
-    };
-    McpServersController_testEnabledServers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TestEnabledServerResponseDto"][];
-                };
-            };
-        };
-    };
-    McpServersController_testConnection: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TestConnectionResponseDto"];
-                };
-            };
-        };
-    };
-    McpServersController_toggleToolEnabled: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                serverId: string;
-                toolId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpToolResponseDto"];
-                };
-            };
-        };
-    };
-    McpServersController_getResolvedConfig: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    McpGroupsController_listGroups: {
-        parameters: {
-            query?: {
-                enabled?: boolean;
-                includeServers?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpGroupResponseDto"][];
-                };
-            };
-        };
-    };
-    McpGroupsController_createGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateMcpGroupDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpGroupResponseDto"];
-                };
-            };
-        };
-    };
-    McpGroupsController_listTemplates: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GroupTemplateDto"][];
-                };
-            };
-        };
-    };
-    McpGroupsController_getGroupBySlug: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpGroupResponseDto"];
-                };
-            };
-        };
-    };
-    McpGroupsController_getGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpGroupResponseDto"];
-                };
-            };
-        };
-    };
-    McpGroupsController_deleteGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpGroupsController_updateGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateMcpGroupDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpGroupResponseDto"];
-                };
-            };
-        };
-    };
-    McpGroupsController_getServersInGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpGroupServerResponseDto"][];
-                };
-            };
-        };
-    };
-    McpGroupsController_addServerToGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddServerToGroupDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpGroupServerResponseDto"][];
-                };
-            };
-        };
-    };
-    McpGroupsController_removeServerFromGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                serverId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpGroupsController_updateServerInGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                serverId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateServerInGroupDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["McpGroupServerResponseDto"][];
-                };
-            };
-        };
-    };
-    McpGroupsController_syncTemplates: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SyncTemplatesResponseDto"];
-                };
-            };
-        };
-    };
-    McpGroupsController_importTemplate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ImportTemplateRequestDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ImportGroupTemplateResponseDto"];
-                };
-            };
-        };
-    };
-    McpRegistryController_getCatalog: {
-        parameters: {
-            query?: {
-                search?: string;
-                category?: string;
-                serverType?: "server" | "remote";
-                featured?: boolean;
-                tags?: string;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistryCatalogListResponseDto"];
-                };
-            };
-        };
-    };
-    McpRegistryController_getCatalogEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistryCatalogDetailDto"];
-                };
-            };
-        };
-    };
-    McpRegistryController_importServer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegistryImportRequestDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistryImportResponseDto"];
-                };
-            };
-        };
-    };
-    McpRegistryController_triggerSync: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpRegistryController_getSyncStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    NotificationsController_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NotificationChannelResponseDto"][];
-                };
-            };
-        };
-    };
-    NotificationsController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateNotificationChannelDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NotificationChannelResponseDto"];
-                };
-            };
-        };
-    };
-    NotificationsController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NotificationChannelResponseDto"];
-                };
-            };
-        };
-    };
-    NotificationsController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateNotificationChannelDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NotificationChannelResponseDto"];
-                };
-            };
-        };
-    };
-    NotificationsController_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    NotificationsController_test: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    NotificationsController_listDeliveries: {
-        parameters: {
-            query: {
-                limit: number;
-                offset: number;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NotificationDeliveryResponseDto"][];
-                };
-            };
-        };
-    };
-    NotificationsController_resendDelivery: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                deliveryId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpGatewayController_handleGateway_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpGatewayController_handleGateway_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpGatewayController_handleGateway_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpGatewayController_handleGateway_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpGatewayController_handleGateway_options: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpGatewayController_handleGateway_head: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpGatewayController_handleGateway_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpDiscoveryController_discover: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DiscoveryInputDto"];
-            };
-        };
-        responses: {
-            /** @description Discovery workflow started successfully */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DiscoveryStartResponseDto"];
-                };
-            };
-            /** @description Invalid input parameters */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpDiscoveryController_getStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflowId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Discovery status retrieved successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DiscoveryStatusDto"];
-                };
-            };
-            /** @description Workflow not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    McpDiscoveryController_discoverGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GroupDiscoveryInputDto"];
-            };
-        };
-        responses: {
-            /** @description Group discovery workflow started successfully */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GroupDiscoveryStartResponseDto"];
-                };
-            };
-        };
-    };
-    McpDiscoveryController_getGroupStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflowId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Group discovery status retrieved successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GroupDiscoveryStatusDto"];
-                };
-            };
-        };
-    };
-    McpSessionsController_listSessions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns all active MCP sessions across instances */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StudioMcpController_handleMcp_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StudioMcpController_handleMcp_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StudioMcpController_handleMcp_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StudioMcpController_handleMcp_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StudioMcpController_handleMcp_options: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StudioMcpController_handleMcp_head: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StudioMcpController_handleMcp_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_listTemplates: {
-        parameters: {
-            query: {
-                category: string;
-                search: string;
-                tags: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns filtered list of templates */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_getCategories: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns available template categories */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_getTags: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns available template tags */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_getMyTemplates: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns templates submitted by the current user */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_getRepoInfo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns GitHub repository information */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_getSubmissions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns template submissions for the current user */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_getRevalidationJobs: {
-        parameters: {
-            query: {
-                limit: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns recent template revalidation jobs */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_getRevalidationJobLog: {
-        parameters: {
-            query: {
-                stream: string;
-                maxBytes: string;
-            };
-            header?: never;
-            path: {
-                auditId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns a bounded stdout/stderr log tail */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_getRevalidationJob: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                auditId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns template revalidation job status */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_getTemplate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Returns template details */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_importCommunityTemplate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ImportCommunityTemplateDto"];
-            };
-        };
-        responses: {
-            /** @description Imported community template */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_publishTemplate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublishTemplateDto"];
-            };
-        };
-        responses: {
-            /** @description Template validation result */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_revalidateTemplate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Template revalidation job started */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_useTemplate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UseTemplateDto"];
-            };
-        };
-        responses: {
-            /** @description Created workflow from template */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TemplatesController_syncTemplates: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Sync result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuditLogsController_export: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description CSV file of audit log events */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuditLogsController_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List audit log events for the authenticated organization */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListAuditLogsResponseDto"];
-                };
-            };
-        };
-    };
-    HealthController_liveness: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    HealthController_readiness: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The Health Check is successful */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example ok */
-                        status?: string;
-                        /**
-                         * @example {
-                         *       "database": {
-                         *         "status": "up"
-                         *       }
-                         *     }
-                         */
-                        info?: {
-                            [key: string]: {
-                                status: string;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                        } | null;
-                        /** @example {} */
-                        error?: {
-                            [key: string]: {
-                                status: string;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                        } | null;
-                        /**
-                         * @example {
-                         *       "database": {
-                         *         "status": "up"
-                         *       }
-                         *     }
-                         */
-                        details?: {
-                            [key: string]: {
-                                status: string;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                        };
-                    };
-                };
-            };
-            /** @description The Health Check is not successful */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example error */
-                        status?: string;
-                        /**
-                         * @example {
-                         *       "database": {
-                         *         "status": "up"
-                         *       }
-                         *     }
-                         */
-                        info?: {
-                            [key: string]: {
-                                status: string;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                        } | null;
-                        /**
-                         * @example {
-                         *       "redis": {
-                         *         "status": "down",
-                         *         "message": "Could not connect"
-                         *       }
-                         *     }
-                         */
-                        error?: {
-                            [key: string]: {
-                                status: string;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                        } | null;
-                        /**
-                         * @example {
-                         *       "database": {
-                         *         "status": "up"
-                         *       },
-                         *       "redis": {
-                         *         "status": "down",
-                         *         "message": "Could not connect"
-                         *       }
-                         *     }
-                         */
-                        details?: {
-                            [key: string]: {
-                                status: string;
-                            } & {
-                                [key: string]: unknown;
-                            };
-                        };
-                    };
-                };
-            };
-        };
-    };
-    InternalHealthController_workerReady: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AgentSkillsController_listSkills: {
-        parameters: {
-            query: {
-                enabledOnly: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AgentSkillResponse"][];
-                };
-            };
-        };
-    };
-    AgentSkillsController_createSkill: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateAgentSkillDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AgentSkillResponse"];
-                };
-            };
-        };
-    };
-    AgentSkillsController_discoverSkills: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DiscoveredAgentSkillResponse"][];
-                };
-            };
-        };
-    };
-    AgentSkillsController_importDiscoveredSkills: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ImportDiscoveredAgentSkillsDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ImportAgentSkillsResultResponse"];
-                };
-            };
-        };
-    };
-    AgentSkillsController_importSkillZip: {
-        parameters: {
-            query: {
-                overwrite: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ImportAgentSkillsResultResponse"];
-                };
-            };
-        };
-    };
-    AgentSkillsController_getSkill: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AgentSkillResponse"];
-                };
-            };
-        };
-    };
-    AgentSkillsController_deleteSkill: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AgentSkillsController_updateSkill: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateAgentSkillDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AgentSkillResponse"];
-                };
-            };
-        };
-    };
-    ScopesController_listScopes: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopeResponse"][];
-                };
-            };
-        };
-    };
-    ScopesController_createScope: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateScopeDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopeResponse"];
-                };
-            };
-        };
-    };
-    ScopesController_getScope: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopeResponse"];
-                };
-            };
-        };
-    };
-    ScopesController_deleteScope: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ScopesController_updateScope: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateScopeDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopeResponse"];
-                };
-            };
-        };
-    };
-    ScopeFindingsController_getSummary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopeFindingsSummaryResponse"];
-                };
-            };
-        };
-    };
-    AssetsController_compareRuns: {
-        parameters: {
-            query: {
-                baselineRunId: string;
-                currentRunId: string;
-            };
-            header?: never;
-            path: {
-                scopeId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssetRunComparisonResponse"];
-                };
-            };
-        };
-    };
-    AssetsController_listAssets: {
-        parameters: {
-            query: {
-                type: string;
-                limit: string;
-            };
-            header?: never;
-            path: {
-                scopeId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssetResponse"][];
-                };
-            };
-        };
-    };
-    AiController_listAnthropicModels: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ListAnthropicModelsDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListAnthropicModelsResponse"];
-                };
-            };
-        };
-    };
-    OutboxController_listDeadLetters: {
-        parameters: {
-            query?: {
-                limit?: number;
-                cursor?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListDeadLettersResponseDto"];
-                };
-            };
-        };
-    };
-    OutboxController_requeue: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                eventId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RequeueDeadLetterResponseDto"];
-                };
-            };
-            /** @description Event ID must be a UUID */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Dead-lettered outbox event not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperatorController_listSessions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperatorController_createSession: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateOperatorSessionDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperatorController_streamSession: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Server-sent Operator session snapshots */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperatorController_getSession: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperatorController_updateSession: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateOperatorSessionDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperatorController_listWorkflowDrafts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OperatorWorkflowDraftDetailDto"][];
-                };
-            };
-        };
-    };
-    OperatorController_createTurn: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateOperatorTurnDto"];
-            };
-        };
-        responses: {
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperatorController_decideAction: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                actionId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OperatorActionDecisionDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
+  AppController_validateAuth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AppController_login: {
+    parameters: {
+      query?: never;
+      header: {
+        authorization: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AppController_logout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AdminInstancesController_listInstances: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns all alive backend instances with metadata */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AdminInstancesController_detectStaleSessions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns sessions whose owning instance is no longer alive */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AdminInstancesController_cleanupStaleSessions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Removes stale session registry entries and returns removed count */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AgentsController_parts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agentRunId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns stored agent trace parts */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AgentsController_chat: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agentRunId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description AI SDK-compatible SSE for agent run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WorkflowRunsController_listRuns: {
+    parameters: {
+      query?: {
+        workflowId?: string;
+        status?: string;
+        limit?: number;
+        offset?: number;
+        scopeId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description List all workflow runs with metadata */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            runs?: {
+              id?: string;
+              workflowId?: string;
+              organizationId?: string;
+              /** @enum {string} */
+              status?:
+                | 'RUNNING'
+                | 'COMPLETED'
+                | 'FAILED'
+                | 'CANCELLED'
+                | 'TERMINATED'
+                | 'CONTINUED_AS_NEW'
+                | 'TIMED_OUT'
+                | 'UNKNOWN';
+              /** Format: date-time */
+              startTime?: string;
+              /** Format: date-time */
+              endTime?: string | null;
+              temporalRunId?: string;
+              workflowVersionId?: string | null;
+              workflowVersion?: number | null;
+              workflowName?: string;
+              eventCount?: number;
+              nodeCount?: number;
+              duration?: number;
+              /** @enum {string} */
+              triggerType?: 'manual' | 'schedule' | 'api';
+              triggerSource?: string | null;
+              triggerLabel?: string | null;
+              inputPreview?: {
+                runtimeInputs?: {
+                  [key: string]: unknown;
+                };
+                nodeOverrides?: {
+                  [key: string]: {
+                    [key: string]: unknown;
+                  };
+                };
+              };
+            }[];
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunsController_getRun: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Metadata for a single workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            id?: string;
+            workflowId?: string;
+            organizationId?: string;
+            /** @enum {string} */
+            status?:
+              | 'RUNNING'
+              | 'COMPLETED'
+              | 'FAILED'
+              | 'CANCELLED'
+              | 'TERMINATED'
+              | 'CONTINUED_AS_NEW'
+              | 'TIMED_OUT'
+              | 'UNKNOWN';
+            /** Format: date-time */
+            startTime?: string;
+            /** Format: date-time */
+            endTime?: string | null;
+            temporalRunId?: string | null;
+            workflowVersionId?: string | null;
+            workflowVersion?: number | null;
+            workflowName?: string;
+            eventCount?: number;
+            nodeCount?: number;
+            duration?: number;
+            /** @enum {string} */
+            triggerType?: 'manual' | 'schedule' | 'api';
+            triggerSource?: string | null;
+            triggerLabel?: string | null;
+            inputPreview?: {
+              runtimeInputs?: {
+                [key: string]: unknown;
+              };
+              nodeOverrides?: {
+                [key: string]: {
+                  [key: string]: unknown;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunsController_listChildRuns: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description List direct child workflow runs spawned by a parent run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            runs?: {
+              runId?: string;
+              workflowId?: string;
+              workflowName?: string;
+              parentNodeRef?: string | null;
+              status?: string;
+              /** Format: date-time */
+              startedAt?: string;
+              /** Format: date-time */
+              completedAt?: string | null;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunsController_status: {
+    parameters: {
+      query?: {
+        temporalRunId?: string;
+      };
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Current Temporal execution status */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WorkflowRunsController_result: {
+    parameters: {
+      query?: {
+        temporalRunId?: string;
+      };
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Resolved workflow result payload */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowRunResultResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowRunsController_config: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Inputs and version metadata captured for a workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            runId?: string;
+            workflowId?: string;
+            workflowVersionId?: string | null;
+            workflowVersion?: number | null;
+            inputs?: {
+              [key: string]: unknown;
+            };
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunsController_cancel: {
+    parameters: {
+      query?: {
+        temporalRunId?: string;
+      };
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Cancellation request accepted by Temporal */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CancelWorkflowRunResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowRunObservabilityController_trace: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Trace events for a workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            runId?: string;
+            events?: {
+              id?: string;
+              runId?: string;
+              nodeId?: string;
+              /** @enum {string} */
+              type?: 'STARTED' | 'PROGRESS' | 'COMPLETED' | 'FAILED';
+              /** @enum {string} */
+              level?: 'info' | 'warn' | 'error' | 'debug';
+              /** Format: date-time */
+              timestamp?: string;
+              message?: string | null;
+              error?: {
+                message?: string;
+                stack?: string;
+                code?: string;
+                type?: string;
+                details?: {
+                  [key: string]: unknown;
+                };
+                fieldErrors?: {
+                  [key: string]: string[];
+                };
+              } | null;
+              outputSummary?: {
+                [key: string]: unknown;
+              } | null;
+              data?: {
+                [key: string]: unknown;
+              } | null;
+              metadata?: {
+                activityId?: string;
+                attempt?: number;
+                correlationId?: string;
+                streamId?: string;
+                /** @enum {string} */
+                joinStrategy?: 'all' | 'any' | 'first';
+                triggeredBy?: string;
+                failure?: {
+                  /** Format: date-time */
+                  at?: string;
+                  reason?: {
+                    message?: string;
+                    name?: string;
+                  };
+                } | null;
+                retryPolicy?: {
+                  maxAttempts?: number;
+                  initialIntervalSeconds?: number;
+                  maximumIntervalSeconds?: number;
+                  backoffCoefficient?: number;
+                  nonRetryableErrorTypes?: string[];
+                } | null;
+              } | null;
+            }[];
+            cursor?: string | null;
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunObservabilityController_events: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Full event timeline for a workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            runId?: string;
+            events?: {
+              id?: string;
+              runId?: string;
+              nodeId?: string;
+              /** @enum {string} */
+              type?: 'STARTED' | 'PROGRESS' | 'COMPLETED' | 'FAILED';
+              /** @enum {string} */
+              level?: 'info' | 'warn' | 'error' | 'debug';
+              /** Format: date-time */
+              timestamp?: string;
+              message?: string | null;
+              error?: {
+                message?: string;
+                stack?: string;
+                code?: string;
+                type?: string;
+                details?: {
+                  [key: string]: unknown;
+                };
+                fieldErrors?: {
+                  [key: string]: string[];
+                };
+              } | null;
+              outputSummary?: {
+                [key: string]: unknown;
+              } | null;
+              data?: {
+                [key: string]: unknown;
+              } | null;
+              metadata?: {
+                activityId?: string;
+                attempt?: number;
+                correlationId?: string;
+                streamId?: string;
+                /** @enum {string} */
+                joinStrategy?: 'all' | 'any' | 'first';
+                triggeredBy?: string;
+                failure?: {
+                  /** Format: date-time */
+                  at?: string;
+                  reason?: {
+                    message?: string;
+                    name?: string;
+                  };
+                } | null;
+                retryPolicy?: {
+                  maxAttempts?: number;
+                  initialIntervalSeconds?: number;
+                  maximumIntervalSeconds?: number;
+                  backoffCoefficient?: number;
+                  nonRetryableErrorTypes?: string[];
+                } | null;
+              } | null;
+            }[];
+            cursor?: string | null;
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunObservabilityController_dataflows: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Derived data flow packets for a workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            runId?: string;
+            packets?: {
+              id?: string;
+              runId?: string;
+              sourceNode?: string;
+              targetNode?: string;
+              inputKey?: string | null;
+              payload?: {
+                [key: string]: unknown;
+              } | null;
+              timestamp?: number;
+              visualTime?: number;
+              size?: number;
+              /** @enum {string} */
+              type?: 'file' | 'json' | 'text' | 'binary';
+            }[];
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunObservabilityController_runArtifacts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Artifacts generated for a workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RunArtifactsResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowRunObservabilityController_downloadRunArtifact: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+        artifactId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Download artifact for a specific run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WorkflowRunObservabilityController_getNodeIO: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Node inputs/outputs for a workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            runId?: string;
+            nodes?: {
+              nodeRef?: string;
+              componentId?: string;
+              /** @enum {string} */
+              status?: 'running' | 'completed' | 'failed' | 'skipped';
+              /** Format: date-time */
+              startedAt?: string | null;
+              /** Format: date-time */
+              completedAt?: string | null;
+              durationMs?: number | null;
+              inputs?: {
+                [key: string]: unknown;
+              } | null;
+              outputs?: {
+                [key: string]: unknown;
+              } | null;
+              inputsSize?: number;
+              outputsSize?: number;
+              inputsSpilled?: boolean;
+              outputsSpilled?: boolean;
+              errorMessage?: string | null;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunObservabilityController_getNodeIODetail: {
+    parameters: {
+      query?: {
+        /** @description Request full node I/O data instead of a preview */
+        full?: boolean;
+      };
+      header?: never;
+      path: {
+        runId: string;
+        nodeRef: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Specific node input/output for a workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            nodeRef?: string;
+            componentId?: string;
+            /** @enum {string} */
+            status?: 'running' | 'completed' | 'failed' | 'skipped';
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            completedAt?: string | null;
+            durationMs?: number | null;
+            inputs?: {
+              [key: string]: unknown;
+            } | null;
+            outputs?: {
+              [key: string]: unknown;
+            } | null;
+            inputsSize?: number;
+            outputsSize?: number;
+            inputsSpilled?: boolean;
+            outputsSpilled?: boolean;
+            inputsTruncated?: boolean;
+            outputsTruncated?: boolean;
+            errorMessage?: string | null;
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunObservabilityController_logs: {
+    parameters: {
+      query?: {
+        nodeRef?: string;
+        stream?: 'stdout' | 'stderr' | 'console';
+        level?: 'debug' | 'info' | 'warn' | 'error';
+        limit?: number;
+        cursor?: string;
+        startTime?: string;
+        endTime?: string;
+      };
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Logs for a workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            runId?: string;
+            logs?: {
+              id?: string;
+              runId?: string;
+              nodeId?: string;
+              /** @enum {string} */
+              level?: 'debug' | 'info' | 'warn' | 'error';
+              message?: string;
+              /** Format: date-time */
+              timestamp?: string;
+            }[];
+            totalCount?: number;
+            hasMore?: boolean;
+            nextCursor?: string | null;
+          };
+        };
+      };
+    };
+  };
+  WorkflowRunStreamController_stream: {
+    parameters: {
+      query?: {
+        temporalRunId?: string;
+        cursor?: string;
+        terminalCursor?: string;
+        logCursor?: string;
+      };
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Server-sent events stream for workflow run updates */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WorkflowRunStreamController_terminalChunks: {
+    parameters: {
+      query?: {
+        nodeRef?: string;
+        stream?: 'stdout' | 'stderr' | 'pty';
+        cursor?: string;
+        startTime?: string;
+        endTime?: string;
+      };
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Terminal chunks for a workflow run */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WorkflowRunStreamController_listTerminalArchives: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TerminalRecordListDto'];
+        };
+      };
+    };
+  };
+  WorkflowRunStreamController_archiveTerminal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TerminalArchiveRequestDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TerminalRecordingDto'];
+        };
+      };
+    };
+  };
+  WorkflowRunStreamController_downloadTerminalArchive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+        recordId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Download terminal recording */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WorkflowTagsController_listAllTags: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description All tags across workflows, sorted alphabetically */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AllTagsResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowsController_findAll: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated tag names to filter by (intersection — workflows must have ALL tags) */
+        tags?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowResponseDto'][];
+        };
+      };
+    };
+  };
+  WorkflowsController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateWorkflowRequestDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowsController_findOne: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowsController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateWorkflowRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowsController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Workflow deleted successfully */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WorkflowsController_updateMetadata: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateWorkflowMetadataDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowsController_listSummary: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated tag names to filter by (intersection — workflows must have ALL tags) */
+        tags?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Lightweight workflow list without graph data */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            description?: string | null;
+            isSystem?: boolean;
+            /** Format: uuid */
+            templateId?: string | null;
+            /** Format: date-time */
+            lastRun?: string | null;
+            runCount?: number;
+            nodeCount?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            tags?: string[];
+          }[];
+        };
+      };
+    };
+  };
+  WorkflowsController_getRuntimeInputs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Get the runtime inputs defined in the workflow Entry Point */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowRuntimeInputsResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowsController_listVersions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflowId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowVersionSummaryDto'][];
+        };
+      };
+    };
+  };
+  WorkflowsController_findVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflowId: string;
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowVersionResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowsController_commit: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Compiled workflow definition */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            title?: string;
+            description?: string | null;
+            entrypoint?: {
+              ref?: string;
+            };
+            actions?: {
+              ref?: string;
+              componentId?: string;
+              params?: {
+                [key: string]: unknown;
+              };
+              dependsOn?: string[];
+            }[];
+            config?: {
+              environment?: string;
+              timeoutSeconds?: number;
+            };
+          };
+        };
+      };
+    };
+  };
+  WorkflowsController_run: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RunWorkflowRequestDto'];
+      };
+    };
+    responses: {
+      /** @description Workflow execution result */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @description Temporal workflow identifier */
+            runId?: string;
+            /** @description Workflow record id */
+            workflowId?: string;
+            /** @description Temporal first execution run id */
+            temporalRunId?: string;
+            /** @description Temporal task queue used for execution */
+            taskQueue?: string;
+            /** @description Workflow version identifier used for execution */
+            workflowVersionId?: string;
+            /** @description Workflow version number used for execution */
+            workflowVersion?: number;
+            /** @enum {string} */
+            status?:
+              | 'RUNNING'
+              | 'COMPLETED'
+              | 'FAILED'
+              | 'CANCELLED'
+              | 'TERMINATED'
+              | 'CONTINUED_AS_NEW'
+              | 'TIMED_OUT'
+              | 'UNKNOWN';
+          };
+        };
+      };
+    };
+  };
+  WorkflowsController_getWorkflowTags: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowTagsResponseDto'];
+        };
+      };
+    };
+  };
+  WorkflowsController_setWorkflowTags: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetWorkflowTagsDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowTagsResponseDto'];
+        };
+      };
+    };
+  };
+  FilesController_uploadFile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /**
+           * Format: binary
+           * @description File to upload
+           */
+          file?: string;
+        };
+      };
+    };
+    responses: {
+      /** @description File uploaded successfully */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** Format: uuid */
+            id?: string;
+            fileName?: string;
+            mimeType?: string;
+            size?: number;
+            storageKey?: string;
+            /** Format: date-time */
+            uploadedAt?: string;
+          };
+        };
+      };
+    };
+  };
+  FilesController_listFiles: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description List all uploaded files */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** Format: uuid */
+            id?: string;
+            fileName?: string;
+            mimeType?: string;
+            size?: number;
+            /** Format: date-time */
+            uploadedAt?: string;
+          }[];
+        };
+      };
+    };
+  };
+  FilesController_getFile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Get file metadata */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  FilesController_deleteFile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Delete file */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  FilesController_downloadFile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Download file */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/octet-stream': string;
+        };
+      };
+    };
+  };
+  ArtifactsController_listArtifacts: {
+    parameters: {
+      query?: {
+        limit?: number;
+        workflowId?: string;
+        componentId?: string;
+        destination?: 'run' | 'library';
+        search?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description List workspace artifacts */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ArtifactListResponseDto'];
+        };
+      };
+    };
+  };
+  ArtifactsController_downloadArtifact: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Download artifact binary */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/octet-stream': string;
+        };
+      };
+    };
+  };
+  ArtifactsController_deleteArtifact: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Artifact deleted successfully */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AnalyticsController_queryAnalytics: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Number of requests remaining in the current time window */
+        'X-RateLimit-Remaining'?: number;
+        /** @description Maximum number of requests allowed per minute */
+        'X-RateLimit-Limit'?: number;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AnalyticsQueryRequestDto'];
+      };
+    };
+    responses: {
+      /** @description Query analytics data for the authenticated organization */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AnalyticsQueryResponseDto'];
+        };
+      };
+    };
+  };
+  AnalyticsController_getAnalyticsSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Get analytics settings for the authenticated organization */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AnalyticsSettingsResponseDto'];
+        };
+      };
+    };
+  };
+  AnalyticsController_updateAnalyticsSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateAnalyticsSettingsDto'];
+      };
+    };
+    responses: {
+      /** @description Update analytics settings for the authenticated organization */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AnalyticsSettingsResponseDto'];
+        };
+      };
+    };
+  };
+  AnalyticsController_ensureTenant: {
+    parameters: {
+      query?: never;
+      header: {
+        'x-internal-token': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EnsureTenantDto'];
+      };
+    };
+    responses: {
+      /** @description Ensure tenant resources exist for organization */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            success?: boolean;
+            securityEnabled?: boolean;
+            message?: string;
+          };
+        };
+      };
+    };
+  };
+  FindingsController_listFindings: {
+    parameters: {
+      query?: {
+        severity?: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'none';
+        search?: string;
+        workflowId?: string;
+        runId?: string;
+        scopeId?: string;
+        componentId?: string;
+        dateFrom?: string;
+        dateTo?: string;
+        triageStatus?: string;
+        assigneeUserId?: string;
+        page?: number;
+        pageSize?: number;
+        sortOrder?: 'asc' | 'desc';
+        paginationMode?: 'offset' | 'cursor';
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Paginated list of security findings */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FindingsResponseDto'];
+        };
+      };
+    };
+  };
+  FindingsController_getStats: {
+    parameters: {
+      query?: {
+        severity?: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'none';
+        search?: string;
+        workflowId?: string;
+        runId?: string;
+        scopeId?: string;
+        componentId?: string;
+        dateFrom?: string;
+        dateTo?: string;
+        triageStatus?: string;
+        assigneeUserId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Severity counts and total for security findings */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FindingsStatsResponseDto'];
+        };
+      };
+    };
+  };
+  FindingsController_exportFindings: {
+    parameters: {
+      query?: {
+        severity?: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'none';
+        search?: string;
+        workflowId?: string;
+        runId?: string;
+        scopeId?: string;
+        componentId?: string;
+        dateFrom?: string;
+        dateTo?: string;
+        triageStatus?: string;
+        assigneeUserId?: string;
+        sortOrder?: 'asc' | 'desc';
+        format?: 'csv' | 'json';
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Finding export in the requested format */
+      200: {
+        headers: {
+          /** @description Attachment filename */
+          'Content-Disposition'?: string;
+          /** @description Trust state for the exported finding data */
+          'X-Sentris-Availability'?: 'available' | 'degraded';
+          /** @description Comma-separated reasons the export is degraded, when present */
+          'X-Sentris-Degraded-Reasons'?: string;
+          /** @description Projection degradation reason, when present */
+          'X-Sentris-Projection-Health-Reason'?: string;
+          /** @description Latest reconciled projection timestamp, when present */
+          'X-Sentris-Projection-Reconciled-Through'?: string;
+          /** @description Canonical observations included in the export */
+          'X-Sentris-Schema-Canonical'?: number;
+          /** @description Legacy observations included in the export */
+          'X-Sentris-Schema-Legacy'?: number;
+          /** @description Invalid versioned observations included in the export */
+          'X-Sentris-Schema-Invalid'?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FindingItemDto'][];
+          'text/csv': string;
+        };
+      };
+    };
+  };
+  FindingsController_getFinding: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description OpenSearch finding document identifier */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Single security finding detail */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FindingDetailResponseDto'];
+        };
+      };
+    };
+  };
+  FindingTriageController_updateTriage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description OpenSearch finding document identifier */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TriageUpdateDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  FindingTriageController_bulkTriage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BulkTriageDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  FindingTriageController_getHistory: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        /** @description OpenSearch finding document identifier */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  FindingTriageController_getTicket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description OpenSearch finding document identifier */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TicketLinkResponseDto'] | null;
+        };
+      };
+    };
+  };
+  TriageAnalyticsController_getPostureTrend: {
+    parameters: {
+      query: {
+        period: '7d' | '30d' | '90d';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TriageAnalyticsController_getTriageVelocity: {
+    parameters: {
+      query: {
+        period: '7d' | '30d' | '90d';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TriageAnalyticsController_getMttr: {
+    parameters: {
+      query: {
+        period: '7d' | '30d' | '90d';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TriageAnalyticsController_getSlaCompliance: {
+    parameters: {
+      query: {
+        period: '7d' | '30d' | '90d';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TriageAnalyticsController_getStatusDistribution: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TriageAnalyticsController_getTopAssignees: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TriageAnalyticsController_getSlaPolicies: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TriageAnalyticsController_upsertSlaPolicies: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpsertSlaPoliciesDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OrgMembersController_listMembers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TicketingController_getConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TicketingConnectionResponseDto'];
+        };
+      };
+    };
+  };
+  TicketingController_connect: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConnectJiraDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OAuthConnectResponseDto'];
+        };
+      };
+    };
+  };
+  TicketingController_callback: {
+    parameters: {
+      query: {
+        code: string;
+        state: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OperationSuccessResponseDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TicketingErrorResponseDto'];
+        };
+      };
+    };
+  };
+  TicketingController_disconnect: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OperationSuccessResponseDto'];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TicketingErrorResponseDto'];
+        };
+      };
+    };
+  };
+  TicketingController_updateConfig: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateTicketingConfigDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TicketingConnectionResponseDto'];
+        };
+      };
+    };
+  };
+  TicketingController_listProjects: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JiraProjectDto'][];
+        };
+      };
+    };
+  };
+  TicketingController_listIssueTypes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JiraIssueTypeDto'][];
+        };
+      };
+    };
+  };
+  TicketingController_reconcileTicketCreation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        findingTriageId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReconcileTicketCreationDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReconcileTicketCreationResponseDto'];
+        };
+      };
+    };
+  };
+  JiraWebhookController_receive: {
+    parameters: {
+      query?: never;
+      header: {
+        'x-hub-signature': string;
+      };
+      path: {
+        /** @description The webhook secret included in the registered callback URL */
+        secret: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Webhook processed */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JiraWebhookResponseDto'];
+        };
+      };
+      /** @description Invalid webhook signature */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TicketingErrorResponseDto'];
+        };
+      };
+      /** @description Webhook processing failed; Jira should retry the delivery */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TicketingErrorResponseDto'];
+        };
+      };
+    };
+  };
+  IntegrationsController_listProviders: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IntegrationProviderResponse'][];
+        };
+      };
+    };
+  };
+  IntegrationsController_getProviderConfiguration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        provider: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProviderConfigurationResponse'];
+        };
+      };
+    };
+  };
+  IntegrationsController_upsertProviderConfiguration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        provider: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpsertProviderConfigDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProviderConfigurationResponse'];
+        };
+      };
+    };
+  };
+  IntegrationsController_deleteProviderConfiguration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        provider: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Provider configuration deleted */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  IntegrationsController_listConnections: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IntegrationConnectionResponse'][];
+        };
+      };
+    };
+  };
+  IntegrationsController_startOAuth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        provider: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['StartOAuthDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OAuthStartResponseDto'];
+        };
+      };
+    };
+  };
+  IntegrationsController_completeOAuth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        provider: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CompleteOAuthDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IntegrationConnectionResponse'];
+        };
+      };
+    };
+  };
+  IntegrationsController_refreshConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IntegrationConnectionResponse'];
+        };
+      };
+    };
+  };
+  IntegrationsController_disconnectConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Connection removed */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  IntegrationsController_issueConnectionToken: {
+    parameters: {
+      query?: never;
+      header: {
+        'x-internal-token': string;
+        'x-organization-id': string;
+        'x-run-id': string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConnectionTokenResponseDto'];
+        };
+      };
+    };
+  };
+  ApiKeysController_list: {
+    parameters: {
+      query?: {
+        limit?: string;
+        offset?: string;
+        isActive?: 'true' | 'false';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiKeyResponseDto'][];
+        };
+      };
+    };
+  };
+  ApiKeysController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateApiKeyDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CreateApiKeyResponseDto'];
+        };
+      };
+    };
+  };
+  ApiKeysController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiKeyResponseDto'];
+        };
+      };
+    };
+  };
+  ApiKeysController_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DeleteApiKeyResponseDto'];
+        };
+      };
+    };
+  };
+  ApiKeysController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateApiKeyDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiKeyResponseDto'];
+        };
+      };
+    };
+  };
+  ApiKeysController_revoke: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiKeyResponseDto'];
+        };
+      };
+    };
+  };
+  ComponentsController_listComponents: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description List all registered components */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @example core.file.loader */
+            id?: string;
+            /** @example file-loader */
+            slug?: string;
+            /** @example File Loader */
+            name?: string;
+            /** @example 1.0.0 */
+            version?: string;
+            /** @example input */
+            type?: string;
+            /** @example input */
+            category?: string;
+            categoryConfig?: {
+              /** @example Input */
+              label?: string;
+              /** @example text-blue-600 */
+              color?: string;
+              /** @example Data sources, triggers, and credential access */
+              description?: string;
+              /** @example 📥 */
+              emoji?: string;
+              /** @example Download */
+              icon?: string;
+            };
+            /** @example Load files from filesystem */
+            description?: string;
+            documentation?: string | null;
+            documentationUrl?: string | null;
+            /** @example FileUp */
+            icon?: string;
+            logo?: string | null;
+            isLatest?: boolean | null;
+            deprecated?: boolean | null;
+            example?: string | null;
+            author?: {
+              name?: string;
+              /** @enum {string} */
+              type?: 'sentris' | 'community';
+              url?: string | null;
+            } | null;
+            runner?: {
+              /**
+               * @example inline
+               * @enum {string}
+               */
+              kind?: 'inline' | 'docker' | 'remote';
+              image?: string | null;
+              command?: string[] | null;
+            };
+            inputs?: {
+              id?: string;
+              label?: string;
+              connectionType?: {
+                /** @enum {string} */
+                kind: 'primitive' | 'list' | 'map' | 'contract' | 'any';
+                name?: string | null;
+                element?: Record<string, never> | null;
+                credential?: boolean | null;
+                acceptedProviderIds?:
+                  | ('anthropic' | 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan')[]
+                  | null;
+                /** @enum {string|null} */
+                producedProviderId?:
+                  | 'anthropic'
+                  | 'openai'
+                  | 'gemini'
+                  | 'openrouter'
+                  | 'zai-coding-plan'
+                  | null;
+              } & {
+                [key: string]: unknown;
+              };
+              /** @enum {string|null} */
+              editor?:
+                | 'text'
+                | 'textarea'
+                | 'number'
+                | 'boolean'
+                | 'select'
+                | 'multi-select'
+                | 'json'
+                | 'secret'
+                | 'llm-provider'
+                | null;
+              hidden?: boolean | null;
+              required?: boolean;
+              description?: string | null;
+              /** @enum {string|null} */
+              valuePriority?: 'manual-first' | 'connection-first' | null;
+            }[];
+            outputs?: {
+              id?: string;
+              label?: string;
+              connectionType?: {
+                /** @enum {string} */
+                kind: 'primitive' | 'list' | 'map' | 'contract' | 'any';
+                name?: string | null;
+                element?: Record<string, never> | null;
+                credential?: boolean | null;
+                acceptedProviderIds?:
+                  | ('anthropic' | 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan')[]
+                  | null;
+                /** @enum {string|null} */
+                producedProviderId?:
+                  | 'anthropic'
+                  | 'openai'
+                  | 'gemini'
+                  | 'openrouter'
+                  | 'zai-coding-plan'
+                  | null;
+              } & {
+                [key: string]: unknown;
+              };
+              description?: string | null;
+            }[];
+            parameters?: {
+              id?: string;
+              label?: string;
+              /** @enum {string} */
+              type?:
+                | 'text'
+                | 'textarea'
+                | 'number'
+                | 'boolean'
+                | 'select'
+                | 'multi-select'
+                | 'json'
+                | 'secret';
+              required?: boolean;
+              default?: unknown;
+              placeholder?: string | null;
+              description?: string | null;
+              helpText?: string | null;
+              options?:
+                | {
+                    label?: string;
+                    value?: unknown;
+                  }[]
+                | null;
+              min?: number | null;
+              max?: number | null;
+              rows?: number | null;
+            }[];
+            examples?: string[];
+            toolProvider?: {
+              /** @enum {string} */
+              kind?: 'component' | 'mcp-server' | 'mcp-group';
+              name?: string;
+              description?: string;
+            } | null;
+          }[];
+        };
+      };
+    };
+  };
+  ComponentsController_getComponent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Get a specific component by ID */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            id?: string;
+            slug?: string;
+            name?: string;
+            version?: string;
+            type?: string;
+            category?: string;
+            categoryConfig?: {
+              label?: string;
+              color?: string;
+              description?: string;
+              emoji?: string;
+              icon?: string;
+            };
+            description?: string | null;
+            documentation?: string | null;
+            documentationUrl?: string | null;
+            icon?: string | null;
+            logo?: string | null;
+            author?: {
+              name?: string;
+              type?: string;
+              url?: string | null;
+            } | null;
+            runner?: Record<string, never>;
+            inputs?: {
+              id?: string;
+              label?: string;
+              connectionType?: {
+                /** @enum {string} */
+                kind: 'primitive' | 'list' | 'map' | 'contract' | 'any';
+                name?: string | null;
+                element?: Record<string, never> | null;
+                credential?: boolean | null;
+                acceptedProviderIds?:
+                  | ('anthropic' | 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan')[]
+                  | null;
+                /** @enum {string|null} */
+                producedProviderId?:
+                  | 'anthropic'
+                  | 'openai'
+                  | 'gemini'
+                  | 'openrouter'
+                  | 'zai-coding-plan'
+                  | null;
+              } & {
+                [key: string]: unknown;
+              };
+              /** @enum {string|null} */
+              editor?:
+                | 'text'
+                | 'textarea'
+                | 'number'
+                | 'boolean'
+                | 'select'
+                | 'multi-select'
+                | 'json'
+                | 'secret'
+                | 'llm-provider'
+                | null;
+              hidden?: boolean | null;
+              required?: boolean;
+              description?: string | null;
+              /** @enum {string|null} */
+              valuePriority?: 'manual-first' | 'connection-first' | null;
+            }[];
+            outputs?: {
+              id?: string;
+              label?: string;
+              connectionType?: {
+                /** @enum {string} */
+                kind: 'primitive' | 'list' | 'map' | 'contract' | 'any';
+                name?: string | null;
+                element?: Record<string, never> | null;
+                credential?: boolean | null;
+                acceptedProviderIds?:
+                  | ('anthropic' | 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan')[]
+                  | null;
+                /** @enum {string|null} */
+                producedProviderId?:
+                  | 'anthropic'
+                  | 'openai'
+                  | 'gemini'
+                  | 'openrouter'
+                  | 'zai-coding-plan'
+                  | null;
+              } & {
+                [key: string]: unknown;
+              };
+              description?: string | null;
+            }[];
+            parameters?: unknown[];
+            examples?: unknown[];
+            deprecated?: boolean | null;
+            example?: string | null;
+            agentTool?: {
+              enabled?: boolean;
+              toolName?: string | null;
+              toolDescription?: string | null;
+            } | null;
+          };
+        };
+      };
+    };
+  };
+  ComponentsController_resolvePorts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResolvePortsDto'];
+      };
+    };
+    responses: {
+      /** @description Resolve dynamic ports based on parameters */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SecretsController_listSecrets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SecretSummaryResponse'][];
+        };
+      };
+    };
+  };
+  SecretsController_createSecret: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateSecretDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SecretSummaryResponse'];
+        };
+      };
+    };
+  };
+  SecretsController_getSecret: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SecretSummaryResponse'];
+        };
+      };
+    };
+  };
+  SecretsController_deleteSecret: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Secret deleted */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SecretsController_updateSecret: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSecretDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SecretSummaryResponse'];
+        };
+      };
+    };
+  };
+  SecretsController_getSecretValue: {
+    parameters: {
+      query?: {
+        /** @description Optional secret version to retrieve (defaults to active version) */
+        version?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SecretValueResponse'];
+        };
+      };
+    };
+  };
+  SecretsController_rotateSecret: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RotateSecretDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SecretSummaryResponse'];
+        };
+      };
+    };
+  };
+  SchedulesController_list: {
+    parameters: {
+      query?: {
+        workflowId?: string;
+        status?: 'active' | 'paused' | 'error';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduleResponseDto'][];
+        };
+      };
+    };
+  };
+  SchedulesController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateScheduleRequestDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduleResponseDto'];
+        };
+      };
+    };
+  };
+  SchedulesController_getOne: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduleResponseDto'];
+        };
+      };
+    };
+  };
+  SchedulesController_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Schedule deleted */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SchedulesController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateScheduleRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduleResponseDto'];
+        };
+      };
+    };
+  };
+  SchedulesController_pause: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduleResponseDto'];
+        };
+      };
+    };
+  };
+  SchedulesController_resume: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduleResponseDto'];
+        };
+      };
+    };
+  };
+  SchedulesController_trigger: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WebhooksController_listWorkflows: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WebhooksController_getWorkflow: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WebhooksController_runWorkflow: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WebhookRunWorkflowDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WebhooksController_getRunStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WebhooksController_getRunResult: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WebhooksController_cancelRun: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  InboundWebhookController_receive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        path: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Webhook processed successfully */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @example delivered */
+            status?: string;
+            /** @example sentris-run-123 */
+            runId?: string;
+          };
+        };
+      };
+      /** @description Invalid payload or parsing failed */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Webhook not found or inactive */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WebhooksAdminController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebhookConfigurationResponseDto'][];
+        };
+      };
+    };
+  };
+  WebhooksAdminController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateWebhookRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebhookConfigurationResponseDto'];
+        };
+      };
+    };
+  };
+  WebhooksAdminController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebhookConfigurationResponseDto'];
+        };
+      };
+    };
+  };
+  WebhooksAdminController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateWebhookRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebhookConfigurationResponseDto'];
+        };
+      };
+    };
+  };
+  WebhooksAdminController_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  WebhooksAdminController_regeneratePath: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegeneratePathResponseDto'];
+        };
+      };
+    };
+  };
+  WebhooksAdminController_getUrl: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GetWebhookUrlResponseDto'];
+        };
+      };
+    };
+  };
+  WebhooksAdminController_testScript: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TestWebhookScriptRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TestWebhookScriptResponseDto'];
+        };
+      };
+    };
+  };
+  WebhooksAdminController_listDeliveries: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebhookDeliveryResponseDto'][];
+        };
+      };
+    };
+  };
+  WebhooksAdminController_getDelivery: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        deliveryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebhookDeliveryResponseDto'];
+        };
+      };
+    };
+  };
+  HumanInputsController_list: {
+    parameters: {
+      query?: {
+        status?: 'pending' | 'resolved' | 'expired' | 'cancelled';
+        inputType?: 'approval' | 'form' | 'selection' | 'review' | 'acknowledge';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HumanInputResponseDto'][];
+        };
+      };
+    };
+  };
+  HumanInputsController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HumanInputResponseDto'];
+        };
+      };
+    };
+  };
+  HumanInputsController_resolve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResolveHumanInputDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HumanInputResponseDto'];
+        };
+      };
+    };
+  };
+  HumanInputsController_resolveByToken: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResolveByTokenDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublicResolveResultDto'];
+        };
+      };
+    };
+  };
+  McpServersController_listServers: {
+    parameters: {
+      query: {
+        groupId: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpServerResponseDto'][];
+        };
+      };
+    };
+  };
+  McpServersController_createServer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateMcpServerDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpServerResponseDto'];
+        };
+      };
+    };
+  };
+  McpServersController_listEnabledServers: {
+    parameters: {
+      query: {
+        groupId: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpServerResponseDto'][];
+        };
+      };
+    };
+  };
+  McpServersController_getAllTools: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpToolResponseDto'][];
+        };
+      };
+    };
+  };
+  McpServersController_getHealthStatuses: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthStatusResponseDto'][];
+        };
+      };
+    };
+  };
+  McpServersController_getServer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpServerResponseDto'];
+        };
+      };
+    };
+  };
+  McpServersController_deleteServer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpServersController_updateServer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateMcpServerDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpServerResponseDto'];
+        };
+      };
+    };
+  };
+  McpServersController_getServerTools: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpToolResponseDto'][];
+        };
+      };
+    };
+  };
+  McpServersController_toggleServer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpServerResponseDto'];
+        };
+      };
+    };
+  };
+  McpServersController_testEnabledServers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TestEnabledServerResponseDto'][];
+        };
+      };
+    };
+  };
+  McpServersController_testConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TestConnectionResponseDto'];
+        };
+      };
+    };
+  };
+  McpServersController_toggleToolEnabled: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        serverId: string;
+        toolId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpToolResponseDto'];
+        };
+      };
+    };
+  };
+  McpServersController_getResolvedConfig: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': Record<string, never>;
+        };
+      };
+    };
+  };
+  McpGroupsController_listGroups: {
+    parameters: {
+      query?: {
+        enabled?: boolean;
+        includeServers?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpGroupResponseDto'][];
+        };
+      };
+    };
+  };
+  McpGroupsController_createGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateMcpGroupDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpGroupResponseDto'];
+        };
+      };
+    };
+  };
+  McpGroupsController_listTemplates: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GroupTemplateDto'][];
+        };
+      };
+    };
+  };
+  McpGroupsController_getGroupBySlug: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpGroupResponseDto'];
+        };
+      };
+    };
+  };
+  McpGroupsController_getGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpGroupResponseDto'];
+        };
+      };
+    };
+  };
+  McpGroupsController_deleteGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpGroupsController_updateGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateMcpGroupDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpGroupResponseDto'];
+        };
+      };
+    };
+  };
+  McpGroupsController_getServersInGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpGroupServerResponseDto'][];
+        };
+      };
+    };
+  };
+  McpGroupsController_addServerToGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AddServerToGroupDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpGroupServerResponseDto'][];
+        };
+      };
+    };
+  };
+  McpGroupsController_removeServerFromGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        serverId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpGroupsController_updateServerInGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        serverId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateServerInGroupDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpGroupServerResponseDto'][];
+        };
+      };
+    };
+  };
+  McpGroupsController_syncTemplates: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SyncTemplatesResponseDto'];
+        };
+      };
+    };
+  };
+  McpGroupsController_importTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImportTemplateRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportGroupTemplateResponseDto'];
+        };
+      };
+    };
+  };
+  McpRegistryController_getCatalog: {
+    parameters: {
+      query?: {
+        search?: string;
+        category?: string;
+        serverType?: 'server' | 'remote';
+        featured?: boolean;
+        tags?: string;
+        limit?: number;
+        offset?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegistryCatalogListResponseDto'];
+        };
+      };
+    };
+  };
+  McpRegistryController_getCatalogEntry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegistryCatalogDetailDto'];
+        };
+      };
+    };
+  };
+  McpRegistryController_importServer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RegistryImportRequestDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegistryImportResponseDto'];
+        };
+      };
+    };
+  };
+  McpRegistryController_triggerSync: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpRegistryController_getSyncStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  NotificationsController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationChannelResponseDto'][];
+        };
+      };
+    };
+  };
+  NotificationsController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateNotificationChannelDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationChannelResponseDto'];
+        };
+      };
+    };
+  };
+  NotificationsController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationChannelResponseDto'];
+        };
+      };
+    };
+  };
+  NotificationsController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateNotificationChannelDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationChannelResponseDto'];
+        };
+      };
+    };
+  };
+  NotificationsController_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  NotificationsController_test: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  NotificationsController_listDeliveries: {
+    parameters: {
+      query: {
+        limit: number;
+        offset: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationDeliveryResponseDto'][];
+        };
+      };
+    };
+  };
+  NotificationsController_resendDelivery: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        deliveryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpGatewayController_handleGateway_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpGatewayController_handleGateway_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpGatewayController_handleGateway_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpGatewayController_handleGateway_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpGatewayController_handleGateway_options: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpGatewayController_handleGateway_head: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpGatewayController_handleGateway_patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpDiscoveryController_discover: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DiscoveryInputDto'];
+      };
+    };
+    responses: {
+      /** @description Discovery workflow started successfully */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DiscoveryStartResponseDto'];
+        };
+      };
+      /** @description Invalid input parameters */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpDiscoveryController_getStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflowId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Discovery status retrieved successfully */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DiscoveryStatusDto'];
+        };
+      };
+      /** @description Workflow not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  McpDiscoveryController_discoverGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GroupDiscoveryInputDto'];
+      };
+    };
+    responses: {
+      /** @description Group discovery workflow started successfully */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GroupDiscoveryStartResponseDto'];
+        };
+      };
+    };
+  };
+  McpDiscoveryController_getGroupStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflowId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Group discovery status retrieved successfully */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GroupDiscoveryStatusDto'];
+        };
+      };
+    };
+  };
+  McpSessionsController_listSessions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns all active MCP sessions across instances */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  StudioMcpController_handleMcp_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  StudioMcpController_handleMcp_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  StudioMcpController_handleMcp_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  StudioMcpController_handleMcp_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  StudioMcpController_handleMcp_options: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  StudioMcpController_handleMcp_head: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  StudioMcpController_handleMcp_patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_listTemplates: {
+    parameters: {
+      query: {
+        category: string;
+        search: string;
+        tags: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns filtered list of templates */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_getCategories: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns available template categories */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_getTags: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns available template tags */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_getMyTemplates: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns templates submitted by the current user */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_getRepoInfo: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns GitHub repository information */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_getSubmissions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns template submissions for the current user */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_getRevalidationJobs: {
+    parameters: {
+      query: {
+        limit: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns recent template revalidation jobs */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_getRevalidationJobLog: {
+    parameters: {
+      query: {
+        stream: string;
+        maxBytes: string;
+      };
+      header?: never;
+      path: {
+        auditId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns a bounded stdout/stderr log tail */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_getRevalidationJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        auditId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns template revalidation job status */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_getTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Returns template details */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_importCommunityTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImportCommunityTemplateDto'];
+      };
+    };
+    responses: {
+      /** @description Imported community template */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_publishTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PublishTemplateDto'];
+      };
+    };
+    responses: {
+      /** @description Template validation result */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_revalidateTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Template revalidation job started */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_useTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UseTemplateDto'];
+      };
+    };
+    responses: {
+      /** @description Created workflow from template */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TemplatesController_syncTemplates: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Sync result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AuditLogsController_export: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description CSV file of audit log events */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AuditLogsController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description List audit log events for the authenticated organization */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListAuditLogsResponseDto'];
+        };
+      };
+    };
+  };
+  HealthController_liveness: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  HealthController_readiness: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The Health Check is successful */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @example ok */
+            status?: string;
+            /**
+             * @example {
+             *       "database": {
+             *         "status": "up"
+             *       }
+             *     }
+             */
+            info?: {
+              [key: string]: {
+                status: string;
+              } & {
+                [key: string]: unknown;
+              };
+            } | null;
+            /** @example {} */
+            error?: {
+              [key: string]: {
+                status: string;
+              } & {
+                [key: string]: unknown;
+              };
+            } | null;
+            /**
+             * @example {
+             *       "database": {
+             *         "status": "up"
+             *       }
+             *     }
+             */
+            details?: {
+              [key: string]: {
+                status: string;
+              } & {
+                [key: string]: unknown;
+              };
+            };
+          };
+        };
+      };
+      /** @description The Health Check is not successful */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @example error */
+            status?: string;
+            /**
+             * @example {
+             *       "database": {
+             *         "status": "up"
+             *       }
+             *     }
+             */
+            info?: {
+              [key: string]: {
+                status: string;
+              } & {
+                [key: string]: unknown;
+              };
+            } | null;
+            /**
+             * @example {
+             *       "redis": {
+             *         "status": "down",
+             *         "message": "Could not connect"
+             *       }
+             *     }
+             */
+            error?: {
+              [key: string]: {
+                status: string;
+              } & {
+                [key: string]: unknown;
+              };
+            } | null;
+            /**
+             * @example {
+             *       "database": {
+             *         "status": "up"
+             *       },
+             *       "redis": {
+             *         "status": "down",
+             *         "message": "Could not connect"
+             *       }
+             *     }
+             */
+            details?: {
+              [key: string]: {
+                status: string;
+              } & {
+                [key: string]: unknown;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+  InternalHealthController_workerReady: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AgentSkillsController_listSkills: {
+    parameters: {
+      query: {
+        enabledOnly: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AgentSkillResponse'][];
+        };
+      };
+    };
+  };
+  AgentSkillsController_createSkill: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateAgentSkillDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AgentSkillResponse'];
+        };
+      };
+    };
+  };
+  AgentSkillsController_discoverSkills: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DiscoveredAgentSkillResponse'][];
+        };
+      };
+    };
+  };
+  AgentSkillsController_importDiscoveredSkills: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImportDiscoveredAgentSkillsDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportAgentSkillsResultResponse'];
+        };
+      };
+    };
+  };
+  AgentSkillsController_importSkillZip: {
+    parameters: {
+      query: {
+        overwrite: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportAgentSkillsResultResponse'];
+        };
+      };
+    };
+  };
+  AgentSkillsController_getSkill: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AgentSkillResponse'];
+        };
+      };
+    };
+  };
+  AgentSkillsController_deleteSkill: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AgentSkillsController_updateSkill: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateAgentSkillDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AgentSkillResponse'];
+        };
+      };
+    };
+  };
+  ScopesController_listScopes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeResponse'][];
+        };
+      };
+    };
+  };
+  ScopesController_createScope: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateScopeDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeResponse'];
+        };
+      };
+    };
+  };
+  ScopesController_getScope: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeResponse'];
+        };
+      };
+    };
+  };
+  ScopesController_deleteScope: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ScopesController_updateScope: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateScopeDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeResponse'];
+        };
+      };
+    };
+  };
+  ScopeFindingsController_getSummary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeFindingsSummaryResponse'];
+        };
+      };
+    };
+  };
+  AssetsController_compareRuns: {
+    parameters: {
+      query: {
+        baselineRunId: string;
+        currentRunId: string;
+      };
+      header?: never;
+      path: {
+        scopeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AssetRunComparisonResponse'];
+        };
+      };
+    };
+  };
+  AssetsController_listAssets: {
+    parameters: {
+      query: {
+        type: string;
+        limit: string;
+      };
+      header?: never;
+      path: {
+        scopeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AssetResponse'][];
+        };
+      };
+    };
+  };
+  AiController_listAnthropicModels: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ListAnthropicModelsDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListAnthropicModelsResponse'];
+        };
+      };
+    };
+  };
+  OutboxController_listDeadLetters: {
+    parameters: {
+      query?: {
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListDeadLettersResponseDto'];
+        };
+      };
+    };
+  };
+  OutboxController_requeue: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        eventId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RequeueDeadLetterResponseDto'];
+        };
+      };
+      /** @description Event ID must be a UUID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Dead-lettered outbox event not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_listSessions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_createSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateOperatorSessionDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_getRunImprovement: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OperatorRunImprovementLookupDto'];
+        };
+      };
+    };
+  };
+  OperatorController_streamSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Server-sent Operator session snapshots */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_getSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_updateSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateOperatorSessionDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_listWorkflowDrafts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OperatorWorkflowDraftDetailDto'][];
+        };
+      };
+    };
+  };
+  OperatorController_createTurn: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateOperatorTurnDto'];
+      };
+    };
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_decideAction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        actionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OperatorActionDecisionDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
 }

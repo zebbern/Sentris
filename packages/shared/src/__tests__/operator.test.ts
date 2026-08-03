@@ -13,6 +13,7 @@ import {
   OperatorInvokeMcpToolInputSchema,
   OperatorListFindingsInputSchema,
   OperatorPersistedTurnPayloadSchema,
+  OperatorPersistedTurnPayloadV1Schema,
   OperatorReadMcpResourceInputSchema,
   OperatorSessionStreamErrorSchema,
   OperatorSessionStreamReadySchema,
@@ -240,13 +241,13 @@ describe('Operator run controls', () => {
     ).toBe('improved');
   });
 
-  it('defines one strict versioned payload while accepting legacy route-only storage', () => {
+  it('defines the current strict payload while accepting prior versioned and route-only storage', () => {
     const routeContext = {
       path: '/workflows/22222222-2222-4222-8222-222222222222',
       workflowId: '22222222-2222-4222-8222-222222222222',
     };
     const payload = {
-      version: 1 as const,
+      version: 2 as const,
       routeContext,
       directCommand: {
         commandName: 'get_run' as const,
@@ -260,8 +261,11 @@ describe('Operator run controls', () => {
     });
     expect(OperatorStoredTurnContextSchema.parse(routeContext)).toEqual(routeContext);
     expect(OperatorStoredTurnContextSchema.parse(null)).toBeNull();
-    expect(OperatorPersistedTurnPayloadSchema.safeParse({ ...payload, version: 2 }).success).toBe(
+    expect(OperatorPersistedTurnPayloadSchema.safeParse({ ...payload, version: 1 }).success).toBe(
       false,
+    );
+    expect(OperatorPersistedTurnPayloadV1Schema.safeParse({ ...payload, version: 1 }).success).toBe(
+      true,
     );
     expect(
       OperatorPersistedTurnPayloadSchema.safeParse({ ...payload, unexpected: true }).success,

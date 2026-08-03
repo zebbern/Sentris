@@ -399,11 +399,34 @@ export const OperatorWorkflowApplyResultSchema = z
     versionId: z.string().uuid(),
     version: z.number().int().positive(),
     created: z.boolean(),
+    staged: z.boolean().default(false),
     name: z.string(),
     sourceRunId: RunIdSchema.optional(),
   })
   .strict();
 export type OperatorWorkflowApplyResult = z.infer<typeof OperatorWorkflowApplyResultSchema>;
+
+export const OperatorPromoteWorkflowVersionInputSchema = z
+  .object({
+    workflowId: WorkflowIdSchema,
+    versionId: z.string().uuid(),
+    baseVersionId: z.string().uuid(),
+    candidateRunId: RunIdSchema,
+  })
+  .strict();
+
+export const OperatorWorkflowPromotionResultSchema = z
+  .object({
+    kind: z.literal('workflow-version-promoted'),
+    workflowId: WorkflowIdSchema,
+    versionId: z.string().uuid(),
+    version: z.number().int().positive(),
+    name: z.string(),
+    candidateRunId: RunIdSchema,
+    alreadyCurrent: z.boolean(),
+  })
+  .strict();
+export type OperatorWorkflowPromotionResult = z.infer<typeof OperatorWorkflowPromotionResultSchema>;
 
 export const OperatorWorkflowDraftDetailSchema = OperatorWorkflowDraftResultSchema.extend({
   proposalActionId: z.string().uuid(),
@@ -675,6 +698,12 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
     effect: 'consequential',
     inputSchema: OperatorApplyWorkflowDraftInputSchema,
   },
+  promote_workflow_version: {
+    description:
+      'Promote a tested candidate workflow version after reviewing its recorded comparison. The candidate run must be terminal and reference the exact version; baseVersionId must still be the workflow current version so Keep cannot overwrite a newer edit.',
+    effect: 'consequential',
+    inputSchema: OperatorPromoteWorkflowVersionInputSchema,
+  },
   list_runs: {
     description:
       'List recent workflow runs, optionally restricted to a workflow or execution status.',
@@ -782,6 +811,7 @@ export type OperatorCommandInputMap = {
   propose_workflow_draft: z.infer<typeof OperatorProposeWorkflowDraftInputSchema>;
   propose_workflow_edits: z.infer<typeof OperatorProposeWorkflowEditsInputSchema>;
   apply_workflow_draft: z.infer<typeof OperatorApplyWorkflowDraftInputSchema>;
+  promote_workflow_version: z.infer<typeof OperatorPromoteWorkflowVersionInputSchema>;
   list_runs: z.infer<typeof OperatorListRunsInputSchema>;
   get_run: z.infer<typeof OperatorGetRunInputSchema>;
   compare_runs: z.infer<typeof OperatorCompareRunsInputSchema>;
@@ -803,6 +833,12 @@ export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
     .object({
       commandName: z.literal('apply_workflow_draft'),
       arguments: OperatorApplyWorkflowDraftInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      commandName: z.literal('promote_workflow_version'),
+      arguments: OperatorPromoteWorkflowVersionInputSchema,
     })
     .strict(),
   z
@@ -838,6 +874,16 @@ export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
 ]);
 export type OperatorDirectCommand = z.infer<typeof OperatorDirectCommandSchema>;
 
+const OperatorPersistedTurnPayloadV1DirectCommandSchema = z.union([
+  OperatorDirectCommandSchema,
+  z
+    .object({
+      commandName: z.literal('promote_workflow_version'),
+      arguments: OperatorPromoteWorkflowVersionInputSchema.omit({ baseVersionId: true }),
+    })
+    .strict(),
+]);
+
 export const OperatorJourneySchema = z.discriminatedUnion('kind', [
   z
     .object({
@@ -848,7 +894,22 @@ export const OperatorJourneySchema = z.discriminatedUnion('kind', [
 ]);
 export type OperatorJourney = z.infer<typeof OperatorJourneySchema>;
 
-export const OPERATOR_PERSISTED_TURN_PAYLOAD_VERSION = 1 as const;
+export const OperatorRunImprovementReferenceSchema = z
+  .object({
+    sourceRunId: RunIdSchema,
+    sessionId: z.string().uuid(),
+    turnId: z.string().uuid(),
+    createdAt: z.string().datetime(),
+  })
+  .strict();
+export type OperatorRunImprovementReference = z.infer<typeof OperatorRunImprovementReferenceSchema>;
+
+export const OperatorRunImprovementLookupSchema = z
+  .object({ improvement: OperatorRunImprovementReferenceSchema.nullable() })
+  .strict();
+export type OperatorRunImprovementLookup = z.infer<typeof OperatorRunImprovementLookupSchema>;
+
+export const OPERATOR_PERSISTED_TURN_PAYLOAD_VERSION = 2 as const;
 export const OperatorPersistedTurnPayloadSchema = z
   .object({
     version: z.literal(OPERATOR_PERSISTED_TURN_PAYLOAD_VERSION),
@@ -859,12 +920,26 @@ export const OperatorPersistedTurnPayloadSchema = z
   .strict();
 export type OperatorPersistedTurnPayload = z.infer<typeof OperatorPersistedTurnPayloadSchema>;
 
+export const OperatorPersistedTurnPayloadV1Schema = z
+  .object({
+    version: z.literal(1),
+    routeContext: OperatorRouteContextSchema.nullable(),
+    directCommand: OperatorPersistedTurnPayloadV1DirectCommandSchema.nullable(),
+    journey: OperatorJourneySchema.nullable().default(null),
+  })
+  .strict();
+export type OperatorPersistedTurnPayloadV1 = z.infer<typeof OperatorPersistedTurnPayloadV1Schema>;
+
 /**
  * JSONB compatibility shape for Operator turns. Route-only objects and null predate
  * structured direct commands; all newly persisted rows use the versioned payload.
  */
 export const OperatorStoredTurnContextSchema = z
-  .union([OperatorPersistedTurnPayloadSchema, OperatorRouteContextSchema])
+  .union([
+    OperatorPersistedTurnPayloadSchema,
+    OperatorPersistedTurnPayloadV1Schema,
+    OperatorRouteContextSchema,
+  ])
   .nullable();
 export type OperatorStoredTurnContext = z.input<typeof OperatorStoredTurnContextSchema>;
 
@@ -926,6 +1001,8 @@ export interface OperatorTurnView {
   temporalWorkflowId: string | null;
   temporalRunId: string | null;
   context: OperatorRouteContext | null;
+  /** Present for current API responses; optional so pre-field snapshots remain readable. */
+  journey?: OperatorJourney | null;
   error: string | null;
   createdAt: string;
   startedAt: string | null;
@@ -990,6 +1067,7 @@ const OperatorTurnStreamSchema = z
     temporalWorkflowId: z.string().nullable(),
     temporalRunId: z.string().nullable(),
     context: OperatorRouteContextSchema.nullable(),
+    journey: OperatorJourneySchema.nullable().optional(),
     error: z.string().nullable(),
     createdAt: z.string(),
     startedAt: z.string().nullable(),

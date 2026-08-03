@@ -245,6 +245,7 @@ describe('OperatorWorkflowAuthoringService', () => {
   let workflows: {
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
+    stageVersion: ReturnType<typeof vi.fn>;
     getRun: ReturnType<typeof vi.fn>;
   };
   let versions: {
@@ -260,6 +261,7 @@ describe('OperatorWorkflowAuthoringService', () => {
     workflows = {
       create: vi.fn(),
       update: vi.fn(),
+      stageVersion: vi.fn(),
       getRun: vi.fn(),
     };
     versions = {
@@ -617,7 +619,7 @@ describe('OperatorWorkflowAuthoringService', () => {
     expect(JSON.stringify(detail)).not.toContain(INLINE_API_KEY);
   });
 
-  it('restores the base credential and applies an update with the proposal idempotency fence', async () => {
+  it('restores the base credential and stages a run-derived candidate without changing the current workflow', async () => {
     const baseGraph = makeCredentialGraph({
       name: 'Base workflow',
       credential: INLINE_API_KEY,
@@ -630,11 +632,11 @@ describe('OperatorWorkflowAuthoringService', () => {
       proposalContext({ graph: proposedGraph, sourceRunId: SOURCE_RUN_ID }),
     );
     versions.findById.mockResolvedValue(versionRecord(baseGraph));
-    workflows.update.mockResolvedValue({
-      id: WORKFLOW_ID,
+    workflows.stageVersion.mockResolvedValue({
+      workflowId: WORKFLOW_ID,
+      id: SAVED_VERSION_ID,
+      version: 4,
       name: 'Updated workflow',
-      currentVersionId: SAVED_VERSION_ID,
-      currentVersion: 4,
     });
 
     const result = await service.apply({
@@ -643,8 +645,9 @@ describe('OperatorWorkflowAuthoringService', () => {
       sessionId: SESSION_ID,
     });
 
-    expect(workflows.update).toHaveBeenCalledTimes(1);
-    const [workflowId, effectiveGraph, actor, options] = workflows.update.mock.calls[0]!;
+    expect(workflows.update).not.toHaveBeenCalled();
+    expect(workflows.stageVersion).toHaveBeenCalledTimes(1);
+    const [workflowId, effectiveGraph, actor, options] = workflows.stageVersion.mock.calls[0]!;
     expect(workflowId).toBe(WORKFLOW_ID);
     expect(readCredential(effectiveGraph as WorkflowGraph)).toBe(INLINE_API_KEY);
     expect(actor).toEqual(auth);
@@ -659,6 +662,7 @@ describe('OperatorWorkflowAuthoringService', () => {
       versionId: SAVED_VERSION_ID,
       version: 4,
       created: false,
+      staged: true,
       name: 'Updated workflow',
       sourceRunId: SOURCE_RUN_ID,
     });
@@ -683,11 +687,11 @@ describe('OperatorWorkflowAuthoringService', () => {
       }),
     );
     versions.findById.mockResolvedValue(versionRecord(baseGraph));
-    workflows.update.mockResolvedValue({
-      id: WORKFLOW_ID,
+    workflows.stageVersion.mockResolvedValue({
+      workflowId: WORKFLOW_ID,
+      id: SAVED_VERSION_ID,
       name: 'Updated workflow',
-      currentVersionId: SAVED_VERSION_ID,
-      currentVersion: 4,
+      version: 4,
     });
 
     const result = await service.apply({
@@ -696,7 +700,7 @@ describe('OperatorWorkflowAuthoringService', () => {
       sessionId: SESSION_ID,
     });
 
-    const [workflowId, effectiveGraph, actor, options] = workflows.update.mock.calls[0]!;
+    const [workflowId, effectiveGraph, actor, options] = workflows.stageVersion.mock.calls[0]!;
     expect(workflowId).toBe(WORKFLOW_ID);
     expect(readCredential(effectiveGraph as WorkflowGraph)).toBe(INLINE_API_KEY);
     expect(
@@ -708,6 +712,7 @@ describe('OperatorWorkflowAuthoringService', () => {
       expectedVersionId: BASE_VERSION_ID,
       idempotencyKey: `operator-draft:${PROPOSAL_ACTION_ID}`,
     });
+    expect(workflows.update).not.toHaveBeenCalled();
     expect(result.sourceRunId).toBe(SOURCE_RUN_ID);
   });
 

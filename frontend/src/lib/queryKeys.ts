@@ -126,6 +126,8 @@ export const queryKeys = {
     session: (sessionId: string) => [...queryKeys.operator.root(), 'sessions', sessionId] as const,
     workflowDrafts: (sessionId: string) =>
       [...queryKeys.operator.session(sessionId), 'workflow-drafts'] as const,
+    runImprovement: (sourceRunId: string) =>
+      [...queryKeys.operator.root(), 'run-improvements', sourceRunId] as const,
   },
   workflows: {
     list: () => ['workflows', getOrgScope()] as const,

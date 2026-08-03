@@ -101,18 +101,23 @@ The selected session is projected to the browser through a versioned SSE stream 
 Postgres-backed snapshots. TanStack Query remains the frontend cache, with periodic REST
 reads only as a connection fallback; the stream is not a second event store and does not
 query Temporal from the browser. Launched run cards continue to use the existing run SSE for
-status and trace updates rather than multiplexing run data into the Operator stream. Terminal
-`get_run` results include separately bounded failure/recent trace evidence and run-scoped
+status and trace updates rather than multiplexing run data into the Operator stream.
+The compact improvement pipeline is a frontend projection of the persisted journey marker and
+action ledger; it owns no execution state, and reloads reconstruct the same stages. Embedded
+workflow progress and Agent turns remain projections of the canonical run trace.
+Terminal `get_run` results include separately bounded failure/recent trace evidence and run-scoped
 finding summaries. Ordinary run commands remain detached. An explicit `improve_run` journey
 instead keeps one bounded turn durable while it diagnoses a terminal source run, proposes the
 smallest valid edit, applies it through the existing Ask/Auto policy, reruns the exact stored
 inputs and scope, and compares the terminal candidate. Candidate waiting uses one observation
 attempt per retrying Activity attempt rather than a long in-Activity polling loop.
 Run-derived update proposals persist the reviewed run identity only after organization and
-workflow validation. Applying a valid proposal carries that lineage onto the new immutable
-version. The improvement journey selects that version and reuses the reviewed run's stored
-inputs and scope; the manual cards may still perform the same stages as separate explicit
-turns. This does not change Retry: Retry still
+workflow validation. Applying a valid proposal carries that lineage onto a staged immutable
+version without changing the workflow's `current_version_id`. The improvement journey selects
+that exact staged version and reuses the reviewed run's stored inputs and scope; the manual
+cards may still perform the same stages as separate explicit turns. Ordinary launches without
+an explicit version resolve through `current_version_id`, which is also the optimistic edit
+fence. This does not change Retry: Retry still
 replays the original version, inputs, and scope.
 After that improved run becomes terminal, the journey invokes the same read-only `compare_runs`
 action that remains available from run cards. The backend requires both runs to belong to the same workflow and
@@ -128,7 +133,16 @@ declares no criteria, exact recorded trace-failure counts remain the fallback. R
 totals and duration remain observations because target state, network behavior, and
 model-provider responses can vary between runs. The comparison is stored in the normal
 Operator action ledger and does not automatically promote, roll back, or mutate a workflow
-version.
+version. `Keep candidate` is a separate consequential `promote_workflow_version` action. It
+requires a terminal candidate run tied to the exact staged version, then atomically moves the
+workflow's current-version pointer only if it still matches the compared source/base version.
+`Revise again` starts another improvement journey from the
+candidate run without promoting it.
+The design toolbar exposes the canonical versioned criteria editor directly. When an
+improvement journey inspects a workflow without criteria, Operator may include the existing
+typed `set_success_criteria` operation in its reviewed proposal only when exact component
+contracts or run evidence justify the output path or finding threshold; it must not invent
+either. The criteria still require the normal proposal review and Save action.
 Before a new launch, `get_workflow` exposes the selected compiled version's sanitized
 runtime-input descriptors so the model can map user intent to exact input IDs. The same
 shared contract is enforced in `WorkflowRunService` for every launch path before persistence

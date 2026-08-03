@@ -1,12 +1,13 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { createAlertDialogMock } from '@/test/mocks/dialog';
+import { createAlertDialogMock, createDialogMock } from '@/test/mocks/dialog';
 import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 
 mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
+mock.module('@/components/ui/dialog', createDialogMock);
 
 const { TopBar } = await import('../TopBar');
 
@@ -182,6 +183,26 @@ describeTopBar('TopBar', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Save workflow' })).toBeNull();
+  });
+
+  it('opens success criteria directly from the design toolbar', () => {
+    render(
+      <MemoryRouter>
+        <TopBar
+          workflowId="workflow-1"
+          onRun={mock()}
+          onSave={mock()}
+          successCriteriaNodes={[{ id: 'agent', label: 'Research agent' }]}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Success criteria, none configured' }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Optional deterministic checks stored with the next workflow version/),
+    ).toBeInTheDocument();
   });
 
   it('saves directly from the visible Save button', async () => {

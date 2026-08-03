@@ -3,6 +3,7 @@ import type {
   OperatorActionView,
   OperatorCreateSession,
   OperatorCreateTurn,
+  OperatorRunImprovementLookup,
   OperatorSessionDetail,
   OperatorSessionSummary,
   OperatorTurnAccepted,
@@ -16,6 +17,11 @@ const sessionPath = (sessionId: string) => `/operator/sessions/${encodeURICompon
 
 export const operatorApi = {
   listSessions: () => httpGet<OperatorSessionSummary[]>('/operator/sessions'),
+
+  getRunImprovement: (sourceRunId: string) =>
+    httpGet<OperatorRunImprovementLookup>(
+      `/operator/run-improvements/${encodeURIComponent(sourceRunId)}`,
+    ),
 
   createSession: (input: OperatorCreateSession) =>
     httpPost<OperatorSessionSummary>('/operator/sessions', input),

@@ -66,9 +66,9 @@ export class WorkflowVersionService {
       throw new NotFoundException(`Workflow ${id} not found`);
     }
 
-    const version = await this.versionRepository.findLatestByWorkflowId(id, {
-      organizationId,
-    });
+    const version = workflow.currentVersionId
+      ? await this.versionRepository.findById(workflow.currentVersionId, { organizationId })
+      : await this.versionRepository.findLatestByWorkflowId(id, { organizationId });
     if (!version) {
       throw new NotFoundException(`No versions recorded for workflow ${id}`);
     }
@@ -178,13 +178,23 @@ export class WorkflowVersionService {
       return version;
     }
 
-    const latest = await this.versionRepository.findLatestByWorkflowId(workflowId, {
+    const workflow = await this.repository.findById(workflowId, {
       organizationId: organizationId ?? undefined,
     });
-    if (!latest) {
+    if (!workflow) {
+      throw new NotFoundException(`Workflow ${workflowId} not found`);
+    }
+    const current = workflow.currentVersionId
+      ? await this.versionRepository.findById(workflow.currentVersionId, {
+          organizationId: organizationId ?? undefined,
+        })
+      : await this.versionRepository.findLatestByWorkflowId(workflowId, {
+          organizationId: organizationId ?? undefined,
+        });
+    if (!current || current.workflowId !== workflowId) {
       throw new NotFoundException(`No versions recorded for workflow ${workflowId}`);
     }
-    return latest;
+    return current;
   }
 
   async ensureDefinitionForVersion(
