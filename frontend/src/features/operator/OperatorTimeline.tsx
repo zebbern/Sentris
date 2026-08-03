@@ -7,6 +7,7 @@ import {
   OperatorWorkflowDraftResultSchema,
   OperatorWorkflowPromotionResultSchema,
   OperatorRunComparisonResultSchema,
+  OperatorRunInputProposalResultSchema,
   OperatorRunWorkflowInputSchema,
   type OperatorActionStatus,
   type OperatorActionView,
@@ -33,6 +34,7 @@ import { MarkdownView } from '@/components/ui/markdown';
 import { cn } from '@/lib/utils';
 import { OperatorRunActivity, type OperatorRunCommandRequest } from './OperatorRunActivity';
 import { OperatorRunComparisonCard } from './OperatorRunComparisonCard';
+import { OperatorRunInputProposalCard } from './OperatorRunInputProposalCard';
 import { OperatorWorkflowDraftCard } from './OperatorWorkflowDraftCard';
 
 const ACTION_STATUS_LABELS: Record<OperatorActionStatus, string> = {
@@ -67,6 +69,7 @@ const COMMAND_LABELS: Record<OperatorCommandName, string> = {
   list_runs: 'List runs',
   get_run: 'Inspect run',
   compare_runs: 'Compare runs',
+  propose_run_input_changes: 'Propose run input changes',
   run_workflow: 'Run workflow',
   cancel_run: 'Cancel run',
   retry_run: 'Retry run',
@@ -291,6 +294,7 @@ function ActionEvent({
   const draftResult = OperatorWorkflowDraftResultSchema.safeParse(action.result);
   const applyResult = OperatorWorkflowApplyResultSchema.safeParse(action.result);
   const runComparison = OperatorRunComparisonResultSchema.safeParse(action.result);
+  const runInputProposal = OperatorRunInputProposalResultSchema.safeParse(action.result);
   const runWorkflowInput =
     action.commandName === 'run_workflow'
       ? OperatorRunWorkflowInputSchema.safeParse(action.arguments)
@@ -307,7 +311,9 @@ function ActionEvent({
         ? null
         : runComparison.success
           ? null
-          : formatPreview(action.result);
+          : runInputProposal.success
+            ? null
+            : formatPreview(action.result);
   const isActive = action.status === 'executing' || action.status === 'approved';
   const workflowDraft = draftResult.success
     ? workflowDrafts.find(
@@ -414,10 +420,21 @@ function ActionEvent({
           />
         ) : null}
 
+        {runInputProposal.success ? (
+          <OperatorRunInputProposalCard
+            result={runInputProposal.data}
+            disabled={runCommandDisabled}
+            onCommand={onRunCommand}
+          />
+        ) : null}
+
         {action.runId ? (
           <OperatorRunActivity
             runId={action.runId}
             sourceRunId={runWorkflowInput?.success ? runWorkflowInput.data.sourceRunId : undefined}
+            allowSourceComparison={
+              runWorkflowInput?.success ? !runWorkflowInput.data.inputChanges : true
+            }
             disabled={runCommandDisabled}
             onCommand={onRunCommand}
           />

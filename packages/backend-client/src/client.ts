@@ -6148,6 +6148,19 @@ export interface components {
               /** Format: uuid */
               scopeId?: string;
               sourceRunId?: string;
+              inputChanges?: (
+                | {
+                    /** @enum {string} */
+                    operation: 'set';
+                    inputId: string;
+                    value: unknown;
+                  }
+                | {
+                    /** @enum {string} */
+                    operation: 'unset';
+                    inputId: string;
+                  }
+              )[];
             };
           }
         | {

@@ -130,6 +130,150 @@ describe('OperatorCommandService', () => {
     expect(result.runId).toBe('sentris-run-1');
   });
 
+  it('validates reviewed input changes and preserves stored secrets and scope on launch', async () => {
+    const sourceRunId = 'sentris-run-input-source';
+    const scopeId = '77777777-7777-4777-8777-777777777777';
+    workflows.getRun = vi.fn().mockResolvedValue({
+      id: sourceRunId,
+      workflowId: WORKFLOW_ID,
+      status: 'COMPLETED',
+      scopeId,
+    });
+    workflows.getRunConfig = vi.fn().mockResolvedValue({
+      runId: sourceRunId,
+      workflowId: WORKFLOW_ID,
+      workflowVersionId: WORKFLOW_VERSION_ID,
+      workflowVersion: 1,
+      inputs: { target: 'old.example.com', apiKey: 'stored-secret' },
+    });
+    workflows.getCompiledWorkflowContext = vi.fn().mockResolvedValue({
+      workflow: { id: WORKFLOW_ID },
+      version: { id: WORKFLOW_VERSION_ID },
+      definition: {
+        entrypoint: { ref: 'entry' },
+        actions: [
+          {
+            ref: 'entry',
+            componentId: 'core.workflow.entrypoint',
+            params: {
+              runtimeInputs: [
+                { id: 'target', label: 'Target', type: 'text', required: true },
+                { id: 'apiKey', label: 'API key', type: 'secret', required: true },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const inputChanges = [
+      { operation: 'set' as const, inputId: 'target', value: 'new.example.com' },
+    ];
+
+    const proposal = await service.execute({
+      commandName: 'propose_run_input_changes',
+      arguments: { sourceRunId, changes: inputChanges },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+    expect(proposal.result).toEqual(
+      expect.objectContaining({
+        kind: 'run-input-proposal',
+        sourceRunId,
+        workflowId: WORKFLOW_ID,
+        versionId: WORKFLOW_VERSION_ID,
+        changes: [
+          expect.objectContaining({
+            inputId: 'target',
+            before: 'old.example.com',
+            after: 'new.example.com',
+          }),
+        ],
+      }),
+    );
+    expect(JSON.stringify(proposal.result)).not.toContain('stored-secret');
+
+    await service.execute({
+      commandName: 'run_workflow',
+      arguments: {
+        workflowId: WORKFLOW_ID,
+        versionId: WORKFLOW_VERSION_ID,
+        inputs: {},
+        sourceRunId,
+        inputChanges,
+      },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:02:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:03:00.000Z',
+    });
+    expect(workflows.run).toHaveBeenCalledWith(
+      WORKFLOW_ID,
+      {
+        inputs: { target: 'new.example.com', apiKey: 'stored-secret' },
+        versionId: WORKFLOW_VERSION_ID,
+        scopeId,
+      },
+      auth,
+      expect.any(Object),
+    );
+  });
+
+  it('rejects Operator changes to declared secret runtime inputs', async () => {
+    const sourceRunId = 'sentris-run-secret-source';
+    workflows.getRun = vi.fn().mockResolvedValue({
+      id: sourceRunId,
+      workflowId: WORKFLOW_ID,
+      status: 'COMPLETED',
+      scopeId: null,
+    });
+    workflows.getRunConfig = vi.fn().mockResolvedValue({
+      runId: sourceRunId,
+      workflowId: WORKFLOW_ID,
+      workflowVersionId: WORKFLOW_VERSION_ID,
+      workflowVersion: 1,
+      inputs: { apiKey: 'stored-secret' },
+    });
+    workflows.getCompiledWorkflowContext = vi.fn().mockResolvedValue({
+      workflow: { id: WORKFLOW_ID },
+      version: { id: WORKFLOW_VERSION_ID },
+      definition: {
+        entrypoint: { ref: 'entry' },
+        actions: [
+          {
+            ref: 'entry',
+            componentId: 'core.workflow.entrypoint',
+            params: {
+              runtimeInputs: [{ id: 'apiKey', label: 'API key', type: 'secret', required: true }],
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(
+      service.execute({
+        commandName: 'propose_run_input_changes',
+        arguments: {
+          sourceRunId,
+          changes: [{ operation: 'set', inputId: 'apiKey', value: 'replacement' }],
+        },
+        auth,
+        sessionId: SESSION_ID,
+        turnId: TURN_ID,
+        turnCreatedAt: '2026-08-02T10:00:00.000Z',
+        actionId: ACTION_ID,
+        actionRequestedAt: '2026-08-02T10:01:00.000Z',
+      }),
+    ).rejects.toThrow('is preserved and cannot be changed');
+    expect(workflows.run).not.toHaveBeenCalled();
+  });
+
   it('promotes an explicitly kept candidate version through the canonical workflow service', async () => {
     workflows.getRun = vi.fn().mockResolvedValue({
       id: 'sentris-run-candidate',

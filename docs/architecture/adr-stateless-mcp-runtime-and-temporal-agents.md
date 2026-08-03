@@ -106,7 +106,14 @@ The compact improvement pipeline is a frontend projection of the persisted journ
 action ledger; it owns no execution state, and reloads reconstruct the same stages. Embedded
 workflow progress and Agent turns remain projections of the canonical run trace.
 Terminal `get_run` results include separately bounded failure/recent trace evidence and run-scoped
-finding summaries. Ordinary run commands remain detached. An explicit `improve_run` journey
+finding summaries. For versions with a declared runtime-input contract, they also include the
+effective non-secret invocation values and opaque placeholders for secret inputs. Operator can
+turn that evidence into a bounded ID-based `propose_run_input_changes` action. The backend
+materializes and validates the proposal against the source run's exact immutable version; a
+separate user-confirmed `run_workflow` action applies only those reviewed operations while
+preserving stored secrets and the source scope server-side. Different-input verification runs
+remain deliberately ineligible for an apples-to-apples improvement verdict.
+Ordinary run commands remain detached. An explicit `improve_run` journey
 instead keeps one bounded turn durable while it diagnoses a terminal source run, proposes the
 smallest valid edit, applies it through the existing Ask/Auto policy, reruns the exact stored
 inputs and scope, and compares the terminal candidate. Candidate waiting uses one observation

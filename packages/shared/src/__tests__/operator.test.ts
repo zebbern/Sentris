@@ -86,6 +86,24 @@ describe('Operator run controls', () => {
         scopeId: '44444444-4444-4444-8444-444444444444',
       }).success,
     ).toBe(false);
+    expect(
+      OperatorRunWorkflowInputSchema.parse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        versionId: '33333333-3333-4333-8333-333333333333',
+        sourceRunId: 'sentris-run-original',
+        inputChanges: [{ operation: 'set', inputId: 'packageSpec', value: 'minimist@1.2.9' }],
+      }).inputChanges,
+    ).toEqual([{ operation: 'set', inputId: 'packageSpec', value: 'minimist@1.2.9' }]);
+    expect(
+      OperatorRunWorkflowInputSchema.safeParse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        versionId: '33333333-3333-4333-8333-333333333333',
+        inputChanges: [{ operation: 'unset', inputId: 'packageSpec' }],
+      }).success,
+    ).toBe(false);
+    expect(() =>
+      z.toJSONSchema(OPERATOR_COMMAND_DEFINITIONS.propose_run_input_changes.inputSchema),
+    ).not.toThrow();
   });
 
   it('keeps retry explicit and accepts only bounded direct run commands', () => {

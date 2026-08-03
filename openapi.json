@@ -19956,6 +19956,59 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 191
+                      },
+                      "inputChanges": {
+                        "minItems": 1,
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "operation": {
+                                  "type": "string",
+                                  "enum": [
+                                    "set"
+                                  ]
+                                },
+                                "inputId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 191
+                                },
+                                "value": {}
+                              },
+                              "required": [
+                                "operation",
+                                "inputId",
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "operation": {
+                                  "type": "string",
+                                  "enum": [
+                                    "unset"
+                                  ]
+                                },
+                                "inputId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 191
+                                }
+                              },
+                              "required": [
+                                "operation",
+                                "inputId"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
                       }
                     },
                     "required": [

@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TERMINAL_STATUSES, type OperatorCreateTurn } from '@sentris/shared';
-import { ExternalLink, GitCompareArrows, Loader2, RefreshCw, Search, Square } from 'lucide-react';
+import {
+  ExternalLink,
+  GitCompareArrows,
+  Loader2,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Square,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { AgentRunCard } from '@/components/timeline/agent-trace/AgentRunCard';
@@ -28,6 +36,7 @@ export interface OperatorRunCommandRequest {
 interface OperatorRunActivityProps {
   runId: string;
   sourceRunId?: string;
+  allowSourceComparison?: boolean;
   label?: string;
   disabled: boolean;
   onCommand: (request: OperatorRunCommandRequest) => void;
@@ -41,6 +50,7 @@ interface AgentEntry {
 export function OperatorRunActivity({
   runId,
   sourceRunId,
+  allowSourceComparison = true,
   label = 'Workflow run',
   disabled,
   onCommand,
@@ -187,7 +197,7 @@ export function OperatorRunActivity({
         ) : null}
         {status && TERMINAL_RUN_STATUSES.has(status) ? (
           <>
-            {sourceRunId ? (
+            {sourceRunId && allowSourceComparison ? (
               <Button
                 type="button"
                 size="sm"
@@ -223,6 +233,21 @@ export function OperatorRunActivity({
             >
               <Search className="h-3 w-3" />
               Improve with Operator
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1.5 px-2 text-[11px]"
+              disabled={disabled}
+              onClick={() =>
+                onCommand({
+                  message: `Propose a reviewed, schema-valid input-change rerun for ${runId}. Inspect its recorded evidence and exact immutable workflow version, change only justified non-secret declared inputs, and do not launch the run until I select Run with changes.`,
+                })
+              }
+            >
+              <SlidersHorizontal className="h-3 w-3" />
+              Change inputs
             </Button>
             <Button
               type="button"

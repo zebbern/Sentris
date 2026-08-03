@@ -7,7 +7,7 @@ import {
   FindingDataAvailabilitySchema,
   FindingObservationSeveritySchema,
 } from './findings/findingObservation.js';
-import type { McpOperationInvocationRequest } from './mcp-invocation.js';
+import type { JsonValue, McpOperationInvocationRequest } from './mcp-invocation.js';
 import {
   WorkflowEdgeSchema,
   WorkflowGraphObjectSchema,
@@ -452,6 +452,80 @@ export const OperatorListRunsInputSchema = z
 
 export const OperatorGetRunInputSchema = z.object({ runId: RunIdSchema }).strict();
 
+export const OPERATOR_RUN_INPUT_CHANGE_OPERATIONS = ['set', 'unset'] as const;
+export const OperatorRunInputChangeSchema = z.discriminatedUnion('operation', [
+  z
+    .object({
+      operation: z.literal('set'),
+      inputId: z.string().trim().min(1).max(191),
+      value: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('unset'),
+      inputId: z.string().trim().min(1).max(191),
+    })
+    .strict(),
+]);
+export type OperatorRunInputChange = z.infer<typeof OperatorRunInputChangeSchema>;
+
+export const OperatorRunInputChangesSchema = z
+  .array(OperatorRunInputChangeSchema)
+  .min(1)
+  .max(20)
+  .superRefine((changes, context) => {
+    const seen = new Set<string>();
+    for (const [index, change] of changes.entries()) {
+      if (seen.has(change.inputId)) {
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'inputId'],
+          message: `Duplicate runtime input change for "${change.inputId}"`,
+        });
+      }
+      seen.add(change.inputId);
+    }
+  });
+
+export const OperatorProposeRunInputChangesInputSchema = z
+  .object({
+    sourceRunId: RunIdSchema,
+    changes: OperatorRunInputChangesSchema,
+  })
+  .strict();
+
+export const OperatorRunInputChangeDiffSchema = z
+  .object({
+    operation: z.enum(OPERATOR_RUN_INPUT_CHANGE_OPERATIONS),
+    inputId: z.string().trim().min(1).max(191),
+    label: z.string().trim().min(1).max(191),
+    type: z.enum(['file', 'text', 'number', 'boolean', 'json', 'array']),
+    before: z.unknown().optional(),
+    after: z.unknown().optional(),
+  })
+  .strict();
+export type OperatorRunInputChangeDiff = Omit<
+  z.infer<typeof OperatorRunInputChangeDiffSchema>,
+  'before' | 'after'
+> & {
+  before?: JsonValue;
+  after?: JsonValue;
+};
+
+export const OperatorRunInputProposalResultSchema = z
+  .object({
+    kind: z.literal('run-input-proposal'),
+    sourceRunId: RunIdSchema,
+    workflowId: WorkflowIdSchema,
+    versionId: z.string().uuid(),
+    sourceScopePreserved: z.literal(true),
+    changes: z.array(OperatorRunInputChangeDiffSchema).min(1).max(20),
+    inputChanges: OperatorRunInputChangesSchema,
+  })
+  .strict();
+export type OperatorRunInputProposalResult = z.infer<typeof OperatorRunInputProposalResultSchema>;
+
 export const OperatorCompareRunsInputSchema = z
   .object({
     sourceRunId: RunIdSchema,
@@ -560,14 +634,24 @@ export const OperatorRunWorkflowInputSchema = z
     inputs: z.record(z.string(), z.unknown()).default({}),
     scopeId: z.string().uuid().optional(),
     sourceRunId: RunIdSchema.optional(),
+    inputChanges: OperatorRunInputChangesSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
-    if (!value.sourceRunId) return;
+    if (!value.sourceRunId) {
+      if (value.inputChanges) {
+        context.addIssue({
+          code: 'custom',
+          message: 'inputChanges requires sourceRunId',
+          path: ['inputChanges'],
+        });
+      }
+      return;
+    }
     if (Object.keys(value.inputs).length > 0) {
       context.addIssue({
         code: 'custom',
-        message: 'inputs must be empty when sourceRunId reuses the source run inputs',
+        message: 'inputs must be empty when sourceRunId reuses or changes source run inputs',
         path: ['inputs'],
       });
     }
@@ -722,9 +806,15 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
     effect: 'read',
     inputSchema: OperatorCompareRunsInputSchema,
   },
+  propose_run_input_changes: {
+    description:
+      'Validate a bounded set of ID-based runtime-input changes against the exact immutable version and stored inputs of a terminal source run. Secret inputs are always preserved and cannot be changed. This only creates a reviewable proposal; it does not launch a run.',
+    effect: 'execute',
+    inputSchema: OperatorProposeRunInputChangesInputSchema,
+  },
   run_workflow: {
     description:
-      'Run an existing workflow version with runtime inputs keyed by the exact IDs returned from get_workflow. Pass its returned immutable versionId, and use only when the user explicitly asks to run it.',
+      'Run an existing workflow version with runtime inputs keyed by the exact IDs returned from get_workflow. Pass its returned immutable versionId. To run a reviewed input-change proposal, pass its sourceRunId and inputChanges while leaving inputs empty; stored secret inputs and source scope are preserved server-side. Use only when the user explicitly asks to run it.',
     effect: 'execute',
     inputSchema: OperatorRunWorkflowInputSchema,
   },
@@ -815,6 +905,7 @@ export type OperatorCommandInputMap = {
   list_runs: z.infer<typeof OperatorListRunsInputSchema>;
   get_run: z.infer<typeof OperatorGetRunInputSchema>;
   compare_runs: z.infer<typeof OperatorCompareRunsInputSchema>;
+  propose_run_input_changes: z.infer<typeof OperatorProposeRunInputChangesInputSchema>;
   run_workflow: z.infer<typeof OperatorRunWorkflowInputSchema>;
   cancel_run: z.infer<typeof OperatorCancelRunInputSchema>;
   retry_run: z.infer<typeof OperatorRetryRunInputSchema>;

@@ -1,22 +1,30 @@
 import { isDeepStrictEqual } from 'node:util';
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 
 import {
   OPERATOR_COMMAND_DEFINITIONS,
+  JsonValueSchema,
   OperatorRunComparisonResultSchema,
+  OperatorRunInputProposalResultSchema,
   OperatorWorkflowPromotionResultSchema,
   MCP_CAPABILITY_CONTRACT_VERSION,
   McpOperationSchema,
   TERMINAL_STATUSES,
   describeWorkflowRuntimeInputs,
   extractWorkflowRuntimeInputDefinitions,
+  formatWorkflowRuntimeInputValidationError,
+  hasWorkflowRuntimeInputDefault,
+  validateWorkflowRuntimeInputs,
+  type JsonValue,
   type McpOperation,
   type McpOperationInvocationRequest,
   type OperatorCommandInputMap,
   type OperatorCommandName,
   type OperatorRunComparisonAssessment,
   type OperatorRunComparisonEvidence,
+  type OperatorRunInputChange,
   type TraceEventPayload,
+  type WorkflowRuntimeInputDefinition,
   type WorkflowSuccessCriterion,
   type WorkflowGraph,
 } from '@sentris/shared';
@@ -73,6 +81,83 @@ function toBoundedJson(value: unknown, maxCharacters = MAX_COMMAND_RESULT_CHARS)
     originalCharacters: serialized.length,
     preview: serialized.slice(0, maxCharacters),
   };
+}
+
+function effectiveRuntimeInputValue(
+  definition: WorkflowRuntimeInputDefinition,
+  inputs: Record<string, unknown>,
+): unknown {
+  const supplied = inputs[definition.id];
+  if ((supplied === undefined || supplied === null) && hasWorkflowRuntimeInputDefault(definition)) {
+    return definition.defaultValue;
+  }
+  return supplied;
+}
+
+function optionalJsonValue(value: unknown): JsonValue | undefined {
+  if (value === undefined) return undefined;
+  return JsonValueSchema.parse(value);
+}
+
+function materializeRunInputChanges(input: {
+  definitions: WorkflowRuntimeInputDefinition[];
+  sourceInputs: Record<string, unknown>;
+  changes: OperatorRunInputChange[];
+}): {
+  inputs: Record<string, unknown>;
+  diffs: {
+    operation: OperatorRunInputChange['operation'];
+    inputId: string;
+    label: string;
+    type: Exclude<WorkflowRuntimeInputDefinition['type'], 'secret'>;
+    before?: JsonValue;
+    after?: JsonValue;
+  }[];
+} {
+  const definitionsById = new Map(
+    input.definitions.map((definition) => [definition.id, definition]),
+  );
+  const inputs = { ...input.sourceInputs };
+  const diffs = [];
+
+  for (const change of input.changes) {
+    const definition = definitionsById.get(change.inputId);
+    if (!definition) {
+      throw new BadRequestException(`Unknown workflow runtime input "${change.inputId}"`);
+    }
+    if (definition.type === 'secret') {
+      throw new BadRequestException(
+        `Secret workflow runtime input "${change.inputId}" is preserved and cannot be changed by Operator`,
+      );
+    }
+
+    const before = optionalJsonValue(effectiveRuntimeInputValue(definition, inputs));
+    if (change.operation === 'set') {
+      inputs[change.inputId] = JsonValueSchema.parse(change.value);
+    } else {
+      Reflect.deleteProperty(inputs, change.inputId);
+    }
+    const after = optionalJsonValue(effectiveRuntimeInputValue(definition, inputs));
+    if (isDeepStrictEqual(before, after)) continue;
+
+    diffs.push({
+      operation: change.operation,
+      inputId: change.inputId,
+      label: definition.label,
+      type: definition.type,
+      ...(before !== undefined ? { before } : {}),
+      ...(after !== undefined ? { after } : {}),
+    });
+  }
+
+  const validation = validateWorkflowRuntimeInputs(input.definitions, inputs);
+  if (!validation.valid) {
+    throw new BadRequestException(formatWorkflowRuntimeInputValidationError(validation));
+  }
+  if (diffs.length === 0) {
+    throw new BadRequestException('The proposed runtime-input operations do not change the run');
+  }
+  return { inputs, diffs };
 }
 
 function truncateEvidenceText(value: string | undefined): string | undefined {
@@ -262,6 +347,11 @@ export class OperatorCommandService {
       case 'compare_runs':
         return this.compareRuns(
           OPERATOR_COMMAND_DEFINITIONS.compare_runs.inputSchema.parse(input.arguments),
+          input.auth,
+        );
+      case 'propose_run_input_changes':
+        return this.proposeRunInputChanges(
+          OPERATOR_COMMAND_DEFINITIONS.propose_run_input_changes.inputSchema.parse(input.arguments),
           input.auth,
         );
       case 'run_workflow':
@@ -516,10 +606,11 @@ export class OperatorCommandService {
       return { result: toBoundedJson({ run, status, terminal }) };
     }
 
-    const [result, trace, findings] = await Promise.all([
+    const [result, trace, findings, invocation] = await Promise.all([
       this.workflowsService.getRunResult(input.runId, run.temporalRunId, auth),
       this.getRunTraceEvidence(input.runId, auth),
       this.getRunFindingEvidence(input.runId, auth),
+      this.getRunInputInspection(input.runId, auth),
     ]);
     return {
       result: toBoundedJson({
@@ -528,6 +619,113 @@ export class OperatorCommandService {
         terminal,
         result: toBoundedJson(result, MAX_RUN_RESULT_CHARS),
         diagnostics: { trace, findings },
+        invocation,
+      }),
+    };
+  }
+
+  private async getRunInputInspection(
+    runId: string,
+    auth: AuthContext,
+  ): Promise<Record<string, unknown>> {
+    try {
+      const config = await this.workflowsService.getRunConfig(runId, auth);
+      if (!config.workflowVersionId) {
+        return {
+          available: false,
+          reason: 'The run does not reference an immutable workflow version',
+        };
+      }
+      const { definition } = await this.workflowsService.getCompiledWorkflowContext(
+        config.workflowId,
+        { versionId: config.workflowVersionId },
+        auth,
+      );
+      const definitions = extractWorkflowRuntimeInputDefinitions(definition);
+      if (definitions.length === 0) {
+        return {
+          available: false,
+          versionId: config.workflowVersionId,
+          reason: 'The workflow version does not declare a runtime-input contract',
+        };
+      }
+
+      const inputs: Record<string, JsonValue> = {};
+      for (const definition of definitions) {
+        const value = effectiveRuntimeInputValue(definition, config.inputs);
+        if (value === undefined) continue;
+        inputs[definition.id] =
+          definition.type === 'secret'
+            ? OPERATOR_PRESERVE_CREDENTIAL
+            : JsonValueSchema.parse(value);
+      }
+      return {
+        available: true,
+        versionId: config.workflowVersionId,
+        runtimeInputs: describeWorkflowRuntimeInputs(definitions),
+        inputs,
+        credentialPlaceholder: OPERATOR_PRESERVE_CREDENTIAL,
+      };
+    } catch (error: unknown) {
+      return {
+        available: false,
+        reason: errorMessage(error),
+      };
+    }
+  }
+
+  private async loadSourceRunInputContext(sourceRunId: string, auth: AuthContext) {
+    const [sourceRun, config] = await Promise.all([
+      this.workflowsService.getRun(sourceRunId, auth),
+      this.workflowsService.getRunConfig(sourceRunId, auth),
+    ]);
+    if (!(TERMINAL_STATUSES as readonly string[]).includes(sourceRun.status)) {
+      throw new ConflictException(
+        `Workflow run ${sourceRunId} is still ${sourceRun.status}; wait for it to finish before changing its inputs`,
+      );
+    }
+    if (config.workflowId !== sourceRun.workflowId) {
+      throw new ConflictException(`Workflow run ${sourceRunId} has inconsistent stored config`);
+    }
+    if (!config.workflowVersionId) {
+      throw new ConflictException(
+        `Workflow run ${sourceRunId} does not reference an immutable workflow version`,
+      );
+    }
+
+    const { definition } = await this.workflowsService.getCompiledWorkflowContext(
+      config.workflowId,
+      { versionId: config.workflowVersionId },
+      auth,
+    );
+    const definitions = extractWorkflowRuntimeInputDefinitions(definition);
+    if (definitions.length === 0) {
+      throw new BadRequestException(
+        `Workflow run ${sourceRunId} has no declared runtime-input contract to validate`,
+      );
+    }
+    return { sourceRun, config, definitions };
+  }
+
+  private async proposeRunInputChanges(
+    input: OperatorCommandInputMap['propose_run_input_changes'],
+    auth: AuthContext,
+  ): Promise<{ result: unknown }> {
+    const { config, definitions } = await this.loadSourceRunInputContext(input.sourceRunId, auth);
+    const proposal = materializeRunInputChanges({
+      definitions,
+      sourceInputs: config.inputs,
+      changes: input.changes,
+    });
+    return {
+      result: OperatorRunInputProposalResultSchema.parse({
+        kind: 'run-input-proposal',
+        sourceRunId: input.sourceRunId,
+        workflowId: config.workflowId,
+        versionId: config.workflowVersionId,
+        sourceScopePreserved: true,
+        changes: proposal.diffs,
+        inputChanges: input.changes,
       }),
     };
   }
@@ -787,7 +985,25 @@ export class OperatorCommandService {
           `Workflow run ${input.sourceRunId} does not belong to workflow ${input.workflowId}`,
         );
       }
-      inputs = sourceConfig.inputs;
+      if (input.inputChanges) {
+        if (sourceConfig.workflowVersionId !== input.versionId) {
+          throw new ConflictException(
+            `Input-change reruns must use the source run's immutable workflow version ${sourceConfig.workflowVersionId ?? 'unknown'}`,
+          );
+        }
+        const { definition } = await this.workflowsService.getCompiledWorkflowContext(
+          input.workflowId,
+          { versionId: input.versionId },
+          auth,
+        );
+        inputs = materializeRunInputChanges({
+          definitions: extractWorkflowRuntimeInputDefinitions(definition),
+          sourceInputs: sourceConfig.inputs,
+          changes: input.inputChanges,
+        }).inputs;
+      } else {
+        inputs = sourceConfig.inputs;
+      }
       scopeId = sourceRun.scopeId ?? undefined;
     }
 
@@ -812,6 +1028,7 @@ export class OperatorCommandService {
       result: toBoundedJson({
         ...run,
         ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
+        ...(input.inputChanges ? { inputChanges: input.inputChanges } : {}),
       }),
       runId: run.runId,
     };
