@@ -120,10 +120,7 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   // Handle ZodNullable
   if (typeName === 'nullable') {
     return {
-      anyOf: [
-        zodToJsonSchema((def as any).innerType),
-        { type: 'null' },
-      ],
+      anyOf: [zodToJsonSchema((def as any).innerType), { type: 'null' }],
     };
   }
 
@@ -135,7 +132,8 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   }
 
   if (typeName === 'effects' || typeName === 'pipe') {
-    const next = (def as any).out ?? (def as any).schema ?? (def as any).innerType ?? (def as any).in;
+    const next =
+      (def as any).out ?? (def as any).schema ?? (def as any).innerType ?? (def as any).in;
     if (next) {
       return zodToJsonSchema(next);
     }
@@ -144,5 +142,3 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   // Fallback: treat as unknown
   return {};
 }
-
-

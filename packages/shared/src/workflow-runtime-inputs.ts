@@ -44,9 +44,7 @@ export const WorkflowRuntimeInputDefinitionsSchema = z
     }
   });
 
-export type WorkflowRuntimeInputDefinition = z.infer<
-  typeof WorkflowRuntimeInputDefinitionSchema
->;
+export type WorkflowRuntimeInputDefinition = z.infer<typeof WorkflowRuntimeInputDefinitionSchema>;
 
 export interface WorkflowRuntimeInputDescriptor {
   id: string;
@@ -131,9 +129,7 @@ export function describeWorkflowRuntimeInputs(
   }));
 }
 
-export function workflowRuntimeInputValueSchema(
-  type: WorkflowRuntimeInputType,
-): z.ZodTypeAny {
+export function workflowRuntimeInputValueSchema(type: WorkflowRuntimeInputType): z.ZodTypeAny {
   switch (type) {
     case 'number':
       return z.number();

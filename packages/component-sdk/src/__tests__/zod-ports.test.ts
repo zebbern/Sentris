@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { z } from 'zod';
-import {
-  deriveConnectionType,
-  extractPorts,
-} from '../zod-ports';
+import { deriveConnectionType, extractPorts } from '../zod-ports';
 import { withPortMeta } from '../port-meta';
 import type { ConnectionType } from '../types';
 
@@ -111,15 +108,15 @@ describe('deriveConnectionType', () => {
     });
 
     it('derives nested records', () => {
-      expect(
-        deriveConnectionType(z.record(z.string(), z.record(z.string(), z.boolean()))),
-      ).toEqual({
-        kind: 'map',
-        element: {
+      expect(deriveConnectionType(z.record(z.string(), z.record(z.string(), z.boolean())))).toEqual(
+        {
           kind: 'map',
-          element: { kind: 'primitive', name: 'boolean' },
+          element: {
+            kind: 'map',
+            element: { kind: 'primitive', name: 'boolean' },
+          },
         },
-      });
+      );
     });
   });
 

@@ -78,8 +78,8 @@ export function inferBindingType(port: ComponentPortMetadata): PortBindingType {
 export function getCredentialInputIds(component: ComponentDefinition): string[] {
   const inputs = extractPorts(component.inputs);
   return inputs
-    .filter(input => inferBindingType(input) === 'credential')
-    .map(input => input.id);
+    .filter((input) => inferBindingType(input) === 'credential')
+    .map((input) => input.id);
 }
 
 /**
@@ -88,9 +88,7 @@ export function getCredentialInputIds(component: ComponentDefinition): string[] 
  */
 export function getActionInputIds(component: ComponentDefinition): string[] {
   const inputs = extractPorts(component.inputs);
-  return inputs
-    .filter(input => inferBindingType(input) === 'action')
-    .map(input => input.id);
+  return inputs.filter((input) => inferBindingType(input) === 'action').map((input) => input.id);
 }
 
 /**
@@ -131,10 +129,7 @@ export function getExposedParameterIds(component: ComponentDefinition): string[]
 /**
  * Pick specific keys from an object.
  */
-function pick<T extends Record<string, unknown>, K extends string>(
-  obj: T,
-  keys: K[]
-): Pick<T, K> {
+function pick<T extends Record<string, unknown>, K extends string>(obj: T, keys: K[]): Pick<T, K> {
   const result = {} as Pick<T, K>;
   for (const key of keys) {
     if (key in obj) {
@@ -235,12 +230,12 @@ export function getToolSchema(component: ComponentDefinition): ToolInputSchema {
   // 3. Filter properties to only include action inputs
   const filteredProperties = pick(
     (fullSchema.properties ?? {}) as Record<string, unknown>,
-    actionInputIds
+    actionInputIds,
   );
 
   // 4. Filter required array
   const filteredRequired = (fullSchema.required ?? []).filter((id: string) =>
-    actionInputIds.includes(id)
+    actionInputIds.includes(id),
   );
 
   // 5. Add descriptions from port metadata
@@ -272,11 +267,11 @@ export function getToolSchema(component: ComponentDefinition): ToolInputSchema {
 
     const paramProperties = pick(
       (paramSchema.properties ?? {}) as Record<string, unknown>,
-      exposedParamIds
+      exposedParamIds,
     );
 
     const paramRequired = (paramSchema.required ?? []).filter((id: string) =>
-      exposedParamIds.includes(id)
+      exposedParamIds.includes(id),
     );
 
     // Avoid collisions: inputs take precedence

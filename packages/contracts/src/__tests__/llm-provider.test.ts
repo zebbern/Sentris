@@ -2,10 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { getPortMeta } from '@sentris/component-sdk';
 import { LLM_PROVIDER_CATALOG, LLM_PROVIDER_IDS } from '@sentris/shared';
 
-import {
-  llmProviderContractName,
-  LLMProviderSchema,
-} from '../index';
+import { llmProviderContractName, LLMProviderSchema } from '../index';
 
 describe('LLMProviderSchema', () => {
   const schema = LLMProviderSchema();
@@ -136,9 +133,7 @@ describe('LLMProviderSchema', () => {
 
   describe('rejection cases', () => {
     it('rejects unknown provider', () => {
-      expect(() =>
-        schema.parse({ provider: 'unknown-provider', modelId: 'model' }),
-      ).toThrow();
+      expect(() => schema.parse({ provider: 'unknown-provider', modelId: 'model' })).toThrow();
     });
 
     it('rejects missing provider field', () => {

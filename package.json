@@ -67,8 +67,8 @@
     "lint:contracts": "bun --cwd=packages/contracts run lint",
     "lint:component-sdk": "bun --cwd=packages/component-sdk run lint",
     "lint:backend-client": "bun --cwd=packages/backend-client run lint",
-    "format:check": "prettier \"frontend/src/**/*.{ts,tsx}\" \"frontend/*.{ts,tsx}\" \"backend/**/*.ts\" \"worker/src/**/*.ts\" --check --cache --cache-location .cache/prettier/.prettier-cache --cache-strategy content",
-    "format": "prettier \"frontend/src/**/*.{ts,tsx}\" \"frontend/*.{ts,tsx}\" \"backend/**/*.ts\" \"worker/src/**/*.ts\" --write --cache --cache-location .cache/prettier/.prettier-cache --cache-strategy content",
+    "format:check": "prettier \"frontend/src/**/*.{ts,tsx}\" \"frontend/*.{ts,tsx}\" \"backend/**/*.ts\" \"worker/src/**/*.ts\" \"packages/**/*.ts\" --check --cache --cache-location .cache/prettier/.prettier-cache --cache-strategy content",
+    "format": "prettier \"frontend/src/**/*.{ts,tsx}\" \"frontend/*.{ts,tsx}\" \"backend/**/*.ts\" \"worker/src/**/*.ts\" \"packages/**/*.ts\" --write --cache --cache-location .cache/prettier/.prettier-cache --cache-strategy content",
     "lint:fix": "bun run lint:frontend --fix && bun run lint:backend --fix && bun run lint:worker --fix && bun run lint:shared --fix && bun run lint:contracts --fix && bun run lint:component-sdk --fix && bun run lint:backend-client --fix && bun run format",
     "release:sync-versions": "bun scripts/sync-versions.ts",
     "prepare": "husky"

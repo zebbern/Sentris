@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { getPortMeta } from '@sentris/component-sdk';
 
-import {
-  mcpToolContractName,
-  McpToolArgumentSchema,
-  McpToolDefinitionSchema,
-} from '../index';
+import { mcpToolContractName, McpToolArgumentSchema, McpToolDefinitionSchema } from '../index';
 
 describe('McpToolArgumentSchema', () => {
   it('parses valid input with defaults applied', () => {
@@ -47,15 +43,11 @@ describe('McpToolArgumentSchema', () => {
   });
 
   it('rejects empty enum array', () => {
-    expect(() =>
-      McpToolArgumentSchema.parse({ name: 'severity', enum: [] }),
-    ).toThrow();
+    expect(() => McpToolArgumentSchema.parse({ name: 'severity', enum: [] })).toThrow();
   });
 
   it('rejects invalid type value', () => {
-    expect(() =>
-      McpToolArgumentSchema.parse({ name: 'field', type: 'array' }),
-    ).toThrow();
+    expect(() => McpToolArgumentSchema.parse({ name: 'field', type: 'array' })).toThrow();
   });
 
   it('accepts all valid type values', () => {
@@ -95,21 +87,15 @@ describe('McpToolDefinitionSchema', () => {
   });
 
   it('rejects empty id', () => {
-    expect(() =>
-      schema.parse({ id: '', title: 'T', endpoint: 'https://e.com' }),
-    ).toThrow();
+    expect(() => schema.parse({ id: '', title: 'T', endpoint: 'https://e.com' })).toThrow();
   });
 
   it('rejects empty title', () => {
-    expect(() =>
-      schema.parse({ id: 't', title: '', endpoint: 'https://e.com' }),
-    ).toThrow();
+    expect(() => schema.parse({ id: 't', title: '', endpoint: 'https://e.com' })).toThrow();
   });
 
   it('rejects empty endpoint', () => {
-    expect(() =>
-      schema.parse({ id: 't', title: 'T', endpoint: '' }),
-    ).toThrow();
+    expect(() => schema.parse({ id: 't', title: 'T', endpoint: '' })).toThrow();
   });
 
   it('rejects missing required fields', () => {

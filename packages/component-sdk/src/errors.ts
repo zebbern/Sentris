@@ -420,10 +420,7 @@ export class HttpError extends ComponentError {
  * @param body - Optional response body (if already read)
  * @returns The appropriate ComponentError subclass
  */
-export function fromHttpResponse(
-  response: Response,
-  body?: string,
-): ComponentError {
+export function fromHttpResponse(response: Response, body?: string): ComponentError {
   const status = response.status;
   const message = body || response.statusText || `HTTP ${status}`;
   const details = {
@@ -522,9 +519,7 @@ export function wrapError(error: unknown, context?: string): ComponentError {
 
   // Standard Error - try to classify
   if (error instanceof Error) {
-    const message = context
-      ? `${context}: ${error.message}`
-      : error.message;
+    const message = context ? `${context}: ${error.message}` : error.message;
 
     // Check for common network error patterns
     if (
@@ -553,9 +548,7 @@ export function wrapError(error: unknown, context?: string): ComponentError {
   }
 
   // Unknown error type
-  const message = context
-    ? `${context}: ${String(error)}`
-    : String(error);
+  const message = context ? `${context}: ${String(error)}` : String(error);
   return new ServiceError(message);
 }
 
@@ -591,9 +584,6 @@ export const RETRYABLE_ERROR_TYPES = [
 /**
  * All component error type names.
  */
-export const ALL_ERROR_TYPES = [
-  ...RETRYABLE_ERROR_TYPES,
-  ...NON_RETRYABLE_ERROR_TYPES,
-] as const;
+export const ALL_ERROR_TYPES = [...RETRYABLE_ERROR_TYPES, ...NON_RETRYABLE_ERROR_TYPES] as const;
 
 export type ErrorTypeName = (typeof ALL_ERROR_TYPES)[number];

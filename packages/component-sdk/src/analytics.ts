@@ -27,7 +27,7 @@ export const analyticsResultSchema = () =>
           .describe('Primary asset identifier (auto-detected if missing)'),
       })
       .passthrough(), // Allow scanner-specific fields
-    { schemaName: analyticsResultContractName }
+    { schemaName: analyticsResultContractName },
   );
 
 export type AnalyticsResult = z.infer<ReturnType<typeof analyticsResultSchema>>;
@@ -56,11 +56,13 @@ export type Severity = z.infer<typeof severitySchema>;
  * const hash = generateFindingHash(check.check_id, projectRef, check.resource);
  * ```
  */
-export function generateFindingHash(
-  ...fields: (string | undefined | null)[]
-): string {
+export function generateFindingHash(...fields: (string | undefined | null)[]): string {
   const normalized = fields
-    .map((f) => String(f ?? '').toLowerCase().trim())
+    .map((f) =>
+      String(f ?? '')
+        .toLowerCase()
+        .trim(),
+    )
     .join('|');
   return createHash('sha256').update(normalized).digest('hex').slice(0, 16);
 }

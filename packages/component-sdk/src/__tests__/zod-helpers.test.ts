@@ -247,7 +247,10 @@ describe('isOptional', () => {
 
   it('returns false for optional hidden inside a transform pipeline', () => {
     // In Zod v4, .transform() creates a ZodPipeline whose output hides the inner optional
-    const schema = z.string().optional().transform((v) => v ?? 'default');
+    const schema = z
+      .string()
+      .optional()
+      .transform((v) => v ?? 'default');
     expect(isOptional(schema)).toBe(false);
   });
 

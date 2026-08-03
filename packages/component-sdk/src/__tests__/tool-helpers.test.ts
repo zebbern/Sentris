@@ -18,7 +18,7 @@ import type { ComponentDefinition, ComponentPortMetadata } from '../types';
 
 // Helper to create a minimal component definition
 function createComponent(
-  overrides: Partial<ComponentDefinition<any, any, any>> = {}
+  overrides: Partial<ComponentDefinition<any, any, any>> = {},
 ): ComponentDefinition<any, any, any> {
   return {
     id: 'test.component',
@@ -107,7 +107,12 @@ describe('tool-helpers', () => {
         inputs: inputs({
           apiKey: port(z.string(), { label: 'API Key', editor: 'secret' }),
           target: port(z.string(), { label: 'Target' }),
-          awsCreds: port(z.any(), { label: 'AWS', isCredential: true, schemaName: 'aws', allowAny: true }),
+          awsCreds: port(z.any(), {
+            label: 'AWS',
+            isCredential: true,
+            schemaName: 'aws',
+            allowAny: true,
+          }),
         }),
       });
       const credIds = getCredentialInputIds(component);

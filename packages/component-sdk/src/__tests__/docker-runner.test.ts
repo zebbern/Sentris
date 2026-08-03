@@ -14,10 +14,8 @@ const dockerAvailable = (() => {
   }
 })();
 
-const dockerDescribe =
-  enableDockerRunnerTests && dockerAvailable ? describe : describe.skip;
-const dockerTest =
-  enableDockerRunnerTests && dockerAvailable ? test : test.skip;
+const dockerDescribe = enableDockerRunnerTests && dockerAvailable ? describe : describe.skip;
+const dockerTest = enableDockerRunnerTests && dockerAvailable ? test : test.skip;
 
 dockerDescribe('Docker Runner', () => {
   let context: ExecutionContext;
@@ -72,8 +70,8 @@ dockerDescribe('Docker Runner', () => {
     );
 
     expect(result).toBe('Hello from Docker!');
-    expect(logs.some(log => log.includes(BUSYBOX_IMAGE))).toBe(true);
-    expect(logs.some(log => log.includes('Completed successfully'))).toBe(true);
+    expect(logs.some((log) => log.includes(BUSYBOX_IMAGE))).toBe(true);
+    expect(logs.some((log) => log.includes('Completed successfully'))).toBe(true);
   });
 
   dockerTest('should handle JSON output from container', async () => {
@@ -136,44 +134,50 @@ dockerDescribe('Docker Runner', () => {
       throw new Error('Should not be called');
     };
 
-    await expect(
-      runComponentWithRunner(runner, dummyExecute, params, context),
-    ).rejects.toThrow('exit code 1');
+    await expect(runComponentWithRunner(runner, dummyExecute, params, context)).rejects.toThrow(
+      'exit code 1',
+    );
   });
 
-  dockerTest('should timeout long-running containers', async () => {
-    const runner: DockerRunnerConfig = {
-      kind: 'docker',
-      image: BUSYBOX_IMAGE,
-      command: ['/bin/sh', '-c', 'sleep 10'],
-      timeoutSeconds: 1, // 1 second timeout
-    };
+  dockerTest(
+    'should timeout long-running containers',
+    async () => {
+      const runner: DockerRunnerConfig = {
+        kind: 'docker',
+        image: BUSYBOX_IMAGE,
+        command: ['/bin/sh', '-c', 'sleep 10'],
+        timeoutSeconds: 1, // 1 second timeout
+      };
 
-    const params = {};
-    const dummyExecute = async () => {
-      throw new Error('Should not be called');
-    };
+      const params = {};
+      const dummyExecute = async () => {
+        throw new Error('Should not be called');
+      };
 
-    await expect(
-      runComponentWithRunner(runner, dummyExecute, params, context),
-    ).rejects.toThrow('timed out');
-  }, 5000); // Test timeout
+      await expect(runComponentWithRunner(runner, dummyExecute, params, context)).rejects.toThrow(
+        'timed out',
+      );
+    },
+    5000,
+  ); // Test timeout
 
-  dockerTest('should handle non-existent Docker images', async () => {
-    const runner: DockerRunnerConfig = {
-      kind: 'docker',
-      image: 'this-image-does-not-exist-12345:latest',
-      command: ['echo', 'hello'],
-      timeoutSeconds: 30,
-    };
+  dockerTest(
+    'should handle non-existent Docker images',
+    async () => {
+      const runner: DockerRunnerConfig = {
+        kind: 'docker',
+        image: 'this-image-does-not-exist-12345:latest',
+        command: ['echo', 'hello'],
+        timeoutSeconds: 30,
+      };
 
-    const params = {};
-    const dummyExecute = async () => {
-      throw new Error('Should not be called');
-    };
+      const params = {};
+      const dummyExecute = async () => {
+        throw new Error('Should not be called');
+      };
 
-    await expect(
-      runComponentWithRunner(runner, dummyExecute, params, context),
-    ).rejects.toThrow();
-  }, 10000); // Give it time to fail
+      await expect(runComponentWithRunner(runner, dummyExecute, params, context)).rejects.toThrow();
+    },
+    10000,
+  ); // Give it time to fail
 });

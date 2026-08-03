@@ -11,37 +11,57 @@ import {
 describe('canConnect', () => {
   describe('primitive compatibility', () => {
     it('same type connects', () => {
-      expect(canConnect({ kind: 'primitive', name: 'text' }, { kind: 'primitive', name: 'text' })).toBe(true);
-      expect(canConnect({ kind: 'primitive', name: 'number' }, { kind: 'primitive', name: 'number' })).toBe(true);
-      expect(canConnect({ kind: 'primitive', name: 'boolean' }, { kind: 'primitive', name: 'boolean' })).toBe(true);
+      expect(
+        canConnect({ kind: 'primitive', name: 'text' }, { kind: 'primitive', name: 'text' }),
+      ).toBe(true);
+      expect(
+        canConnect({ kind: 'primitive', name: 'number' }, { kind: 'primitive', name: 'number' }),
+      ).toBe(true);
+      expect(
+        canConnect({ kind: 'primitive', name: 'boolean' }, { kind: 'primitive', name: 'boolean' }),
+      ).toBe(true);
     });
 
     it('number → text coerces', () => {
-      expect(canConnect({ kind: 'primitive', name: 'number' }, { kind: 'primitive', name: 'text' })).toBe(true);
+      expect(
+        canConnect({ kind: 'primitive', name: 'number' }, { kind: 'primitive', name: 'text' }),
+      ).toBe(true);
     });
 
     it('boolean → text coerces', () => {
-      expect(canConnect({ kind: 'primitive', name: 'boolean' }, { kind: 'primitive', name: 'text' })).toBe(true);
+      expect(
+        canConnect({ kind: 'primitive', name: 'boolean' }, { kind: 'primitive', name: 'text' }),
+      ).toBe(true);
     });
 
     it('text → number coerces', () => {
-      expect(canConnect({ kind: 'primitive', name: 'text' }, { kind: 'primitive', name: 'number' })).toBe(true);
+      expect(
+        canConnect({ kind: 'primitive', name: 'text' }, { kind: 'primitive', name: 'number' }),
+      ).toBe(true);
     });
 
     it('text → boolean coerces', () => {
-      expect(canConnect({ kind: 'primitive', name: 'text' }, { kind: 'primitive', name: 'boolean' })).toBe(true);
+      expect(
+        canConnect({ kind: 'primitive', name: 'text' }, { kind: 'primitive', name: 'boolean' }),
+      ).toBe(true);
     });
 
     it('number → boolean does not coerce', () => {
-      expect(canConnect({ kind: 'primitive', name: 'number' }, { kind: 'primitive', name: 'boolean' })).toBe(false);
+      expect(
+        canConnect({ kind: 'primitive', name: 'number' }, { kind: 'primitive', name: 'boolean' }),
+      ).toBe(false);
     });
 
     it('boolean → number does not coerce', () => {
-      expect(canConnect({ kind: 'primitive', name: 'boolean' }, { kind: 'primitive', name: 'number' })).toBe(false);
+      expect(
+        canConnect({ kind: 'primitive', name: 'boolean' }, { kind: 'primitive', name: 'number' }),
+      ).toBe(false);
     });
 
     it('secret → text does not coerce', () => {
-      expect(canConnect({ kind: 'primitive', name: 'secret' }, { kind: 'primitive', name: 'text' })).toBe(false);
+      expect(
+        canConnect({ kind: 'primitive', name: 'secret' }, { kind: 'primitive', name: 'text' }),
+      ).toBe(false);
     });
   });
 
@@ -53,7 +73,9 @@ describe('canConnect', () => {
 
     it('anything connects to any target', () => {
       expect(canConnect({ kind: 'primitive', name: 'text' }, { kind: 'any' })).toBe(true);
-      expect(canConnect({ kind: 'list', element: { kind: 'primitive', name: 'text' } }, { kind: 'any' })).toBe(true);
+      expect(
+        canConnect({ kind: 'list', element: { kind: 'primitive', name: 'text' } }, { kind: 'any' }),
+      ).toBe(true);
     });
 
     it('any connects to any', () => {
@@ -63,11 +85,15 @@ describe('canConnect', () => {
 
   describe('contract compatibility', () => {
     it('same contract name connects', () => {
-      expect(canConnect({ kind: 'contract', name: 'api-key' }, { kind: 'contract', name: 'api-key' })).toBe(true);
+      expect(
+        canConnect({ kind: 'contract', name: 'api-key' }, { kind: 'contract', name: 'api-key' }),
+      ).toBe(true);
     });
 
     it('different contract names do not connect', () => {
-      expect(canConnect({ kind: 'contract', name: 'api-key' }, { kind: 'contract', name: 'db-cred' })).toBe(false);
+      expect(
+        canConnect({ kind: 'contract', name: 'api-key' }, { kind: 'contract', name: 'db-cred' }),
+      ).toBe(false);
     });
 
     it('credential flag must match', () => {
@@ -180,7 +206,9 @@ describe('canConnect', () => {
 
   describe('cross-kind incompatibility', () => {
     it('primitive does not connect to contract', () => {
-      expect(canConnect({ kind: 'primitive', name: 'text' }, { kind: 'contract', name: 'text' })).toBe(false);
+      expect(
+        canConnect({ kind: 'primitive', name: 'text' }, { kind: 'contract', name: 'text' }),
+      ).toBe(false);
     });
 
     it('contract does not connect to list', () => {
@@ -212,11 +240,15 @@ describe('describeConnectionType', () => {
   });
 
   it('describes contract', () => {
-    expect(describeConnectionType({ kind: 'contract', name: 'MyContract' })).toBe('contract:MyContract');
+    expect(describeConnectionType({ kind: 'contract', name: 'MyContract' })).toBe(
+      'contract:MyContract',
+    );
   });
 
   it('describes credential contract', () => {
-    expect(describeConnectionType({ kind: 'contract', name: 'ApiKey', credential: true })).toBe('credential:ApiKey');
+    expect(describeConnectionType({ kind: 'contract', name: 'ApiKey', credential: true })).toBe(
+      'credential:ApiKey',
+    );
   });
 
   it('describes contract without name', () => {
@@ -254,11 +286,15 @@ describe('createPlaceholderForConnectionType', () => {
   });
 
   it('returns placeholder string for text', () => {
-    expect(createPlaceholderForConnectionType({ kind: 'primitive', name: 'text' })).toBe('__placeholder__');
+    expect(createPlaceholderForConnectionType({ kind: 'primitive', name: 'text' })).toBe(
+      '__placeholder__',
+    );
   });
 
   it('returns secret-placeholder for secret', () => {
-    expect(createPlaceholderForConnectionType({ kind: 'primitive', name: 'secret' })).toBe('secret-placeholder');
+    expect(createPlaceholderForConnectionType({ kind: 'primitive', name: 'secret' })).toBe(
+      'secret-placeholder',
+    );
   });
 
   it('returns 1 for number', () => {
@@ -287,13 +323,19 @@ describe('createPlaceholderForConnectionType', () => {
 
   it('returns wrapped array for list', () => {
     expect(
-      createPlaceholderForConnectionType({ kind: 'list', element: { kind: 'primitive', name: 'number' } }),
+      createPlaceholderForConnectionType({
+        kind: 'list',
+        element: { kind: 'primitive', name: 'number' },
+      }),
     ).toEqual([1]);
   });
 
   it('returns wrapped object for map', () => {
     expect(
-      createPlaceholderForConnectionType({ kind: 'map', element: { kind: 'primitive', name: 'text' } }),
+      createPlaceholderForConnectionType({
+        kind: 'map',
+        element: { kind: 'primitive', name: 'text' },
+      }),
     ).toEqual({ placeholder: '__placeholder__' });
   });
 
@@ -302,12 +344,14 @@ describe('createPlaceholderForConnectionType', () => {
   });
 
   it('returns credential-placeholder for credential contract', () => {
-    expect(createPlaceholderForConnectionType({ kind: 'contract', name: 'X', credential: true })).toBe(
-      'credential-placeholder',
-    );
+    expect(
+      createPlaceholderForConnectionType({ kind: 'contract', name: 'X', credential: true }),
+    ).toBe('credential-placeholder');
   });
 
   it('returns null for unknown primitive name', () => {
-    expect(createPlaceholderForConnectionType({ kind: 'primitive', name: 'unknown-type' })).toBeNull();
+    expect(
+      createPlaceholderForConnectionType({ kind: 'primitive', name: 'unknown-type' }),
+    ).toBeNull();
   });
 });

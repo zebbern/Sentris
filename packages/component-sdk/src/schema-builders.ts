@@ -2,11 +2,7 @@ import { z } from 'zod';
 
 import { withPortMeta, type PortMeta } from './port-meta';
 import { withParamMeta, type ParamMeta } from './param-meta';
-import type {
-  InputsSchema,
-  OutputsSchema,
-  ParametersSchema,
-} from './types';
+import type { InputsSchema, OutputsSchema, ParametersSchema } from './types';
 
 /**
  * Create a port schema with metadata and return a branded Zod type.
@@ -51,9 +47,7 @@ export function param<T extends z.ZodTypeAny>(schema: T, meta: ParamMeta): T {
  * });
  * ```
  */
-export function inputs<T extends Record<string, z.ZodTypeAny>>(
-  shape: T
-): InputsSchema<T> {
+export function inputs<T extends Record<string, z.ZodTypeAny>>(shape: T): InputsSchema<T> {
   return z.object(shape) as unknown as InputsSchema<T>;
 }
 
@@ -67,9 +61,7 @@ export function inputs<T extends Record<string, z.ZodTypeAny>>(
  * });
  * ```
  */
-export function outputs<T extends Record<string, z.ZodTypeAny>>(
-  shape: T
-): OutputsSchema<T> {
+export function outputs<T extends Record<string, z.ZodTypeAny>>(shape: T): OutputsSchema<T> {
   return z.object(shape) as unknown as OutputsSchema<T>;
 }
 
@@ -86,8 +78,6 @@ export function outputs<T extends Record<string, z.ZodTypeAny>>(
  * });
  * ```
  */
-export function parameters<T extends Record<string, z.ZodTypeAny>>(
-  shape: T
-): ParametersSchema<T> {
+export function parameters<T extends Record<string, z.ZodTypeAny>>(shape: T): ParametersSchema<T> {
   return z.object(shape) as unknown as ParametersSchema<T>;
 }

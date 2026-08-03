@@ -86,11 +86,7 @@ const BLOCKED_HOSTNAMES = new Set([
 /**
  * Hostname suffix patterns that indicate internal/local addresses.
  */
-const BLOCKED_HOSTNAME_SUFFIXES = [
-  '.local',
-  '.internal',
-  '.svc.cluster.local',
-];
+const BLOCKED_HOSTNAME_SUFFIXES = ['.local', '.internal', '.svc.cluster.local'];
 
 // ─── IP Parsing ──────────────────────────────────────────────────────────────
 
@@ -104,12 +100,7 @@ function deobfuscateIp(hostname: string): string | null {
   if (/^\d+$/.test(hostname)) {
     const num = Number(hostname);
     if (num >= 0 && num <= 0xffffffff) {
-      return [
-        (num >>> 24) & 0xff,
-        (num >>> 16) & 0xff,
-        (num >>> 8) & 0xff,
-        num & 0xff,
-      ].join('.');
+      return [(num >>> 24) & 0xff, (num >>> 16) & 0xff, (num >>> 8) & 0xff, num & 0xff].join('.');
     }
   }
 
@@ -117,12 +108,7 @@ function deobfuscateIp(hostname: string): string | null {
   if (/^0x[0-9a-fA-F]+$/i.test(hostname)) {
     const num = parseInt(hostname, 16);
     if (num >= 0 && num <= 0xffffffff) {
-      return [
-        (num >>> 24) & 0xff,
-        (num >>> 16) & 0xff,
-        (num >>> 8) & 0xff,
-        num & 0xff,
-      ].join('.');
+      return [(num >>> 24) & 0xff, (num >>> 16) & 0xff, (num >>> 8) & 0xff, num & 0xff].join('.');
     }
   }
 
@@ -224,12 +210,7 @@ function isIpv6Private(ip: string): boolean {
   if (ffffHexMatch) {
     const high = parseInt(ffffHexMatch[1], 16);
     const low = parseInt(ffffHexMatch[2], 16);
-    const ipv4 = [
-      (high >> 8) & 0xff,
-      high & 0xff,
-      (low >> 8) & 0xff,
-      low & 0xff,
-    ].join('.');
+    const ipv4 = [(high >> 8) & 0xff, high & 0xff, (low >> 8) & 0xff, low & 0xff].join('.');
     return isIpv4Private(ipv4);
   }
 

@@ -36,9 +36,7 @@ describe('secretMetadataSchema', () => {
   });
 
   it('rejects invalid format value', () => {
-    expect(() =>
-      schema.parse({ secretId: 's', version: 1, format: 'xml' }),
-    ).toThrow();
+    expect(() => schema.parse({ secretId: 's', version: 1, format: 'xml' })).toThrow();
   });
 
   it('has correct port metadata', () => {
@@ -81,9 +79,7 @@ describe('fileContractSchema', () => {
   });
 
   it('rejects missing mimeType', () => {
-    expect(() =>
-      schema.parse({ id: 'f', name: 'f', size: 10, content: 'c' }),
-    ).toThrow();
+    expect(() => schema.parse({ id: 'f', name: 'f', size: 10, content: 'c' })).toThrow();
   });
 
   it('rejects missing size', () => {
@@ -93,9 +89,7 @@ describe('fileContractSchema', () => {
   });
 
   it('rejects missing content', () => {
-    expect(() =>
-      schema.parse({ id: 'f', name: 'f', mimeType: 'text/plain', size: 10 }),
-    ).toThrow();
+    expect(() => schema.parse({ id: 'f', name: 'f', mimeType: 'text/plain', size: 10 })).toThrow();
   });
 
   it('has correct port metadata', () => {

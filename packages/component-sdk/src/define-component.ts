@@ -50,18 +50,30 @@ type InferOutputs<T> = T extends { __inferred: infer O } ? O : never;
 type InferParams<T> = T extends { __inferred: infer P } ? P : never;
 
 // Helper to infer the resolved port types from resolvePorts return type
-type InferResolvedInputs<T> = T extends { inputs: infer I } ? (I extends InputsSchema<infer S> ? z.infer<z.ZodObject<S>> : never) : never;
-type InferResolvedOutputs<T> = T extends { outputs: infer O } ? (O extends OutputsSchema<infer S> ? z.infer<z.ZodObject<S>> : never) : never;
+type InferResolvedInputs<T> = T extends { inputs: infer I }
+  ? I extends InputsSchema<infer S>
+    ? z.infer<z.ZodObject<S>>
+    : never
+  : never;
+type InferResolvedOutputs<T> = T extends { outputs: infer O }
+  ? O extends OutputsSchema<infer S>
+    ? z.infer<z.ZodObject<S>>
+    : never
+  : never;
 
 // ==============================================================================
 // Overload 1: Static ports, no parameters
 // ==============================================================================
-export function defineComponent<
-  IS extends Record<string, any>,
-  OS extends Record<string, any>
->(
+export function defineComponent<IS extends Record<string, any>, OS extends Record<string, any>>(
   definition: Omit<
-    ComponentDefinition<IS, OS, {}, InferInputs<InputsSchema<IS>>, InferOutputs<OutputsSchema<OS>>, {}>,
+    ComponentDefinition<
+      IS,
+      OS,
+      {},
+      InferInputs<InputsSchema<IS>>,
+      InferOutputs<OutputsSchema<OS>>,
+      {}
+    >,
     'inputs' | 'outputs' | 'parameters' | 'execute'
   > & {
     inputs: InputsSchema<IS>;
@@ -72,7 +84,14 @@ export function defineComponent<
       context: ExecutionContext,
     ) => Promise<InferOutputs<OutputsSchema<OS>>>;
   },
-): ComponentDefinition<IS, OS, {}, InferInputs<InputsSchema<IS>>, InferOutputs<OutputsSchema<OS>>, {}>;
+): ComponentDefinition<
+  IS,
+  OS,
+  {},
+  InferInputs<InputsSchema<IS>>,
+  InferOutputs<OutputsSchema<OS>>,
+  {}
+>;
 
 // ==============================================================================
 // Overload 2: Static ports, with parameters
@@ -80,10 +99,17 @@ export function defineComponent<
 export function defineComponent<
   IS extends Record<string, any>,
   OS extends Record<string, any>,
-  PS extends Record<string, any>
+  PS extends Record<string, any>,
 >(
   definition: Omit<
-    ComponentDefinition<IS, OS, PS, InferInputs<InputsSchema<IS>>, InferOutputs<OutputsSchema<OS>>, InferParams<ParametersSchema<PS>>>,
+    ComponentDefinition<
+      IS,
+      OS,
+      PS,
+      InferInputs<InputsSchema<IS>>,
+      InferOutputs<OutputsSchema<OS>>,
+      InferParams<ParametersSchema<PS>>
+    >,
     'inputs' | 'outputs' | 'parameters' | 'execute'
   > & {
     inputs: InputsSchema<IS>;
@@ -94,7 +120,14 @@ export function defineComponent<
       context: ExecutionContext,
     ) => Promise<InferOutputs<OutputsSchema<OS>>>;
   },
-): ComponentDefinition<IS, OS, PS, InferInputs<InputsSchema<IS>>, InferOutputs<OutputsSchema<OS>>, InferParams<ParametersSchema<PS>>>;
+): ComponentDefinition<
+  IS,
+  OS,
+  PS,
+  InferInputs<InputsSchema<IS>>,
+  InferOutputs<OutputsSchema<OS>>,
+  InferParams<ParametersSchema<PS>>
+>;
 
 // ==============================================================================
 // Overload 3: Dynamic outputs (with resolvePorts), static inputs
@@ -102,7 +135,7 @@ export function defineComponent<
 export function defineComponent<
   IS extends Record<string, any>,
   OS extends Record<string, any>,
-  PS extends Record<string, any>
+  PS extends Record<string, any>,
 >(
   definition: Omit<
     ComponentDefinition<IS, OS, PS, any, any, InferParams<ParametersSchema<PS>>>,
@@ -111,9 +144,7 @@ export function defineComponent<
     inputs: InputsSchema<IS>;
     outputs: OutputsSchema<OS>;
     parameters: ParametersSchema<PS>;
-    resolvePorts: (
-      params: InferParams<ParametersSchema<PS>>,
-    ) => {
+    resolvePorts: (params: InferParams<ParametersSchema<PS>>) => {
       inputs?: InputsSchema<any>;
       outputs: OutputsSchema<any>;
     };
@@ -130,7 +161,7 @@ export function defineComponent<
 export function defineComponent<
   IS extends Record<string, any>,
   OS extends Record<string, any>,
-  PS extends Record<string, any>
+  PS extends Record<string, any>,
 >(
   definition: Omit<
     ComponentDefinition<IS, OS, PS, any, any, InferParams<ParametersSchema<PS>>>,
@@ -139,9 +170,7 @@ export function defineComponent<
     inputs: InputsSchema<IS>;
     outputs: OutputsSchema<OS>;
     parameters: ParametersSchema<PS>;
-    resolvePorts: (
-      params: InferParams<ParametersSchema<PS>>,
-    ) => {
+    resolvePorts: (params: InferParams<ParametersSchema<PS>>) => {
       inputs: InputsSchema<any>;
       outputs: OutputsSchema<any>;
     };
@@ -158,9 +187,7 @@ export function defineComponent<
 export function defineComponent<
   IS extends Record<string, any>,
   OS extends Record<string, any>,
-  PS extends Record<string, any> | undefined = undefined
->(
-  definition: any,
-): any {
+  PS extends Record<string, any> | undefined = undefined,
+>(definition: any): any {
   return definition;
 }

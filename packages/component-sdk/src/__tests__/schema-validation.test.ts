@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { z } from 'zod';
-import {
-  validateComponentSchema,
-  validateParameterSchema,
-} from '../schema-validation';
+import { validateComponentSchema, validateParameterSchema } from '../schema-validation';
 import { withPortMeta } from '../port-meta';
 import { param } from '../schema-builders';
 
@@ -159,10 +156,10 @@ describe('validateComponentSchema', () => {
 
   it('passes when nesting is within maxDepth', () => {
     const schema = z.object({
-      nested: withPortMeta(
-        z.object({ inner: z.string() }),
-        { label: 'Nested', schemaName: 'Nested' },
-      ),
+      nested: withPortMeta(z.object({ inner: z.string() }), {
+        label: 'Nested',
+        schemaName: 'Nested',
+      }),
     });
 
     const result = validateComponentSchema(schema, { maxDepth: 2 });
@@ -209,10 +206,7 @@ describe('validateComponentSchema', () => {
 
   it('calculates depth correctly for array types', () => {
     const schema = z.object({
-      items: withPortMeta(
-        z.array(z.object({ name: z.string() })),
-        { label: 'Items' },
-      ),
+      items: withPortMeta(z.array(z.object({ name: z.string() })), { label: 'Items' }),
     });
 
     // Array depth = element depth = object{ string } = 2
@@ -223,10 +217,9 @@ describe('validateComponentSchema', () => {
 
   it('calculates depth correctly for record types', () => {
     const schema = z.object({
-      mapping: withPortMeta(
-        z.record(z.string(), z.object({ value: z.number() })),
-        { label: 'Mapping' },
-      ),
+      mapping: withPortMeta(z.record(z.string(), z.object({ value: z.number() })), {
+        label: 'Mapping',
+      }),
     });
 
     // Record depth = value depth = object{ number } = 2

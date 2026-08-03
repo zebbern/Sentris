@@ -68,15 +68,15 @@ describe('SSRF Guard — validateUrlForSsrf', () => {
 
   describe('blocks cloud metadata endpoints', () => {
     it('blocks http://169.254.169.254/latest/meta-data/', async () => {
-      await expect(
-        validateUrlForSsrf('http://169.254.169.254/latest/meta-data/'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('http://169.254.169.254/latest/meta-data/')).rejects.toThrow(
+        /SSRF blocked/,
+      );
     });
 
     it('blocks Alibaba Cloud metadata 100.100.100.200', async () => {
-      await expect(
-        validateUrlForSsrf('http://100.100.100.200/latest/meta-data/'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('http://100.100.100.200/latest/meta-data/')).rejects.toThrow(
+        /SSRF blocked/,
+      );
     });
 
     it('blocks metadata.google.internal', async () => {
@@ -98,15 +98,11 @@ describe('SSRF Guard — validateUrlForSsrf', () => {
     });
 
     it('blocks IPv6-mapped IPv4 loopback (::ffff:127.0.0.1)', async () => {
-      await expect(
-        validateUrlForSsrf('http://[::ffff:127.0.0.1]'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('http://[::ffff:127.0.0.1]')).rejects.toThrow(/SSRF blocked/);
     });
 
     it('blocks IPv6-mapped IPv4 private (::ffff:10.0.0.1)', async () => {
-      await expect(
-        validateUrlForSsrf('http://[::ffff:10.0.0.1]'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('http://[::ffff:10.0.0.1]')).rejects.toThrow(/SSRF blocked/);
     });
 
     it('blocks fe80::/10 link-local at fea0::1', async () => {
@@ -153,15 +149,15 @@ describe('SSRF Guard — validateUrlForSsrf', () => {
     });
 
     it('blocks *.internal suffix', async () => {
-      await expect(
-        validateUrlForSsrf('http://some-service.internal'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('http://some-service.internal')).rejects.toThrow(
+        /SSRF blocked/,
+      );
     });
 
     it('blocks *.svc.cluster.local (Kubernetes)', async () => {
-      await expect(
-        validateUrlForSsrf('http://my-api.default.svc.cluster.local'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('http://my-api.default.svc.cluster.local')).rejects.toThrow(
+        /SSRF blocked/,
+      );
     });
   });
 
@@ -187,15 +183,13 @@ describe('SSRF Guard — validateUrlForSsrf', () => {
     });
 
     it('blocks data: URIs', async () => {
-      await expect(
-        validateUrlForSsrf('data:text/html,<h1>hi</h1>'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('data:text/html,<h1>hi</h1>')).rejects.toThrow(
+        /SSRF blocked/,
+      );
     });
 
     it('blocks javascript: URIs', async () => {
-      await expect(
-        validateUrlForSsrf('javascript:alert(1)'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('javascript:alert(1)')).rejects.toThrow(/SSRF blocked/);
     });
   });
 
@@ -233,15 +227,15 @@ describe('SSRF Guard — validateUrlForSsrf', () => {
 
   describe('blocks private IPs even with credentials in URL', () => {
     it('blocks http://user:pass@127.0.0.1', async () => {
-      await expect(
-        validateUrlForSsrf('http://user:pass@127.0.0.1'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('http://user:pass@127.0.0.1')).rejects.toThrow(
+        /SSRF blocked/,
+      );
     });
 
     it('blocks http://admin:secret@10.0.0.1/admin', async () => {
-      await expect(
-        validateUrlForSsrf('http://admin:secret@10.0.0.1/admin'),
-      ).rejects.toThrow(/SSRF blocked/);
+      await expect(validateUrlForSsrf('http://admin:secret@10.0.0.1/admin')).rejects.toThrow(
+        /SSRF blocked/,
+      );
     });
   });
 

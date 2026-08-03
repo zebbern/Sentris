@@ -75,4 +75,9 @@ export const integrationStoreKeySchema = z
 export const kafkaBrokersSchema = z
   .string({ error: 'LOG_KAFKA_BROKERS is required' })
   .min(1, 'LOG_KAFKA_BROKERS must not be empty')
-  .transform((v) => v.split(',').map((s) => s.trim()).filter(Boolean));
+  .transform((v) =>
+    v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );

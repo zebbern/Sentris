@@ -1,17 +1,8 @@
 import { describe, it, expect } from 'bun:test';
 import { z } from 'zod';
-import {
-  withPortMeta,
-  getPortMeta,
-  mergePortMeta,
-  type PortMeta,
-} from '../port-meta';
+import { withPortMeta, getPortMeta, mergePortMeta, type PortMeta } from '../port-meta';
 import { port } from '../schema-builders';
-import {
-  extractPorts,
-  deriveConnectionType,
-  canConnect,
-} from '../zod-ports';
+import { extractPorts, deriveConnectionType, canConnect } from '../zod-ports';
 import type { ConnectionType } from '../types';
 import { validateComponentSchema } from '../schema-validation';
 
@@ -29,10 +20,10 @@ describe('Port Metadata System', () => {
     });
 
     it('replaces metadata when called multiple times', () => {
-      const schema = withPortMeta(
-        withPortMeta(z.string(), { label: 'First' }),
-        { label: 'Second', description: 'Merged' }
-      );
+      const schema = withPortMeta(withPortMeta(z.string(), { label: 'First' }), {
+        label: 'Second',
+        description: 'Merged',
+      });
 
       const meta = getPortMeta(schema);
       expect(meta?.label).toBe('Second');
@@ -79,10 +70,10 @@ describe('Port Metadata System', () => {
     });
 
     it('returns latest metadata when called multiple times', () => {
-      const schema = withPortMeta(
-        withPortMeta(z.string(), { label: 'First' }),
-        { label: 'Second', description: 'Merged' }
-      );
+      const schema = withPortMeta(withPortMeta(z.string(), { label: 'First' }), {
+        label: 'Second',
+        description: 'Merged',
+      });
 
       const meta = getPortMeta(schema);
       expect(meta?.label).toBe('Second');
@@ -126,24 +117,30 @@ describe('Port Extraction', () => {
       const ports = extractPorts(schema);
 
       expect(ports).toHaveLength(3);
-      expect(ports[0]).toEqual(expect.objectContaining({
-        id: 'apiKey',
-        label: 'API Key',
-        connectionType: expect.any(Object),
-        required: true,
-      }));
-      expect(ports[1]).toEqual(expect.objectContaining({
-        id: 'target',
-        label: 'Target',
-        connectionType: expect.any(Object),
-        required: false,
-      }));
-      expect(ports[2]).toEqual(expect.objectContaining({
-        id: 'count',
-        label: 'Count',
-        connectionType: expect.any(Object),
-        required: false,
-      }));
+      expect(ports[0]).toEqual(
+        expect.objectContaining({
+          id: 'apiKey',
+          label: 'API Key',
+          connectionType: expect.any(Object),
+          required: true,
+        }),
+      );
+      expect(ports[1]).toEqual(
+        expect.objectContaining({
+          id: 'target',
+          label: 'Target',
+          connectionType: expect.any(Object),
+          required: false,
+        }),
+      );
+      expect(ports[2]).toEqual(
+        expect.objectContaining({
+          id: 'count',
+          label: 'Count',
+          connectionType: expect.any(Object),
+          required: false,
+        }),
+      );
     });
 
     it('defaults label to field name', () => {
@@ -201,7 +198,7 @@ describe('Port Extraction', () => {
       const type = deriveConnectionType(
         withPortMeta(z.union([z.string(), z.number()]), {
           connectionType: 'custom-union',
-        })
+        }),
       );
 
       expect(type).toEqual({
@@ -216,16 +213,14 @@ describe('Port Extraction', () => {
 
     it('allows z.any() with explicit allowAny', () => {
       const type = deriveConnectionType(
-        withPortMeta(z.any(), { allowAny: true, reason: 'Dynamic data' })
+        withPortMeta(z.any(), { allowAny: true, reason: 'Dynamic data' }),
       );
 
       expect(type).toEqual({ kind: 'any' });
     });
 
     it('extracts schemaName for contracts', () => {
-      const type = deriveConnectionType(
-        withPortMeta(z.object({}), { schemaName: 'MyContract' })
-      );
+      const type = deriveConnectionType(withPortMeta(z.object({}), { schemaName: 'MyContract' }));
 
       expect(type).toEqual({
         kind: 'contract',

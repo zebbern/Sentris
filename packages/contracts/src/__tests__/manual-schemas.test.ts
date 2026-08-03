@@ -130,15 +130,13 @@ describe('manualSelectionPendingSchema', () => {
   });
 
   it('accepts selection of any type — object', () => {
-    expect(
-      schema.parse({ ...validInput, selection: { complex: true } }).selection,
-    ).toEqual({ complex: true });
+    expect(schema.parse({ ...validInput, selection: { complex: true } }).selection).toEqual({
+      complex: true,
+    });
   });
 
   it('accepts selection of any type — array', () => {
-    expect(
-      schema.parse({ ...validInput, selection: ['a', 'b'] }).selection,
-    ).toEqual(['a', 'b']);
+    expect(schema.parse({ ...validInput, selection: ['a', 'b'] }).selection).toEqual(['a', 'b']);
   });
 
   it('accepts optional responseNote', () => {

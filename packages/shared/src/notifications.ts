@@ -22,16 +22,19 @@ export type NotificationEventType = z.infer<typeof NotificationEventTypeSchema>;
 const ALLOWED_SLACK_DOMAINS = ['hooks.slack.com', 'hooks.slack-gov.com'];
 
 export const SlackChannelConfigSchema = z.object({
-  webhookUrl: z.string().url().refine(
-    (url) => {
-      try {
-        return ALLOWED_SLACK_DOMAINS.includes(new URL(url).hostname);
-      } catch {
-        return false;
-      }
-    },
-    { message: 'Webhook URL must be a valid Slack webhook URL (hooks.slack.com)' },
-  ),
+  webhookUrl: z
+    .string()
+    .url()
+    .refine(
+      (url) => {
+        try {
+          return ALLOWED_SLACK_DOMAINS.includes(new URL(url).hostname);
+        } catch {
+          return false;
+        }
+      },
+      { message: 'Webhook URL must be a valid Slack webhook URL (hooks.slack.com)' },
+    ),
 });
 export type SlackChannelConfig = z.infer<typeof SlackChannelConfigSchema>;
 

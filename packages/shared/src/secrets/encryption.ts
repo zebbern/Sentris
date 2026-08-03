@@ -28,13 +28,10 @@ export class SecretEncryption {
             rawKey.byteOffset + rawKey.byteLength,
           ) as ArrayBuffer);
 
-    return await crypto.subtle.importKey(
-      'raw',
-      keyBuffer,
-      { name: 'AES-GCM' },
-      false,
-      ['encrypt', 'decrypt']
-    );
+    return await crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, [
+      'encrypt',
+      'decrypt',
+    ]);
   }
 
   async encrypt(plaintext: string): Promise<SecretEncryptionMaterial> {
@@ -46,7 +43,7 @@ export class SecretEncryption {
     const ciphertext = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv: SecretEncryption.toArrayBuffer(iv) },
       masterKey,
-      SecretEncryption.toArrayBuffer(encoded)
+      SecretEncryption.toArrayBuffer(encoded),
     );
 
     const ciphertextBytes = new Uint8Array(ciphertext);
@@ -78,7 +75,7 @@ export class SecretEncryption {
     const decrypted = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: SecretEncryption.toArrayBuffer(iv) },
       masterKey,
-      SecretEncryption.toArrayBuffer(payload)
+      SecretEncryption.toArrayBuffer(payload),
     );
 
     return new TextDecoder().decode(decrypted);

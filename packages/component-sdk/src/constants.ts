@@ -4,13 +4,13 @@
 
 /**
  * Spill Thresholds
- * 
+ *
  * There are two levels of spilling to handle different payload size limits:
- * 
+ *
  * 1. KAFKA_SPILL_THRESHOLD (100KB): For Kafka message size limits
  *    - Node I/O data exceeding this is spilled to object storage before sending via Kafka
  *    - Keeps Kafka messages small and prevents broker issues
- * 
+ *
  * 2. TEMPORAL_SPILL_THRESHOLD (2MB): For Temporal workflow history limits
  *    - Activity outputs exceeding this are spilled in the activity itself
  *    - Prevents Temporal gRPC payload size errors
@@ -30,10 +30,10 @@ export const LOG_CHUNK_SIZE_CHARS = 100_000; // 100k characters
 
 /**
  * Spilled data marker format.
- * 
+ *
  * When data is spilled to object storage, this marker structure is used
  * to indicate that the actual data should be fetched from storage.
- * 
+ *
  * Fields:
  * - __spilled__: Always true, indicates this is a spill marker
  * - storageRef: UUID of the file in object storage

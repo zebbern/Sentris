@@ -16,7 +16,9 @@ import {
   type HttpRequestInput,
 } from './types';
 
-const resolveOptions = (options?: HttpInstrumentationOptions): Required<Omit<HttpInstrumentationOptions, 'correlationId' | 'ssrfGuard'>> => ({
+const resolveOptions = (
+  options?: HttpInstrumentationOptions,
+): Required<Omit<HttpInstrumentationOptions, 'correlationId' | 'ssrfGuard'>> => ({
   maxRequestBodySize: options?.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE,
   maxResponseBodySize: options?.maxResponseBodySize ?? DEFAULT_MAX_RESPONSE_BODY_SIZE,
   sensitiveHeaders: options?.sensitiveHeaders ?? DEFAULT_SENSITIVE_HEADERS,
@@ -42,11 +44,7 @@ export async function instrumentedFetch(
 ): Promise<Response> {
   const correlationId = options.correlationId ?? randomUUID();
   const url =
-    input instanceof URL
-      ? input.toString()
-      : input instanceof Request
-        ? input.url
-        : String(input);
+    input instanceof URL ? input.toString() : input instanceof Request ? input.url : String(input);
   const timingAdapter = getTimingAdapter();
   const startTime = new Date().toISOString();
   const startMs = performance.now();
@@ -136,12 +134,7 @@ export function createHttpClient(
 } {
   return {
     fetch: (input, init, options) =>
-      instrumentedFetch(
-        input,
-        init,
-        context,
-        { ...defaultOptions, ...options },
-      ),
+      instrumentedFetch(input, init, context, { ...defaultOptions, ...options }),
     toCurl: (input, init) =>
       harToCurl(
         buildHarRequest(

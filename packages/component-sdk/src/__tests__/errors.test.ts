@@ -288,13 +288,21 @@ describe('HttpError', () => {
 
 describe('fromHttpResponse', () => {
   function createMockResponse(status: number): Response {
-    return { status, statusText: `Status ${status}`, url: 'https://api.example.com/test', headers: new Headers() } as Response;
+    return {
+      status,
+      statusText: `Status ${status}`,
+      url: 'https://api.example.com/test',
+      headers: new Headers(),
+    } as Response;
   }
 
   it('maps 4xx status codes to appropriate errors', () => {
     const tests: [number, string, boolean][] = [
-      [400, 'ValidationError', false], [401, 'AuthenticationError', false], [403, 'PermissionError', false],
-      [404, 'NotFoundError', false], [422, 'ValidationError', false],
+      [400, 'ValidationError', false],
+      [401, 'AuthenticationError', false],
+      [403, 'PermissionError', false],
+      [404, 'NotFoundError', false],
+      [422, 'ValidationError', false],
     ];
     for (const [status, expectedType, retryable] of tests) {
       const error = fromHttpResponse(createMockResponse(status));
@@ -476,17 +484,30 @@ describe('wrapError', () => {
 describe('Error Type Constants', () => {
   it('NON_RETRYABLE_ERROR_TYPES contains expected types', () => {
     expect(NON_RETRYABLE_ERROR_TYPES).toHaveLength(7);
-    expect(NON_RETRYABLE_ERROR_TYPES).toEqual(expect.arrayContaining([
-      'AuthenticationError', 'NotFoundError', 'ValidationError', 'ConfigurationError',
-      'PermissionError', 'ContainerError', 'HttpError',
-    ]));
+    expect(NON_RETRYABLE_ERROR_TYPES).toEqual(
+      expect.arrayContaining([
+        'AuthenticationError',
+        'NotFoundError',
+        'ValidationError',
+        'ConfigurationError',
+        'PermissionError',
+        'ContainerError',
+        'HttpError',
+      ]),
+    );
   });
 
   it('RETRYABLE_ERROR_TYPES contains expected types', () => {
     expect(RETRYABLE_ERROR_TYPES).toHaveLength(5);
-    expect(RETRYABLE_ERROR_TYPES).toEqual(expect.arrayContaining([
-      'NetworkError', 'RateLimitError', 'ServiceError', 'TimeoutError', 'ResourceUnavailableError',
-    ]));
+    expect(RETRYABLE_ERROR_TYPES).toEqual(
+      expect.arrayContaining([
+        'NetworkError',
+        'RateLimitError',
+        'ServiceError',
+        'TimeoutError',
+        'ResourceUnavailableError',
+      ]),
+    );
   });
 
   it('ALL_ERROR_TYPES has correct count', () => {

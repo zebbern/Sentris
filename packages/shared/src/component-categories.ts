@@ -33,7 +33,10 @@ export interface ComponentCategoryDescriptor {
   headerBackgroundColor: CategoryColorToken;
 }
 
-export const COMPONENT_CATEGORY_DESCRIPTORS: Record<ComponentCategory, ComponentCategoryDescriptor> = {
+export const COMPONENT_CATEGORY_DESCRIPTORS: Record<
+  ComponentCategory,
+  ComponentCategoryDescriptor
+> = {
   input: {
     label: 'Input',
     description: 'Data sources, triggers, and credential access',
@@ -260,7 +263,9 @@ export function resolveComponentCategory(value?: string | null): ComponentCatego
   return normalizeComponentCategory(value) ?? DEFAULT_COMPONENT_CATEGORY;
 }
 
-export function getComponentCategoryDescriptor(category?: string | null): ComponentCategoryDescriptor {
+export function getComponentCategoryDescriptor(
+  category?: string | null,
+): ComponentCategoryDescriptor {
   return COMPONENT_CATEGORY_DESCRIPTORS[resolveComponentCategory(category)];
 }
 

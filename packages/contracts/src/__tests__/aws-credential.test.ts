@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { getPortMeta } from '@sentris/component-sdk';
 
-import {
-  awsCredentialContractName,
-  awsCredentialSchema,
-} from '../index';
+import { awsCredentialContractName, awsCredentialSchema } from '../index';
 
 describe('awsCredentialSchema', () => {
   const schema = awsCredentialSchema();

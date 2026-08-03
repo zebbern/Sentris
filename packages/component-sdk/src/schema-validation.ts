@@ -38,7 +38,7 @@ const DEFAULT_MAX_DEPTH = 1;
  */
 export function validateComponentSchema(
   schema: z.ZodTypeAny,
-  options: ValidationOptions = {}
+  options: ValidationOptions = {},
 ): SchemaValidationResult {
   const errors: string[] = [];
   const objectSchema = unwrapToObject(schema);
@@ -70,7 +70,7 @@ export function validateComponentSchema(
     const unwrapped = unwrapEffects(typedSchema);
     if (isAnyOrUnknown(unwrapped) && !portMeta?.allowAny) {
       errors.push(
-        `Field "${fieldName}": z.any() or z.unknown() requires explicit meta.allowAny=true${portMeta?.reason ? ` (${portMeta.reason})` : ''}`
+        `Field "${fieldName}": z.any() or z.unknown() requires explicit meta.allowAny=true${portMeta?.reason ? ` (${portMeta.reason})` : ''}`,
       );
     }
 
@@ -84,7 +84,7 @@ export function validateComponentSchema(
       const depth = calculateDepth(typedSchema);
       if (depth > options.maxDepth) {
         errors.push(
-          `Field "${fieldName}": Nesting depth ${depth} exceeds max depth ${options.maxDepth}. Use meta.connectionType for complex nested types.`
+          `Field "${fieldName}": Nesting depth ${depth} exceeds max depth ${options.maxDepth}. Use meta.connectionType for complex nested types.`,
         );
       }
     }
@@ -99,7 +99,7 @@ export function validateComponentSchema(
     if (isUnionType(unwrappedForUnion)) {
       if (!portMeta?.connectionType && !portMeta?.editor && !portMeta?.schemaName) {
         errors.push(
-          `Field "${fieldName}": Union types require explicit meta.connectionType or meta.editor override`
+          `Field "${fieldName}": Union types require explicit meta.connectionType or meta.editor override`,
         );
       }
     }
@@ -111,9 +111,7 @@ export function validateComponentSchema(
   };
 }
 
-export function validateParameterSchema(
-  schema: z.ZodTypeAny
-): SchemaValidationResult {
+export function validateParameterSchema(schema: z.ZodTypeAny): SchemaValidationResult {
   const errors: string[] = [];
   const objectSchema = unwrapToObject(schema);
   if (!objectSchema) {
@@ -199,8 +197,6 @@ function calculateDepth(schema: z.ZodTypeAny): number {
   return 1;
 }
 
-
-
 /**
  * Check if schema is z.any() or z.unknown()
  */
@@ -215,5 +211,3 @@ function isAnyOrUnknown(schema: z.ZodTypeAny): boolean {
 function isUnionType(schema: z.ZodTypeAny): boolean {
   return getSchemaType(schema) === 'union';
 }
-
-

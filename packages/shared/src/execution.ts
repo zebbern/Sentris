@@ -47,11 +47,13 @@ export const EXECUTION_TRIGGER_TYPES = ['manual', 'schedule', 'api', 'webhook'] 
 export type ExecutionTriggerType = (typeof EXECUTION_TRIGGER_TYPES)[number];
 export const ExecutionTriggerTypeSchema = z.enum(EXECUTION_TRIGGER_TYPES);
 
-export const ExecutionTriggerMetadataSchema = z.object({
-  type: ExecutionTriggerTypeSchema,
-  sourceId: z.string().optional().nullable(),
-  label: z.string().optional().nullable(),
-}).strip();
+export const ExecutionTriggerMetadataSchema = z
+  .object({
+    type: ExecutionTriggerTypeSchema,
+    sourceId: z.string().optional().nullable(),
+    label: z.string().optional().nullable(),
+  })
+  .strip();
 
 export type ExecutionTriggerMetadata = z.infer<typeof ExecutionTriggerMetadataSchema>;
 
@@ -153,32 +155,36 @@ export const TraceRetryPolicySchema = z.object({
   nonRetryableErrorTypes: z.array(z.string()).optional(),
 });
 
-export const TraceEventMetadataSchema = z.object({
-  activityId: z.string().optional(),
-  attempt: z.number().int().nonnegative().optional(),
-  correlationId: z.string().optional(),
-  streamId: z.string().optional(),
-  joinStrategy: z.enum(['all', 'any', 'first']).optional(),
-  triggeredBy: z.string().optional(),
-  failure: ExecutionFailureMetadataSchema.optional(),
-  retryPolicy: TraceRetryPolicySchema.optional(),
-  childRunId: z.string().optional(),
-  parentRunId: z.string().optional(),
-  parentNodeRef: z.string().optional(),
-  depth: z.number().int().nonnegative().optional(),
-}).strip();
+export const TraceEventMetadataSchema = z
+  .object({
+    activityId: z.string().optional(),
+    attempt: z.number().int().nonnegative().optional(),
+    correlationId: z.string().optional(),
+    streamId: z.string().optional(),
+    joinStrategy: z.enum(['all', 'any', 'first']).optional(),
+    triggeredBy: z.string().optional(),
+    failure: ExecutionFailureMetadataSchema.optional(),
+    retryPolicy: TraceRetryPolicySchema.optional(),
+    childRunId: z.string().optional(),
+    parentRunId: z.string().optional(),
+    parentNodeRef: z.string().optional(),
+    depth: z.number().int().nonnegative().optional(),
+  })
+  .strip();
 
 export type TraceEventMetadata = z.infer<typeof TraceEventMetadataSchema>;
 
-export const TraceEventDataSchema = z.object({
-  activatedPorts: z.array(z.string()).optional(),
-  approved: z.boolean().optional(),
-  requestId: z.string().optional(),
-  inputType: z.string().optional(),
-  title: z.string().optional(),
-  description: z.string().optional(),
-  timeoutAt: z.string().optional(),
-}).passthrough();
+export const TraceEventDataSchema = z
+  .object({
+    activatedPorts: z.array(z.string()).optional(),
+    approved: z.boolean().optional(),
+    requestId: z.string().optional(),
+    inputType: z.string().optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    timeoutAt: z.string().optional(),
+  })
+  .passthrough();
 
 export type TraceEventData = z.infer<typeof TraceEventDataSchema>;
 
@@ -217,9 +223,13 @@ export const WorkflowRunConfigSchema = z.object({
 export type WorkflowRunConfigPayload = z.infer<typeof WorkflowRunConfigSchema>;
 
 export const ExecutionContractSchema = z.object({
-  workflowRunStatus: WorkflowRunStatusSchema.describe('Primary status payload returned by GET /workflows/runs/:id/status'),
+  workflowRunStatus: WorkflowRunStatusSchema.describe(
+    'Primary status payload returned by GET /workflows/runs/:id/status',
+  ),
   traceEvent: TraceEventSchema.describe('Individual trace event emitted by worker/trace adapter'),
-  workflowRunConfig: WorkflowRunConfigSchema.describe('Inputs captured for a workflow run (GET /workflows/runs/:id/config)'),
+  workflowRunConfig: WorkflowRunConfigSchema.describe(
+    'Inputs captured for a workflow run (GET /workflows/runs/:id/config)',
+  ),
 });
 
 export type ExecutionContract = z.infer<typeof ExecutionContractSchema>;
@@ -230,9 +240,7 @@ export const WorkflowRunDispatchRequestSchema = z
     versionId: z.string().uuid().optional(),
     version: z.number().int().positive().optional(),
     inputs: z.record(z.string(), z.unknown()).optional(),
-    nodeOverrides: z
-      .record(z.string(), z.record(z.string(), z.unknown()))
-      .optional(),
+    nodeOverrides: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
     trigger: ExecutionTriggerMetadataSchema.optional(),
     runId: z.string().optional(),
     idempotencyKey: z.string().trim().min(1).max(128).optional(),

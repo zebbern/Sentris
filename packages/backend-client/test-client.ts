@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
  * Quick test script for the Sentris API Client
- * 
+ *
  * Prerequisites: Backend must be running on http://localhost:3211
- * 
+ *
  * Usage: bun run test-client.ts
  */
 

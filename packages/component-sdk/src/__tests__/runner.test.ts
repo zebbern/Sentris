@@ -27,14 +27,7 @@ describe('Component Runner', () => {
         PORT: '8080',
       });
 
-      expect(dockerArgs).toEqual([
-        'run',
-        '--rm',
-        '-e',
-        'ANTHROPIC_API_KEY',
-        '-e',
-        'PORT',
-      ]);
+      expect(dockerArgs).toEqual(['run', '--rm', '-e', 'ANTHROPIC_API_KEY', '-e', 'PORT']);
       expect(spawnEnv.ANTHROPIC_API_KEY).toBe('prefix#suffix-with-special chars');
       expect(spawnEnv.PORT).toBe('8080');
     });
@@ -127,7 +120,7 @@ describe('Component Runner', () => {
           execute,
           {},
           context,
-        )
+        ),
       ).rejects.toThrow();
     });
 
@@ -168,10 +161,10 @@ describe('Component Runner', () => {
         runner: { kind: 'inline' },
         inputs: inputSchema,
         outputs: outputSchema,
-      async execute({ inputs }) {
-        return { result: inputs.text.repeat(inputs.repeat) };
-      },
-    });
+        async execute({ inputs }) {
+          return { result: inputs.text.repeat(inputs.repeat) };
+        },
+      });
 
       const context = createExecutionContext({
         runId: 'integration-test',

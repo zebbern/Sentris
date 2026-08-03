@@ -78,18 +78,17 @@ function editorToConnectionType(editor?: PortMeta['editor']): ConnectionType | u
  */
 export function extractPorts(
   schema: z.ZodTypeAny,
-  defaultLabelPrefix: string = ''
+  defaultLabelPrefix: string = '',
 ): ComponentPortMetadata[] {
   const ports: ComponentPortMetadata[] = [];
   const objectSchema = unwrapToObject(schema);
   if (!objectSchema) {
     return ports;
   }
-  const shape = typeof objectSchema.shape === 'function' ? objectSchema.shape() : objectSchema.shape;
+  const shape =
+    typeof objectSchema.shape === 'function' ? objectSchema.shape() : objectSchema.shape;
 
-  for (const [fieldName, fieldSchema] of Object.entries(
-    shape as Record<string, z.ZodTypeAny>,
-  )) {
+  for (const [fieldName, fieldSchema] of Object.entries(shape as Record<string, z.ZodTypeAny>)) {
     const typedSchema = fieldSchema as z.ZodTypeAny;
     const portMeta = getPortMeta(typedSchema);
     if (!portMeta) {
@@ -157,7 +156,7 @@ export function deriveConnectionType(schema: z.ZodTypeAny): ConnectionType {
       return { kind: 'any' };
     }
     throw new Error(
-      `z.any() or z.unknown() requires explicit allowAny=true${portMeta?.reason ? `: ${portMeta.reason}` : ''}`
+      `z.any() or z.unknown() requires explicit allowAny=true${portMeta?.reason ? `: ${portMeta.reason}` : ''}`,
     );
   }
 
@@ -208,13 +207,13 @@ export function deriveConnectionType(schema: z.ZodTypeAny): ConnectionType {
         : portMeta.connectionType;
     }
     throw new Error(
-      'Union types require explicit meta.connectionType override to define compatibility'
+      'Union types require explicit meta.connectionType override to define compatibility',
     );
   }
 
   // Default: treat as any with error (developer should be explicit)
   throw new Error(
-    `Cannot derive connection type for schema. Use meta.connectionType or meta.schemaName for complex types.`
+    `Cannot derive connection type for schema. Use meta.connectionType or meta.schemaName for complex types.`,
   );
 }
 
@@ -263,8 +262,6 @@ export function canConnect(source: ConnectionType, target: ConnectionType): bool
 
   return false;
 }
-
-
 
 /**
  * Get primitive type name

@@ -197,6 +197,7 @@ describe('package development scripts', () => {
     );
     expect(packageJson.scripts['format:check']).toContain('prettier');
     expect(packageJson.scripts['format:check']).toContain('--cache');
+    expect(packageJson.scripts['format:check']).toContain('"packages/**/*.ts"');
 
     for (const childPackage of [
       frontendPackageJson,

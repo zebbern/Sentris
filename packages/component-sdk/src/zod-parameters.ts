@@ -7,13 +7,7 @@
 import { z } from 'zod';
 import type { ComponentParameterMetadata } from './types';
 import { getParamMeta } from './param-meta';
-import {
-  type ZodDef,
-  getDefType,
-  unwrapToObject,
-  getObjectShape,
-  isOptional,
-} from './zod-helpers';
+import { type ZodDef, getDefType, unwrapToObject, getObjectShape, isOptional } from './zod-helpers';
 
 export function extractParameters(schema: z.ZodTypeAny): ComponentParameterMetadata[] {
   const parameters: ComponentParameterMetadata[] = [];
@@ -84,5 +78,3 @@ function getDefaultValue(schema: z.ZodTypeAny): unknown {
     return undefined;
   }
 }
-
-
