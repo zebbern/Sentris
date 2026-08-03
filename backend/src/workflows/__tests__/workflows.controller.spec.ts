@@ -144,6 +144,18 @@ describe('WorkflowsController', () => {
       }
       return record;
     },
+    async findByIds(ids: string[], options: { organizationId?: string | null } = {}) {
+      return ids.flatMap((id) => {
+        const record = versionStore.get(id);
+        if (
+          !record ||
+          (options.organizationId && record.organizationId !== options.organizationId)
+        ) {
+          return [];
+        }
+        return [record];
+      });
+    },
     async findByWorkflowAndVersion(input: {
       workflowId: string;
       version: number;

@@ -44,6 +44,7 @@ function workflowRecord(overrides: Record<string, unknown> = {}) {
     graph: GRAPH,
     compiledDefinition: null,
     organizationId: AUTH.organizationId,
+    currentVersionId: null,
     lastRun: null,
     runCount: 0,
     createdAt: NOW,
@@ -97,6 +98,16 @@ function makeWorkflowsHarness(auditError?: Error) {
     transaction: tracker.transaction,
     create: vi.fn(async (..._args: unknown[]) => workflowRecord()),
     update: vi.fn(async (..._args: unknown[]) => workflowRecord()),
+    activateVersion: vi.fn(
+      async (_id: unknown, version: ReturnType<typeof versionRecord>, _options?: unknown) =>
+        workflowRecord({
+          name: version.graph.name,
+          description: version.graph.description ?? null,
+          graph: version.graph,
+          compiledDefinition: version.compiledDefinition,
+          currentVersionId: version.id,
+        }),
+    ),
     updateMetadata: vi.fn(async (_id: unknown, metadata: { name: string }, ..._args: unknown[]) =>
       workflowRecord({ name: metadata.name }),
     ),
@@ -153,6 +164,10 @@ describe('workflow mutation durable audit transactions', () => {
     expect(harness.versionRepository.create.mock.calls[0]?.[1]).toEqual({
       executor: harness.tracker.executor,
     });
+    expect(harness.repository.activateVersion.mock.calls[0]?.[2]).toMatchObject({
+      organizationId: 'org-1',
+      executor: harness.tracker.executor,
+    });
     expect(harness.roleRepository.upsert.mock.calls[0]?.[1]).toEqual({
       executor: harness.tracker.executor,
     });
@@ -170,7 +185,7 @@ describe('workflow mutation durable audit transactions', () => {
 
     await harness.service.update('wf-1', GRAPH, AUTH);
 
-    expect(harness.repository.update.mock.calls[0]?.[2]).toMatchObject({
+    expect(harness.repository.activateVersion.mock.calls[0]?.[2]).toMatchObject({
       organizationId: 'org-1',
       executor: harness.tracker.executor,
     });

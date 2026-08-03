@@ -100,6 +100,7 @@ describe('McpFacadeService', () => {
 
   it('rejects POST bodies with a non-JSON content type', async () => {
     const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    logError.mockClear();
     const service = trackService(new McpFacadeService(), services);
     const endpoint = service.createEndpoint({
       createServer: async (context) => createTestServer(context),

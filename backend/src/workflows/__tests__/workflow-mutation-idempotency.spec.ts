@@ -43,6 +43,7 @@ interface StoredWorkflow {
   graph: Graph;
   compiledDefinition: null;
   organizationId: string;
+  currentVersionId: string | null;
   mutationIdempotencyKey: string | null;
   lastRun: null;
   runCount: number;
@@ -88,6 +89,7 @@ function createHarness() {
           graph: input,
           compiledDefinition: null,
           organizationId: options.organizationId,
+          currentVersionId: null,
           mutationIdempotencyKey: options.mutationIdempotencyKey ?? null,
           lastRun: null,
           runCount: 0,
@@ -109,6 +111,19 @@ function createHarness() {
         name: input.name,
         description: input.description ?? null,
         graph: input,
+        updatedAt: new Date(now.getTime() + versions.length * 1_000),
+      };
+      return workflow;
+    }),
+    activateVersion: vi.fn(async (_id: string, version: StoredVersion) => {
+      if (!workflow) throw new Error('Workflow not found');
+      workflow = {
+        ...workflow,
+        name: version.graph.name,
+        description: version.graph.description ?? null,
+        graph: version.graph,
+        compiledDefinition: version.compiledDefinition,
+        currentVersionId: version.id,
         updatedAt: new Date(now.getTime() + versions.length * 1_000),
       };
       return workflow;
@@ -227,7 +242,7 @@ describe('workflow mutation idempotency and optimistic concurrency', () => {
     expect(replay.currentVersionId).toBe(authored.currentVersionId);
     expect(replay.currentVersion).toBe(authored.currentVersion);
     expect(replay.graph.description).toBe('Operator-authored revision');
-    expect(harness.repository.update).toHaveBeenCalledTimes(2);
+    expect(harness.repository.activateVersion).toHaveBeenCalledTimes(3);
     expect(harness.versionRepository.create).toHaveBeenCalledTimes(3);
     expect(harness.auditLogService.recordDurableWithExecutor).toHaveBeenCalledTimes(3);
   });
@@ -241,7 +256,7 @@ describe('workflow mutation idempotency and optimistic concurrency', () => {
       { expectedVersionId: created.currentVersionId ?? undefined },
     );
     const writesBeforeConflict = {
-      workflows: harness.repository.update.mock.calls.length,
+      workflows: harness.repository.activateVersion.mock.calls.length,
       versions: harness.versionRepository.create.mock.calls.length,
       audits: harness.auditLogService.recordDurableWithExecutor.mock.calls.length,
     };
@@ -258,7 +273,9 @@ describe('workflow mutation idempotency and optimistic concurrency', () => {
       ),
     ).rejects.toBeInstanceOf(ConflictException);
 
-    expect(harness.repository.update).toHaveBeenCalledTimes(writesBeforeConflict.workflows);
+    expect(harness.repository.activateVersion).toHaveBeenCalledTimes(
+      writesBeforeConflict.workflows,
+    );
     expect(harness.versionRepository.create).toHaveBeenCalledTimes(writesBeforeConflict.versions);
     expect(harness.auditLogService.recordDurableWithExecutor).toHaveBeenCalledTimes(
       writesBeforeConflict.audits,
