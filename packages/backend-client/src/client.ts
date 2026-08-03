@@ -6163,6 +6163,27 @@ export interface components {
             arguments: {
               runId: string;
             };
+          }
+        | {
+            /** @enum {string} */
+            commandName: 'update_finding_triage';
+            arguments: {
+              findingId: string;
+              /** @enum {string} */
+              status?:
+                | 'new'
+                | 'triaged'
+                | 'in_progress'
+                | 'fixed'
+                | 'verified'
+                | 'wont_fix'
+                | 'accepted_risk';
+              assigneeUserId?: string | null;
+              /** @enum {string|null} */
+              severityOverride?: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'none' | null;
+              notes?: string | null;
+              comment?: string;
+            };
           };
       journey?: {
         /** @enum {string} */

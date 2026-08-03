@@ -1,4 +1,8 @@
 import {
+  FindingTriageStatusSchema,
+  OperatorGetFindingInputSchema,
+  OperatorGetRunInputSchema,
+  OperatorUpdateFindingTriageInputSchema,
   OperatorWorkflowApplyResultSchema,
   OperatorWorkflowDraftResultSchema,
   OperatorWorkflowPromotionResultSchema,
@@ -7,10 +11,21 @@ import {
   type OperatorActionStatus,
   type OperatorActionView,
   type OperatorCommandName,
+  type FindingTriageStatus,
   type OperatorMessageView,
   type OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
-import { Bot, Check, ChevronRight, CircleDot, Clock3, Loader2, ShieldCheck, X } from 'lucide-react';
+import {
+  Bot,
+  Check,
+  ChevronRight,
+  CircleDot,
+  Clock3,
+  ListChecks,
+  Loader2,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -125,6 +140,129 @@ function MessageEvent({ message }: { message: OperatorMessageView }) {
         />
       </div>
     </article>
+  );
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readFindingStatus(result: unknown): FindingTriageStatus | null {
+  const resultRecord = asRecord(result);
+  if (!resultRecord) return null;
+  if (resultRecord.triage === null || resultRecord.triage === undefined) return 'new';
+  const triage = asRecord(resultRecord.triage);
+  const parsed = FindingTriageStatusSchema.safeParse(triage?.status);
+  return parsed.success ? parsed.data : null;
+}
+
+function readFindingRunId(result: unknown): string | null {
+  const runId = asRecord(result)?.run_id;
+  return typeof runId === 'string' && runId.length > 0 ? runId : null;
+}
+
+function currentFindingStatus(
+  findingId: string,
+  inspectionResult: unknown,
+  actions: OperatorActionView[],
+): FindingTriageStatus | null {
+  let status = readFindingStatus(inspectionResult);
+  for (const action of actions) {
+    if (action.status !== 'succeeded' || action.commandName !== 'update_finding_triage') continue;
+    const update = OperatorUpdateFindingTriageInputSchema.safeParse(action.arguments);
+    if (update.success && update.data.findingId === findingId && update.data.status) {
+      status = update.data.status;
+    }
+  }
+  return status;
+}
+
+function InvestigationFollowUps({
+  action,
+  actions,
+  disabled,
+  onCommand,
+}: {
+  action: OperatorActionView;
+  actions: OperatorActionView[];
+  disabled: boolean;
+  onCommand: (request: OperatorRunCommandRequest) => void;
+}) {
+  const runInput =
+    action.commandName === 'get_run' ? OperatorGetRunInputSchema.safeParse(action.arguments) : null;
+  const findingInput =
+    action.commandName === 'get_finding'
+      ? OperatorGetFindingInputSchema.safeParse(action.arguments)
+      : null;
+
+  if (runInput?.success) {
+    return (
+      <div className="ml-9 max-w-[calc(100%-2.25rem)] space-y-2 rounded-lg border border-primary/20 bg-primary/[0.03] p-2.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+          <ListChecks className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+          Suggested follow-ups
+        </div>
+        <OperatorRunActivity
+          runId={runInput.data.runId}
+          disabled={disabled}
+          onCommand={onCommand}
+        />
+      </div>
+    );
+  }
+
+  if (!findingInput?.success) return null;
+
+  const findingId = findingInput.data.findingId;
+  const status = currentFindingStatus(findingId, action.result, actions);
+  const nextStatus =
+    status === 'new'
+      ? ({ status: 'triaged', label: 'Mark triaged' } as const)
+      : status === 'triaged'
+        ? ({ status: 'in_progress', label: 'Start work' } as const)
+        : null;
+  const sourceRunId = readFindingRunId(action.result);
+
+  if (!nextStatus && !sourceRunId) return null;
+
+  return (
+    <div className="ml-9 max-w-[calc(100%-2.25rem)] space-y-2 rounded-lg border border-primary/20 bg-primary/[0.03] p-2.5">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+        <ListChecks className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+        Suggested follow-ups
+      </div>
+      {nextStatus ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 gap-1.5 px-2 text-[11px]"
+          disabled={disabled}
+          onClick={() =>
+            onCommand({
+              message: `${nextStatus.label} for finding ${findingId}`,
+              directCommand: {
+                commandName: 'update_finding_triage',
+                arguments: { findingId, status: nextStatus.status },
+              },
+            })
+          }
+        >
+          <Check className="h-3 w-3" aria-hidden="true" />
+          {nextStatus.label}
+        </Button>
+      ) : null}
+      {sourceRunId ? (
+        <OperatorRunActivity
+          runId={sourceRunId}
+          label="Source workflow run"
+          disabled={disabled}
+          onCommand={onCommand}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -339,6 +477,19 @@ export function OperatorTimeline({
   onRunCommand = () => {},
 }: OperatorTimelineProps) {
   const events = toTimelineEvents(messages, actions);
+  const latestInvestigationAction = [...actions]
+    .reverse()
+    .find(
+      (action) =>
+        action.status === 'succeeded' &&
+        (action.commandName === 'get_run' || action.commandName === 'get_finding'),
+    );
+  const investigationAnswered = latestInvestigationAction
+    ? messages.some(
+        (message) =>
+          message.turnId === latestInvestigationAction.turnId && message.role === 'assistant',
+      )
+    : false;
   const appliedDraftIds = new Set(
     actions.flatMap((action) => {
       if (action.status !== 'succeeded') return [];
@@ -373,6 +524,15 @@ export function OperatorTimeline({
           />
         ),
       )}
+
+      {latestInvestigationAction && investigationAnswered ? (
+        <InvestigationFollowUps
+          action={latestInvestigationAction}
+          actions={actions}
+          disabled={runCommandDisabled}
+          onCommand={onRunCommand}
+        />
+      ) : null}
 
       {isActive ? (
         <div className="ml-9 flex items-center gap-2 py-2 text-xs text-muted-foreground">

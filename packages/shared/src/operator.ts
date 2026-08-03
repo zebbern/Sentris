@@ -877,6 +877,12 @@ export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
       arguments: OperatorRetryRunInputSchema,
     })
     .strict(),
+  z
+    .object({
+      commandName: z.literal('update_finding_triage'),
+      arguments: OperatorUpdateFindingTriageInputSchema,
+    })
+    .strict(),
 ]);
 export type OperatorDirectCommand = z.infer<typeof OperatorDirectCommandSchema>;
 

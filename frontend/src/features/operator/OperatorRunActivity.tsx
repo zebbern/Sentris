@@ -28,6 +28,7 @@ export interface OperatorRunCommandRequest {
 interface OperatorRunActivityProps {
   runId: string;
   sourceRunId?: string;
+  label?: string;
   disabled: boolean;
   onCommand: (request: OperatorRunCommandRequest) => void;
 }
@@ -40,6 +41,7 @@ interface AgentEntry {
 export function OperatorRunActivity({
   runId,
   sourceRunId,
+  label = 'Workflow run',
   disabled,
   onCommand,
 }: OperatorRunActivityProps) {
@@ -82,7 +84,7 @@ export function OperatorRunActivity({
             <ExternalLink className="h-3.5 w-3.5 shrink-0 text-primary" />
           )}
           <span className="min-w-0">
-            <span className="block font-medium text-foreground">Workflow run</span>
+            <span className="block font-medium text-foreground">{label}</span>
             <span className="block truncate font-mono text-[10px] text-muted-foreground">
               {runId}
             </span>
