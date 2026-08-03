@@ -53,7 +53,7 @@ mock.module('@/store/workflowUiStore', () => {
   return { useWorkflowUiStore };
 });
 
-const mockWorkflowId = 'wf-1';
+const mockWorkflowId = '22222222-2222-4222-8222-222222222222';
 const mockCurrentVersion = 2;
 
 mock.module('@/store/workflowStore', () => {
@@ -99,7 +99,7 @@ mock.module('@/store/executionStore', () => {
 const mockRuns = [
   {
     id: 'run-1',
-    workflowId: 'wf-1',
+    workflowId: mockWorkflowId,
     workflowName: 'Test',
     status: 'COMPLETED',
     startTime: '2026-01-01T00:00:00Z',
@@ -134,7 +134,7 @@ mock.module('@/hooks/useWorkflowExecution', () => ({
   }),
 }));
 
-const mockNavigate = mock(() => {});
+const mockNavigate = mock((_to: string, _options?: { state?: unknown }) => {});
 
 mock.module('react-router-dom', () => ({
   ...realModuleExports('react-router-dom'),
@@ -204,6 +204,7 @@ function resetMocks() {
   mockExecRunId = null;
   mockSetInspectorTab.mockClear();
   mockStopExecution.mockClear();
+  mockNavigate.mockClear();
 }
 
 function renderInspector(props: ComponentProps<typeof ExecutionInspector> = {}) {
@@ -328,6 +329,30 @@ describe('ExecutionInspector', () => {
     renderInspector({ onRerunRun: onRerun });
 
     expect(screen.getByTestId('run-selector').getAttribute('data-has-rerun')).toBe('true');
+  });
+
+  it('opens Operator with the selected run evidence preloaded', () => {
+    renderInspector();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Operator about this run' }));
+
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate.mock.calls[0]?.[0]).toBe('/operator');
+    expect(mockNavigate.mock.calls[0]?.[1]).toMatchObject({
+      state: {
+        operatorHandoff: {
+          kind: 'direct_command',
+          directCommand: {
+            commandName: 'get_run',
+            arguments: { runId: 'run-1' },
+          },
+          routeContext: {
+            workflowId: mockWorkflowId,
+            runId: 'run-1',
+          },
+        },
+      },
+    });
   });
 
   it('shows "Select a run to explore" when no run is selected', () => {

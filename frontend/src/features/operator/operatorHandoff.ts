@@ -1,7 +1,9 @@
 import {
   OperatorDirectCommandSchema,
+  OperatorRouteContextSchema,
   type OperatorCreateTurn,
   type OperatorDirectCommand,
+  type OperatorRouteContext,
 } from '@sentris/shared';
 
 const OPERATOR_HANDOFF_VERSION = 1 as const;
@@ -22,6 +24,7 @@ export interface OperatorDirectCommandHandoff {
   message: string;
   directCommand: OperatorDirectCommand;
   sourcePath: string;
+  routeContext?: OperatorRouteContext;
 }
 
 export type OperatorTurnHandoff = OperatorImproveRunHandoff | OperatorDirectCommandHandoff;
@@ -29,6 +32,24 @@ export type OperatorTurnHandoff = OperatorImproveRunHandoff | OperatorDirectComm
 export interface OperatorNavigationState {
   operatorHandoff: OperatorTurnHandoff;
 }
+
+interface OperatorInvestigateRunInput {
+  runId: string;
+  workflowId: string;
+  sourcePath: string;
+}
+
+interface OperatorInvestigateFindingInput {
+  findingId: string;
+  workflowId?: string;
+  runId?: string;
+  sourcePath: string;
+}
+
+const INVESTIGATE_RUN_MESSAGE =
+  'Investigate this run. Review its status, stored output, recent and failed trace evidence, and findings. Explain what happened and recommend the most useful next step. Do not make changes unless I ask.';
+const INVESTIGATE_FINDING_MESSAGE =
+  'Investigate this finding. Review its bounded raw evidence, source run and workflow context, and current triage state. Explain what it means, how credible it is, and recommend the most useful next step. Do not change triage or workflows unless I ask.';
 
 export function createOperatorImproveRunNavigationState(
   sourceRunId: string,
@@ -64,6 +85,48 @@ export function createOperatorDirectCommandNavigationState(
   };
 }
 
+export function createOperatorInvestigateRunNavigationState(
+  input: OperatorInvestigateRunInput,
+  createId: () => string = () => crypto.randomUUID(),
+): OperatorNavigationState {
+  return {
+    operatorHandoff: {
+      version: OPERATOR_HANDOFF_VERSION,
+      kind: 'direct_command',
+      clientTurnId: createId(),
+      message: INVESTIGATE_RUN_MESSAGE,
+      directCommand: { commandName: 'get_run', arguments: { runId: input.runId } },
+      sourcePath: input.sourcePath,
+      routeContext: {
+        path: input.sourcePath,
+        workflowId: input.workflowId,
+        runId: input.runId,
+      },
+    },
+  };
+}
+
+export function createOperatorInvestigateFindingNavigationState(
+  input: OperatorInvestigateFindingInput,
+  createId: () => string = () => crypto.randomUUID(),
+): OperatorNavigationState {
+  return {
+    operatorHandoff: {
+      version: OPERATOR_HANDOFF_VERSION,
+      kind: 'direct_command',
+      clientTurnId: createId(),
+      message: INVESTIGATE_FINDING_MESSAGE,
+      directCommand: { commandName: 'get_finding', arguments: { findingId: input.findingId } },
+      sourcePath: input.sourcePath,
+      routeContext: {
+        path: input.sourcePath,
+        ...(input.workflowId ? { workflowId: input.workflowId } : {}),
+        ...(input.runId ? { runId: input.runId } : {}),
+      },
+    },
+  };
+}
+
 export function readOperatorTurnHandoff(state: unknown): OperatorTurnHandoff | null {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
   const handoff = (state as { operatorHandoff?: unknown }).operatorHandoff;
@@ -91,15 +154,21 @@ export function readOperatorTurnHandoff(state: unknown): OperatorTurnHandoff | n
   if (candidate.kind === 'direct_command') {
     const directCandidate = candidate as Partial<OperatorDirectCommandHandoff>;
     const directCommand = OperatorDirectCommandSchema.safeParse(directCandidate.directCommand);
+    const routeContext =
+      directCandidate.routeContext === undefined
+        ? undefined
+        : OperatorRouteContextSchema.safeParse(directCandidate.routeContext);
     if (
       typeof directCandidate.message === 'string' &&
       directCandidate.message.trim().length > 0 &&
       directCandidate.message.length <= 20_000 &&
-      directCommand.success
+      directCommand.success &&
+      (routeContext === undefined || routeContext.success)
     ) {
       return {
         ...(directCandidate as OperatorDirectCommandHandoff),
         directCommand: directCommand.data,
+        ...(routeContext ? { routeContext: routeContext.data } : {}),
       };
     }
   }
@@ -117,7 +186,7 @@ export function createOperatorTurnFromHandoff(handoff: OperatorTurnHandoff): Ope
     return {
       clientTurnId: handoff.clientTurnId,
       message: handoff.message,
-      context: { path: handoff.sourcePath },
+      context: handoff.routeContext ?? { path: handoff.sourcePath },
       directCommand: handoff.directCommand,
     };
   }

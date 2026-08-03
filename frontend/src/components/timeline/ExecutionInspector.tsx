@@ -5,7 +5,7 @@ import { ExecutionTimeline } from '@/components/timeline/ExecutionTimeline';
 import { EventInspector } from '@/components/timeline/EventInspector';
 import { Button } from '@/components/ui/button';
 import { MessageModal } from '@/components/ui/MessageModal';
-import { Globe, Loader2, FileSearch, Sparkles } from 'lucide-react';
+import { Bot, Globe, Loader2, FileSearch, Sparkles } from 'lucide-react';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { logger } from '@/lib/logger';
 import { useExecutionStore } from '@/store/executionStore';
@@ -28,7 +28,10 @@ import { useAutoFocusOnCompletion } from '@/hooks/useAutoFocusOnCompletion';
 import { useRunArtifacts } from '@/hooks/queries/useArtifactQueries';
 import { useExecutionNodeIO } from '@/hooks/queries/useExecutionQueries';
 import { TERMINAL_STATUSES } from '@sentris/shared';
-import { createOperatorImproveRunNavigationState } from '@/features/operator/operatorHandoff';
+import {
+  createOperatorImproveRunNavigationState,
+  createOperatorInvestigateRunNavigationState,
+} from '@/features/operator/operatorHandoff';
 import { OperatorRunImprovementPanel } from '@/features/operator/OperatorRunImprovementPanel';
 import { useOperatorRunImprovementProjection } from '@/features/operator/operatorRunImprovement';
 
@@ -306,6 +309,28 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
             isLoadingRuns={isLoadingRuns}
           />
           <div className="flex shrink-0 items-center gap-2">
+            {selectedRun ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 px-2 text-[11px]"
+                onClick={() =>
+                  navigate('/operator', {
+                    state: createOperatorInvestigateRunNavigationState({
+                      runId: selectedRun.id,
+                      workflowId: selectedRun.workflowId,
+                      sourcePath: `/workflows/${selectedRun.workflowId}/runs/${selectedRun.id}`,
+                    }),
+                  })
+                }
+                aria-label="Ask Operator about this run"
+                title="Ask Operator about this run"
+              >
+                <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+                Ask
+              </Button>
+            ) : null}
             {selectedRun && TERMINAL_STATUSES.includes(selectedRun.status) ? (
               <Button
                 type="button"

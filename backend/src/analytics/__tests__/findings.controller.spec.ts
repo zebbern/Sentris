@@ -410,22 +410,47 @@ describe('FindingsController', () => {
               must: [
                 { term: { sentris_normalized_severity: 'high' } },
                 {
-                  multi_match: {
-                    query: 'injection',
-                    fields: [
-                      'title',
-                      'description',
-                      'name',
-                      'finding',
-                      'asset_key',
-                      'sentris.asset_key',
-                      'sentris.workflow_name',
-                      'workflow_name',
-                      'host',
-                      'domain',
-                      'url',
+                  bool: {
+                    minimum_should_match: 1,
+                    should: [
+                      {
+                        multi_match: {
+                          query: 'injection',
+                          fields: [
+                            'title',
+                            'description',
+                            'name',
+                            'finding',
+                            'workflow_name',
+                            'host',
+                            'domain',
+                            'url',
+                          ],
+                          type: 'phrase_prefix',
+                        },
+                      },
+                      {
+                        prefix: {
+                          asset_key: { value: 'injection', case_insensitive: true },
+                        },
+                      },
+                      {
+                        prefix: {
+                          'sentris.asset_key': {
+                            value: 'injection',
+                            case_insensitive: true,
+                          },
+                        },
+                      },
+                      {
+                        prefix: {
+                          'sentris.workflow_name': {
+                            value: 'injection',
+                            case_insensitive: true,
+                          },
+                        },
+                      },
                     ],
-                    type: 'phrase_prefix',
                   },
                 },
                 {

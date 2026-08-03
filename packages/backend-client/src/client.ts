@@ -6120,6 +6120,13 @@ export interface components {
           }
         | {
             /** @enum {string} */
+            commandName: 'get_finding';
+            arguments: {
+              findingId: string;
+            };
+          }
+        | {
+            /** @enum {string} */
             commandName: 'compare_runs';
             arguments: {
               sourceRunId: string;

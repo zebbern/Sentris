@@ -849,6 +849,12 @@ export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
     .strict(),
   z
     .object({
+      commandName: z.literal('get_finding'),
+      arguments: OperatorGetFindingInputSchema,
+    })
+    .strict(),
+  z
+    .object({
       commandName: z.literal('compare_runs'),
       arguments: OperatorCompareRunsInputSchema,
     })

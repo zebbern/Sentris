@@ -3,6 +3,8 @@ import { describe, expect, it } from 'bun:test';
 import {
   createOperatorImproveRunNavigationState,
   createOperatorDirectCommandNavigationState,
+  createOperatorInvestigateFindingNavigationState,
+  createOperatorInvestigateRunNavigationState,
   createOperatorTurnFromHandoff,
   readOperatorImproveRunHandoff,
   readOperatorTurnHandoff,
@@ -59,6 +61,63 @@ describe('Operator run improvement handoff', () => {
           baseVersionId: '44444444-4444-4444-8444-444444444444',
           candidateRunId: 'sentris-run-candidate',
         },
+      },
+    });
+  });
+
+  it('loads run evidence before asking Operator to investigate', () => {
+    const state = createOperatorInvestigateRunNavigationState(
+      {
+        runId: 'sentris-run-source',
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        sourcePath: '/workflows/22222222-2222-4222-8222-222222222222/runs/sentris-run-source',
+      },
+      () => CLIENT_TURN_ID,
+    );
+
+    const handoff = readOperatorTurnHandoff(state);
+    expect(handoff?.kind).toBe('direct_command');
+    expect(createOperatorTurnFromHandoff(handoff!)).toEqual({
+      clientTurnId: CLIENT_TURN_ID,
+      message:
+        'Investigate this run. Review its status, stored output, recent and failed trace evidence, and findings. Explain what happened and recommend the most useful next step. Do not make changes unless I ask.',
+      context: {
+        path: '/workflows/22222222-2222-4222-8222-222222222222/runs/sentris-run-source',
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        runId: 'sentris-run-source',
+      },
+      directCommand: {
+        commandName: 'get_run',
+        arguments: { runId: 'sentris-run-source' },
+      },
+    });
+  });
+
+  it('loads bounded finding evidence before asking Operator to investigate', () => {
+    const state = createOperatorInvestigateFindingNavigationState(
+      {
+        findingId: 'finding-1',
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        runId: 'sentris-run-source',
+        sourcePath: '/findings',
+      },
+      () => CLIENT_TURN_ID,
+    );
+
+    const handoff = readOperatorTurnHandoff(state);
+    expect(handoff?.kind).toBe('direct_command');
+    expect(createOperatorTurnFromHandoff(handoff!)).toEqual({
+      clientTurnId: CLIENT_TURN_ID,
+      message:
+        'Investigate this finding. Review its bounded raw evidence, source run and workflow context, and current triage state. Explain what it means, how credible it is, and recommend the most useful next step. Do not change triage or workflows unless I ask.',
+      context: {
+        path: '/findings',
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        runId: 'sentris-run-source',
+      },
+      directCommand: {
+        commandName: 'get_finding',
+        arguments: { findingId: 'finding-1' },
       },
     });
   });

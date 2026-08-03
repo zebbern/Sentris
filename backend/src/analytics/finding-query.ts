@@ -272,22 +272,34 @@ export function buildFindingFilter(
 
   if (query.search) {
     must.push({
-      multi_match: {
-        query: query.search,
-        fields: [
-          'title',
-          'description',
-          'name',
-          'finding',
-          'asset_key',
-          'sentris.asset_key',
-          'sentris.workflow_name',
-          'workflow_name',
-          'host',
-          'domain',
-          'url',
+      bool: {
+        minimum_should_match: 1,
+        should: [
+          {
+            multi_match: {
+              query: query.search,
+              fields: [
+                'title',
+                'description',
+                'name',
+                'finding',
+                'workflow_name',
+                'host',
+                'domain',
+                'url',
+              ],
+              type: 'phrase_prefix',
+            },
+          },
+          ...['asset_key', 'sentris.asset_key', 'sentris.workflow_name'].map((field) => ({
+            prefix: {
+              [field]: {
+                value: query.search,
+                case_insensitive: true,
+              },
+            },
+          })),
         ],
-        type: 'phrase_prefix',
       },
     });
   }

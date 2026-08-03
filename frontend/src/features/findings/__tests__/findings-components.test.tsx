@@ -1,7 +1,7 @@
 import { describe, it, expect, mock, afterEach, afterAll, vi } from 'bun:test';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { restoreMockedModules } from '@/test/restore-mocks';
 
@@ -89,6 +89,15 @@ function Wrapper({ children }: { children: ReactNode }) {
     <MemoryRouter>
       <QueryClientProvider client={qc}>{children}</QueryClientProvider>
     </MemoryRouter>
+  );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <output data-testid="location">
+      {JSON.stringify({ pathname: location.pathname, state: location.state })}
+    </output>
   );
 }
 
@@ -340,7 +349,7 @@ describe('FindingDetailSheet', () => {
     name: 'SQL Injection',
     asset_key: 'example.com',
     workflow_name: 'Web Scan',
-    workflow_id: 'wf-1',
+    workflow_id: '22222222-2222-4222-8222-222222222222',
     run_id: 'run-1',
     component_id: 'comp-1',
     node_ref: 'node-1',
@@ -405,6 +414,39 @@ describe('FindingDetailSheet', () => {
     expect(screen.getAllByText('High').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('example.com')).toBeTruthy();
     expect(screen.getByText('Web Scan')).toBeTruthy();
+  });
+
+  it('opens Operator with the finding evidence preloaded', async () => {
+    getMock.mockResolvedValueOnce(mockFinding);
+    const queryClient = createTestQueryClient();
+
+    render(
+      <MemoryRouter initialEntries={['/findings']}>
+        <QueryClientProvider client={queryClient}>
+          <Routes>
+            <Route
+              path="*"
+              element={
+                <>
+                  <FindingDetailSheet findingId="finding-1" isOpen={true} onClose={vi.fn()} />
+                  <LocationProbe />
+                </>
+              }
+            />
+          </Routes>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask Operator about this finding' }));
+
+    await waitFor(() => {
+      const location = screen.getByTestId('location').textContent ?? '';
+      expect(location).toContain('"pathname":"/operator"');
+      expect(location).toContain('"commandName":"get_finding"');
+      expect(location).toContain('"findingId":"finding-1"');
+      expect(location).toContain('"runId":"run-1"');
+    });
   });
 
   it('shows raw data toggle button', async () => {

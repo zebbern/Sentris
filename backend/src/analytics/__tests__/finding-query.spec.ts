@@ -26,9 +26,34 @@ describe('buildFindingFilter triage projection', () => {
       bool: {
         must: [
           {
-            multi_match: expect.objectContaining({
-              fields: expect.arrayContaining(['sentris.workflow_name', 'workflow_name']),
-            }),
+            bool: {
+              minimum_should_match: 1,
+              should: [
+                {
+                  multi_match: expect.objectContaining({
+                    fields: expect.arrayContaining(['workflow_name']),
+                  }),
+                },
+                {
+                  prefix: {
+                    asset_key: { value: 'Nightly scan', case_insensitive: true },
+                  },
+                },
+                {
+                  prefix: {
+                    'sentris.asset_key': { value: 'Nightly scan', case_insensitive: true },
+                  },
+                },
+                {
+                  prefix: {
+                    'sentris.workflow_name': {
+                      value: 'Nightly scan',
+                      case_insensitive: true,
+                    },
+                  },
+                },
+              ],
+            },
           },
           {
             bool: {

@@ -19857,6 +19857,36 @@
                   "commandName": {
                     "type": "string",
                     "enum": [
+                      "get_finding"
+                    ]
+                  },
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "findingId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    },
+                    "required": [
+                      "findingId"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "commandName",
+                  "arguments"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "commandName": {
+                    "type": "string",
+                    "enum": [
                       "compare_runs"
                     ]
                   },

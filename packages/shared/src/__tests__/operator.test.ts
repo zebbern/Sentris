@@ -134,6 +134,20 @@ describe('Operator run controls', () => {
     });
   });
 
+  it('accepts a bounded finding inspection as a direct read command', () => {
+    expect(OPERATOR_COMMAND_DEFINITIONS.get_finding.effect).toBe('read');
+    expect(
+      OperatorCreateTurnSchema.parse({
+        clientTurnId: SESSION_ID,
+        message: 'Investigate this finding',
+        directCommand: {
+          commandName: 'get_finding',
+          arguments: { findingId: 'finding-1' },
+        },
+      }).directCommand,
+    ).toEqual({ commandName: 'get_finding', arguments: { findingId: 'finding-1' } });
+  });
+
   it('accepts one bounded improve-run journey separately from direct commands', () => {
     expect(
       OperatorCreateTurnSchema.parse({

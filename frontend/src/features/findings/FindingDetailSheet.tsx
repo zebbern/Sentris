@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Bot, ChevronDown, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +18,7 @@ import { FindingTriageControls } from '@/features/findings/FindingTriageControls
 import { LinkedTicket } from '@/features/findings/LinkedTicket';
 import { FindingTimeline } from '@/features/findings/FindingTimeline';
 import type { FindingTriageStatus } from '@/features/findings/types';
+import { createOperatorInvestigateFindingNavigationState } from '@/features/operator/operatorHandoff';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,6 +57,8 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 
 export function FindingDetailSheet({ findingId, isOpen, onClose }: FindingDetailSheetProps) {
   const { data: finding, isLoading, error } = useFindingDetailQuery(findingId);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isRawExpanded, setIsRawExpanded] = useState(false);
   const [isTimelineExpanded, setIsTimelineExpanded] = useState(true);
 
@@ -80,6 +84,32 @@ export function FindingDetailSheet({ findingId, isOpen, onClose }: FindingDetail
           <SheetTitle>Finding Details</SheetTitle>
           <SheetDescription>{finding?.name ?? 'Loading finding details…'}</SheetDescription>
         </SheetHeader>
+
+        {finding ? (
+          <div className="mt-4 flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              aria-label="Ask Operator about this finding"
+              onClick={() => {
+                const sourcePath = `${location.pathname}${location.search}`;
+                const state = createOperatorInvestigateFindingNavigationState({
+                  findingId: finding.id,
+                  sourcePath,
+                  ...(finding.workflow_id ? { workflowId: finding.workflow_id } : {}),
+                  ...(finding.run_id ? { runId: finding.run_id } : {}),
+                });
+                onClose();
+                navigate('/operator', { state });
+              }}
+            >
+              <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+              Ask Operator
+            </Button>
+          </div>
+        ) : null}
 
         {/* Loading */}
         {isLoading && (
