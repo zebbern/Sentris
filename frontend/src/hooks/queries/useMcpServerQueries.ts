@@ -7,7 +7,6 @@ import type {
   UpdateMcpServer,
 } from '@sentris/shared';
 import { getApiAuthHeaders, API_BASE_URL } from '@/services/api';
-import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
 import { queryKeys } from '@/lib/queryKeys';
 
 // Re-export types that consumers need
@@ -86,7 +85,6 @@ export function useMcpServers(options?: { enabled?: boolean }) {
     staleTime: 120_000,
   });
 }
-
 export function useMcpAllTools(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.mcpServers.tools(),
@@ -215,59 +213,6 @@ export function useToggleMcpTool() {
       apiRequest<McpToolResponse>(`/api/v1/mcp-servers/${serverId}/tools/${toolId}/toggle`, {
         method: 'POST',
       }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
-    },
-  });
-}
-
-export function useDiscoverMcpTools() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      serverId,
-      servers,
-      image,
-    }: {
-      serverId: string;
-      servers: McpServerResponse[];
-      image?: string;
-    }) => {
-      const server = servers.find((s) => s.id === serverId);
-      if (!server) throw new Error(`Server ${serverId} not found`);
-
-      const { workflowId } = await mcpDiscoveryApi.discover({
-        transport: server.transportType,
-        name: server.name,
-        endpoint: server.endpoint ?? undefined,
-        command: server.command ?? undefined,
-        args: server.args ?? undefined,
-        image,
-      });
-
-      const maxAttempts = 60;
-      const pollInterval = 1000;
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const status = await mcpDiscoveryApi.getStatus(workflowId);
-        if (status.status === 'completed' && status.tools) {
-          return status.tools.map((tool) => ({
-            id: `${serverId}-${tool.name}`,
-            toolName: tool.name,
-            description: tool.description ?? null,
-            inputSchema: tool.inputSchema ?? null,
-            serverId,
-            serverName: server.name,
-            enabled: true,
-            discoveredAt: new Date().toISOString(),
-          })) as McpToolResponse[];
-        }
-        if (status.status === 'failed') {
-          throw new Error(status.error ?? 'Discovery failed');
-        }
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
-      }
-      throw new Error('Discovery timed out after 60 seconds');
-    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
     },

@@ -35,7 +35,6 @@ export type {
   HeaderEntry,
   DiscoveryPreviewItem,
   DiscoveryStatusState,
-  DiscoveryCacheEntry,
   ToolCounts,
   ConnectionInfo,
   GroupServerInfo,

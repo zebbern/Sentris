@@ -9,13 +9,6 @@ mock.module('@/services/api', () => ({
   API_BASE_URL: 'http://localhost:3000',
 }));
 
-mock.module('@/services/mcpDiscoveryApi', () => ({
-  mcpDiscoveryApi: {
-    discover: vi.fn(),
-    getStatus: vi.fn(),
-  },
-}));
-
 const originalFetch = globalThis.fetch;
 const fetchMock = vi.fn();
 

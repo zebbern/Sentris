@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SecretSelect } from '@/components/inputs/SecretSelect';
-import { AlertCircle, CheckCircle, Loader2, KeyRound } from 'lucide-react';
+import { AlertCircle, Loader2, KeyRound } from 'lucide-react';
 import { TRANSPORT_TYPES } from './types';
 import type { TransportType, ServerFormData, HeaderEntry, DiscoveryStatusState } from './types';
 import { HeaderEntriesSection } from './HeaderEntriesSection';
@@ -25,7 +25,6 @@ interface ManualServerFormProps {
   onUpdateHeader: (index: number, field: 'key' | 'value' | 'secretId', value: string) => void;
   onRemoveHeader: (index: number) => void;
   discoveryStatus: DiscoveryStatusState | null;
-  onTestAndDiscover: () => void;
   onSave: () => void;
   isSaving: boolean;
   editingServer: string | null;
@@ -42,7 +41,6 @@ export function ManualServerForm({
   onUpdateHeader,
   onRemoveHeader,
   discoveryStatus,
-  onTestAndDiscover,
   onSave,
   isSaving,
   editingServer,
@@ -185,21 +183,6 @@ export function ManualServerForm({
         onRemoveHeader={onRemoveHeader}
       />
 
-      {discoveryStatus?.status === 'completed' && (
-        <div className="flex items-center justify-between p-3 rounded-md bg-success/10 border border-success/20">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <span className="text-sm text-success">
-              Found {discoveryStatus.toolCount} tool
-              {discoveryStatus.toolCount !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <Button size="sm" onClick={onSave} disabled={isSaving || !formData.name.trim()}>
-            {isSaving ? 'Saving...' : 'Save MCP Server'}
-          </Button>
-        </div>
-      )}
-
       {discoveryStatus?.status === 'failed' && (
         <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
           <AlertCircle className="h-4 w-4 text-destructive" />
@@ -217,38 +200,25 @@ export function ManualServerForm({
         >
           Cancel
         </Button>
-        {discoveryStatus?.status !== 'completed' && (
-          <>
-            <Button
-              variant="outline"
-              onClick={onTestAndDiscover}
-              disabled={
-                discoveryStatus?.status === 'running' ||
-                !formData.name.trim() ||
-                (!formData.endpoint.trim() && !formData.command.trim())
-              }
-            >
-              {discoveryStatus?.status === 'running' ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Discovering...
-                </>
-              ) : (
-                'Test & Discover'
-              )}
-            </Button>
-            <Button
-              onClick={onSave}
-              disabled={
-                isSaving ||
-                !formData.name.trim() ||
-                (!formData.endpoint.trim() && !formData.command.trim())
-              }
-            >
-              {isSaving ? 'Saving...' : editingServer ? 'Update' : 'Create'}
-            </Button>
-          </>
-        )}
+        <Button
+          onClick={onSave}
+          disabled={
+            isSaving ||
+            !formData.name.trim() ||
+            (!formData.endpoint.trim() && !formData.command.trim())
+          }
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Saving &amp; discovering...
+            </>
+          ) : editingServer ? (
+            'Update & Discover'
+          ) : (
+            'Create & Discover'
+          )}
+        </Button>
       </div>
     </>
   );

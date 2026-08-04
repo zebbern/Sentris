@@ -1,5 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import {
   useCreateMcpServer,
@@ -7,8 +6,6 @@ import {
   useTestMcpConnection,
   type McpServerResponse,
 } from '@/hooks/queries/useMcpServerQueries';
-import { queryKeys } from '@/lib/queryKeys';
-import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
 import type { CreateMcpServer } from '@sentris/shared';
 import type { ServerFormData, HeaderEntry, DiscoveryStatusState } from './types';
 import { INITIAL_FORM_DATA } from './types';
@@ -21,7 +18,6 @@ interface UseEditorActionsOptions {
 
 export function useEditorActions({ servers, setCheckingServers }: UseEditorActionsOptions) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // Editor state
   const [editorOpen, setEditorOpen] = useState(false);
@@ -37,23 +33,10 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
   // Manual tab discovery
   const [discoveryStatus, setDiscoveryStatus] = useState<DiscoveryStatusState | null>(null);
 
-  // Poll interval ref for cleanup on unmount
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // Mutations
   const createServerMutation = useCreateMcpServer();
   const updateServerMutation = useUpdateMcpServer();
   const testConnectionMutation = useTestMcpConnection();
-
-  // Cleanup poll interval on unmount
-  useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    };
-  }, []);
 
   // Populate header entries when editing a server
   useEffect(() => {
@@ -137,69 +120,10 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
     [servers],
   );
 
-  const handleTestAndDiscover = useCallback(async () => {
-    const headersPayload = buildHeadersPayload(headerEntries);
-
-    const input = {
-      transport: formData.transportType,
-      name: formData.name.trim(),
-      endpoint: formData.transportType === 'http' ? formData.endpoint.trim() : undefined,
-      headers: headersPayload,
-      command: formData.transportType === 'stdio' ? formData.command.trim() : undefined,
-      args:
-        formData.transportType === 'stdio' && formData.args.trim()
-          ? formData.args
-              .split('\n')
-              .map((a) => a.trim())
-              .filter(Boolean)
-          : undefined,
-    };
-
-    try {
-      const { workflowId } = await mcpDiscoveryApi.discover(input);
-      setDiscoveryStatus({ workflowId, status: 'running' });
-
-      // Clear any existing poll interval before starting a new one
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          const result = await mcpDiscoveryApi.getStatus(workflowId);
-          if (result.status === 'completed') {
-            clearInterval(pollIntervalRef.current!);
-            pollIntervalRef.current = null;
-            setDiscoveryStatus({
-              status: 'completed',
-              tools: result.tools,
-              toolCount: result.toolCount,
-            });
-          } else if (result.status === 'failed') {
-            clearInterval(pollIntervalRef.current!);
-            pollIntervalRef.current = null;
-            setDiscoveryStatus({ status: 'failed', error: result.error });
-          }
-        } catch (error: unknown) {
-          clearInterval(pollIntervalRef.current!);
-          pollIntervalRef.current = null;
-          setDiscoveryStatus({
-            status: 'failed',
-            error: error instanceof Error ? error.message : 'Discovery failed',
-          });
-        }
-      }, 2000);
-    } catch (error: unknown) {
-      setDiscoveryStatus({
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Failed to start discovery',
-      });
-    }
-  }, [formData, headerEntries]);
-
   const handleSave = useCallback(async () => {
     setIsSaving(true);
+    setDiscoveryStatus({ status: 'running' });
+    let serverId = editingServer;
     try {
       const headersPayload = buildHeadersPayload(headerEntries);
 
@@ -217,64 +141,51 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
                 .filter(Boolean)
             : undefined,
         headers: headersPayload,
-        enabled: true,
+        enabled: formData.enabled,
       };
 
-      if (editingServer) {
-        setCheckingServers((prev) => new Set([...prev, editingServer]));
-        await updateServerMutation.mutateAsync({ id: editingServer, input: payload });
-        testConnectionMutation
-          .mutateAsync(editingServer)
-          .then(async () => {
-            await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
-            await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
-          })
-          .catch(() => {
-            // Global MutationCache error handler shows the toast
-          })
-          .finally(() => {
-            setCheckingServers((prev) => {
-              const next = new Set(prev);
-              next.delete(editingServer);
-              return next;
-            });
-          });
-        toast({ title: 'Server updated', description: `${payload.name} has been updated.` });
+      if (serverId) {
+        await updateServerMutation.mutateAsync({ id: serverId, input: payload });
       } else {
         const newServer = await createServerMutation.mutateAsync(payload);
-        setCheckingServers((prev) => new Set([...prev, newServer.id]));
-        testConnectionMutation
-          .mutateAsync(newServer.id)
-          .then(async (result) => {
-            await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
-            await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
-            if (result.toolCount !== undefined && result.toolCount > 0) {
-              toast({
-                title: 'Server ready',
-                description: `Discovered ${result.toolCount} tool(s) from ${payload.name}.`,
-              });
-            }
-          })
-          .catch(() => {
-            // Global MutationCache error handler shows the toast
-          })
-          .finally(() => {
-            setCheckingServers((prev) => {
-              const next = new Set(prev);
-              next.delete(newServer.id);
-              return next;
-            });
-          });
-        toast({ title: 'Server created', description: `${payload.name} has been added.` });
+        serverId = newServer.id;
+        setEditingServer(newServer.id);
       }
 
+      const persistedServerId = serverId;
+      if (!persistedServerId) throw new Error('MCP server persistence returned no server ID');
+      setCheckingServers((prev) => new Set(prev).add(persistedServerId));
+      const result = await testConnectionMutation.mutateAsync(persistedServerId);
+      if (!result.success) {
+        setDiscoveryStatus({ status: 'failed', error: result.message });
+        toast({
+          title: 'Server saved, discovery failed',
+          description: 'The configuration remains editable so you can correct and retry it.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({ title: 'Server ready', description: result.message });
       setEditorOpen(false);
       setEditingServer(null);
       setFormData(INITIAL_FORM_DATA);
       setDiscoveryStatus(null);
-    } catch {
+    } catch (error: unknown) {
+      setDiscoveryStatus({
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Failed to save and discover server',
+      });
       // Global MutationCache error handler shows the toast
     } finally {
+      const completedServerId = serverId;
+      if (completedServerId) {
+        setCheckingServers((prev) => {
+          const next = new Set(prev);
+          next.delete(completedServerId);
+          return next;
+        });
+      }
       setIsSaving(false);
     }
   }, [
@@ -284,7 +195,6 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
     createServerMutation,
     updateServerMutation,
     testConnectionMutation,
-    queryClient,
     toast,
     setCheckingServers,
   ]);
@@ -310,7 +220,6 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
     handleCreateNew,
     handleEditorClose,
     handleEdit,
-    handleTestAndDiscover,
     handleSave,
     formDataToJson,
   };

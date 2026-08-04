@@ -10,10 +10,6 @@ mock.module('@/services/api', () => ({
   API_BASE_URL: 'http://api.test',
   getApiAuthHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer test' }),
 }));
-mock.module('@/services/mcpDiscoveryApi', () => ({
-  mcpDiscoveryApi: { discover: vi.fn(), getStatus: vi.fn() },
-}));
-
 import { useMcpAllTools, useMcpServers } from '../useMcpServerQueries';
 
 afterEach(cleanup);

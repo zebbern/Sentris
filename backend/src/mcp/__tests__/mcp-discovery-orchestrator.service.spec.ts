@@ -1,13 +1,7 @@
 import { describe, expect, test, vi } from 'bun:test';
 
-import { McpDiscoveryOrchestratorService } from '../mcp-discovery-orchestrator.service';
 import type { AuthContext } from '../../auth/types';
-
-const discoveryInput = {
-  transport: 'http' as const,
-  name: 'public-mcp',
-  endpoint: 'https://93.184.216.34/mcp',
-};
+import { McpDiscoveryOrchestratorService } from '../mcp-discovery-orchestrator.service';
 
 const groupDiscoveryInput = {
   servers: [
@@ -43,9 +37,7 @@ function createService() {
     del: vi.fn(async (...keys: string[]) => {
       let deleted = 0;
       for (const key of keys) {
-        if (records.delete(key)) {
-          deleted += 1;
-        }
+        if (records.delete(key)) deleted += 1;
       }
       return deleted;
     }),
@@ -54,7 +46,7 @@ function createService() {
   const temporal = {
     getDefaultTaskQueue: vi.fn(() => 'test-queue'),
     startWorkflow: vi.fn(async () => ({ workflowId: 'ignored' })),
-    queryWorkflow: vi.fn(async () => ({ status: 'completed' as const, tools: [] })),
+    queryWorkflow: vi.fn(async () => ({ status: 'completed' as const, results: [] })),
   };
 
   return {
@@ -69,52 +61,18 @@ function generatedKeys(redis: ReturnType<typeof createService>['redis']): string
   return redis.setex.mock.calls.map(([key]) => key);
 }
 
-describe('McpDiscoveryOrchestratorService access boundaries', () => {
-  test('rejects discovery requests from non-admin organization members', async () => {
+describe('McpDiscoveryOrchestratorService group access boundaries', () => {
+  test('rejects group discovery from non-admin organization members', async () => {
     const { service, temporal } = createService();
     const member: AuthContext = { ...adminInOrgA, roles: ['MEMBER'] };
 
-    await expect((service as any).startDiscovery(discoveryInput, member)).rejects.toThrow(
+    await expect(service.startGroupDiscovery(groupDiscoveryInput, member)).rejects.toThrow(
       'Administrator role required',
     );
     expect(temporal.startWorkflow).not.toHaveBeenCalled();
   });
 
-  test('denies status access to a discovery owned by another organization', async () => {
-    const { service, temporal } = createService();
-    const started = await (service as any).startDiscovery(discoveryInput, adminInOrgA);
-    const adminInOrgB: AuthContext = { ...adminInOrgA, userId: 'admin-b', organizationId: 'org-b' };
-
-    await expect((service as any).getStatus(started.workflowId, adminInOrgB)).rejects.toThrow(
-      'Discovery workflow access denied',
-    );
-    expect(temporal.queryWorkflow).not.toHaveBeenCalled();
-  });
-
-  test('allows the owning organization to query a single discovery', async () => {
-    const { service, temporal } = createService();
-    const started = await service.startDiscovery(discoveryInput, adminInOrgA);
-
-    await expect(service.getStatus(started.workflowId, adminInOrgA)).resolves.toMatchObject({
-      workflowId: started.workflowId,
-      status: 'completed',
-    });
-    expect(temporal.queryWorkflow).toHaveBeenCalledWith({
-      workflowId: started.workflowId,
-      queryType: 'getDiscoveryResult',
-    });
-  });
-
-  test('denies single-discovery status when the ownership record is missing', async () => {
-    const { service, temporal } = createService();
-
-    await expect(service.getStatus('missing-workflow', adminInOrgA)).rejects.toThrow(
-      'Discovery workflow access denied',
-    );
-    expect(temporal.queryWorkflow).not.toHaveBeenCalled();
-  });
-
-  test('allows the owning organization to query a group discovery', async () => {
+  test('allows the owning organization to query group discovery', async () => {
     const { service, temporal } = createService();
     const started = await service.startGroupDiscovery(groupDiscoveryInput, adminInOrgA);
 
@@ -128,7 +86,7 @@ describe('McpDiscoveryOrchestratorService access boundaries', () => {
     });
   });
 
-  test('denies group-discovery status to another organization', async () => {
+  test('denies group discovery status to another organization', async () => {
     const { service, temporal } = createService();
     const started = await service.startGroupDiscovery(groupDiscoveryInput, adminInOrgA);
     const adminInOrgB: AuthContext = {
@@ -143,7 +101,7 @@ describe('McpDiscoveryOrchestratorService access boundaries', () => {
     expect(temporal.queryWorkflow).not.toHaveBeenCalled();
   });
 
-  test('denies group-discovery status when the ownership record is missing', async () => {
+  test('denies group discovery status when the ownership record is missing', async () => {
     const { service, temporal } = createService();
 
     await expect(service.getGroupStatus('missing-group-workflow', adminInOrgA)).rejects.toThrow(
@@ -153,24 +111,8 @@ describe('McpDiscoveryOrchestratorService access boundaries', () => {
   });
 });
 
-describe('McpDiscoveryOrchestratorService startup compensation', () => {
-  test('deletes the single workflow owner and cache record when Temporal start fails', async () => {
-    const { service, temporal, redis, records } = createService();
-    records.set('mcp-discovery:workflow:existing-workflow', '{"organizationId":"org-existing"}');
-    temporal.startWorkflow.mockRejectedValueOnce(new Error('Temporal unavailable'));
-
-    await expect(service.startDiscovery(discoveryInput, adminInOrgA)).rejects.toThrow(
-      'Temporal unavailable',
-    );
-
-    const freshKeys = generatedKeys(redis);
-    expect(freshKeys).toHaveLength(2);
-    expect(redis.del).toHaveBeenCalledWith(...freshKeys);
-    expect(freshKeys.every((key) => !records.has(key))).toBe(true);
-    expect(records.has('mcp-discovery:workflow:existing-workflow')).toBe(true);
-  });
-
-  test('deletes the group owner and every generated cache record when Temporal start fails', async () => {
+describe('McpDiscoveryOrchestratorService group startup compensation', () => {
+  test('deletes the owner and every generated cache record when Temporal start fails', async () => {
     const { service, temporal, redis, records } = createService();
     records.set('mcp-discovery:existing-cache', '{"organizationId":"org-existing"}');
     temporal.startWorkflow.mockRejectedValueOnce(new Error('Temporal unavailable'));
@@ -186,19 +128,19 @@ describe('McpDiscoveryOrchestratorService startup compensation', () => {
     expect(records.has('mcp-discovery:existing-cache')).toBe(true);
   });
 
-  test('waits for partial single-record writes to settle before deleting every generated key', async () => {
+  test('waits for partial writes to settle before deleting every generated key', async () => {
     const { service, redis, records, temporal } = createService();
+    let invocation = 0;
     redis.setex.mockImplementation(async (key: string, _ttl: number, value: string) => {
-      if (key.startsWith('mcp-discovery:workflow:')) {
-        throw new Error('owner write failed');
-      }
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      invocation += 1;
+      if (invocation === 2) throw new Error('cache write failed');
+      if (invocation === 1) await new Promise((resolve) => setTimeout(resolve, 10));
       records.set(key, value);
       return 'OK';
     });
 
-    await expect(service.startDiscovery(discoveryInput, adminInOrgA)).rejects.toThrow(
-      'owner write failed',
+    await expect(service.startGroupDiscovery(groupDiscoveryInput, adminInOrgA)).rejects.toThrow(
+      'cache write failed',
     );
 
     const freshKeys = generatedKeys(redis);
@@ -207,14 +149,12 @@ describe('McpDiscoveryOrchestratorService startup compensation', () => {
     expect(temporal.startWorkflow).not.toHaveBeenCalled();
   });
 
-  test('waits for an in-flight write before compensating a synchronous Redis write failure', async () => {
+  test('waits for in-flight writes before compensating a synchronous write failure', async () => {
     const { service, redis, records, temporal } = createService();
     let invocation = 0;
     redis.setex.mockImplementation((key: string, _ttl: number, value: string) => {
       invocation += 1;
-      if (invocation === 2) {
-        throw new Error('synchronous owner write failure');
-      }
+      if (invocation === 2) throw new Error('synchronous cache write failure');
       return new Promise<'OK'>((resolve) => {
         setTimeout(() => {
           records.set(key, value);
@@ -223,33 +163,8 @@ describe('McpDiscoveryOrchestratorService startup compensation', () => {
       });
     });
 
-    await expect(service.startDiscovery(discoveryInput, adminInOrgA)).rejects.toThrow(
-      'synchronous owner write failure',
-    );
-
-    const freshKeys = generatedKeys(redis);
-    expect(redis.del).toHaveBeenCalledWith(...freshKeys);
-    expect(freshKeys.every((key) => !records.has(key))).toBe(true);
-    expect(temporal.startWorkflow).not.toHaveBeenCalled();
-  });
-
-  test('waits for partial group-record writes to settle before deleting every generated key', async () => {
-    const { service, redis, records, temporal } = createService();
-    let invocation = 0;
-    redis.setex.mockImplementation(async (key: string, _ttl: number, value: string) => {
-      invocation += 1;
-      if (invocation === 2) {
-        throw new Error('cache write failed');
-      }
-      if (invocation === 1) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-      records.set(key, value);
-      return 'OK';
-    });
-
     await expect(service.startGroupDiscovery(groupDiscoveryInput, adminInOrgA)).rejects.toThrow(
-      'cache write failed',
+      'synchronous cache write failure',
     );
 
     const freshKeys = generatedKeys(redis);

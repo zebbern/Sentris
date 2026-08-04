@@ -56,7 +56,8 @@ const mockQueryState: {
   testConnection: any;
   testEnabledServers: any;
   toggleTool: any;
-  discoverTools: any;
+  createServer: any;
+  updateServer: any;
 } = {
   servers: [],
   tools: [],
@@ -71,7 +72,8 @@ const mockQueryState: {
   testConnection: mock().mockResolvedValue({ success: true, message: 'OK' }),
   testEnabledServers: mock().mockResolvedValue([]),
   toggleTool: mock().mockResolvedValue({ id: 'tool-1', toolName: 'test', enabled: true }),
-  discoverTools: mock().mockResolvedValue([]),
+  createServer: mock().mockResolvedValue({ id: 'created-server' }),
+  updateServer: mock().mockResolvedValue({ id: 'updated-server' }),
 };
 
 mock.module('@/hooks/queries/useMcpServerQueries', () => ({
@@ -111,14 +113,11 @@ mock.module('@/hooks/queries/useMcpServerQueries', () => ({
   useToggleMcpTool: () => ({
     mutateAsync: mockQueryState.toggleTool,
   }),
-  useDiscoverMcpTools: () => ({
-    mutateAsync: mockQueryState.discoverTools,
-  }),
   useCreateMcpServer: () => ({
-    mutateAsync: mock().mockResolvedValue({}),
+    mutateAsync: mockQueryState.createServer,
   }),
   useUpdateMcpServer: () => ({
-    mutateAsync: mock().mockResolvedValue({}),
+    mutateAsync: mockQueryState.updateServer,
   }),
 }));
 
@@ -145,9 +144,8 @@ mock.module('@/hooks/queries/useMcpGroupQueries', () => ({
 // Mock mcpDiscoveryApi to prevent real API calls
 mock.module('@/services/mcpDiscoveryApi', () => ({
   mcpDiscoveryApi: {
-    discover: mock().mockResolvedValue({ workflowId: 'wf-1' }),
-    getStatus: mock().mockResolvedValue({ status: 'completed', tools: [] }),
-    testGroupServers: mock().mockResolvedValue({ servers: [] }),
+    discoverGroup: mock().mockResolvedValue({ workflowId: 'wf-1', cacheTokens: {} }),
+    getGroupStatus: mock().mockResolvedValue({ status: 'completed', results: [] }),
   },
 }));
 
@@ -225,7 +223,8 @@ interface MockQueryOverrides {
   toggleServer?: (...args: any[]) => Promise<any>;
   testConnection?: (...args: any[]) => Promise<any>;
   testEnabledServers?: (...args: any[]) => Promise<any>;
-  discoverTools?: (...args: any[]) => Promise<any>;
+  createServer?: (...args: any[]) => Promise<any>;
+  updateServer?: (...args: any[]) => Promise<any>;
 }
 
 const setupStore = (overrides: MockQueryOverrides = {}) => {
@@ -248,7 +247,10 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.testConnection =
     overrides.testConnection ?? mock().mockResolvedValue({ success: true, message: 'OK' });
   mockQueryState.testEnabledServers = overrides.testEnabledServers ?? mock().mockResolvedValue([]);
-  mockQueryState.discoverTools = overrides.discoverTools ?? mock().mockResolvedValue([]);
+  mockQueryState.createServer =
+    overrides.createServer ?? mock().mockResolvedValue({ id: 'created-server' });
+  mockQueryState.updateServer =
+    overrides.updateServer ?? mock().mockResolvedValue({ id: 'updated-server' });
 
   return mockQueryState;
 };
@@ -340,6 +342,37 @@ describe('McpLibraryPage', () => {
     expect(addButton).toBeInTheDocument();
   });
 
+  it('saves a new server before discovering it through the canonical saved-server path', async () => {
+    const operationOrder: string[] = [];
+    const createServer = mock(async () => {
+      operationOrder.push('create');
+      return { id: 'saved-server' };
+    });
+    const testConnection = mock(async () => {
+      operationOrder.push('discover');
+      return {
+        success: true,
+        message: 'Connection successful (1 tools, 1 resources, 0 templates, 0 prompts discovered)',
+        toolCount: 1,
+      };
+    });
+    setupStore({ servers: [], createServer, testConnection });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Add Server/i }));
+    fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'Saved MCP' } });
+    fireEvent.change(screen.getByLabelText('Endpoint URL *'), {
+      target: { value: 'https://mcp.example.com/mcp' },
+    });
+
+    expect(screen.queryByRole('button', { name: /Test & Discover/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create & Discover' }));
+
+    await waitFor(() => expect(createServer).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(testConnection).toHaveBeenCalledWith('saved-server'));
+    expect(operationOrder).toEqual(['create', 'discover']);
+  });
+
   it('renders the search input', () => {
     renderPage();
 
@@ -404,21 +437,10 @@ describe('McpLibraryPage', () => {
       message: 'Connection successful (1 tools discovered)',
       toolCount: 1,
     });
-    const discoverTools = mock().mockResolvedValue([
-      {
-        id: 'preview-tool',
-        toolName: 'preview',
-        serverId: 'srv-001',
-        serverName: 'GitHub MCP',
-        enabled: true,
-        discoveredAt: ISO,
-      },
-    ]);
     setupStore({
       servers: [baseServer],
       tools: [],
       testConnection,
-      discoverTools,
     });
     renderPage();
 
@@ -426,7 +448,6 @@ describe('McpLibraryPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Discover capabilities/i }));
 
     await waitFor(() => expect(testConnection).toHaveBeenCalledWith('srv-001'));
-    expect(discoverTools).not.toHaveBeenCalled();
   });
 
   it('shows discovered resources, templates, and prompts for a saved server', () => {

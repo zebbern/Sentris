@@ -1,9 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { McpDiscoveryPreview } from '@/components/mcp/McpDiscoveryPreview';
-import { Search, AlertCircle, HelpCircle, Loader2 } from 'lucide-react';
-import type { DiscoveryPreviewItem } from './types';
+import { AlertCircle, HelpCircle, Loader2 } from 'lucide-react';
 
 interface JsonServerFormProps {
   editingServer: string | null;
@@ -11,10 +9,6 @@ interface JsonServerFormProps {
   onJsonValueChange: (value: string) => void;
   jsonParseError: string | null;
   onJsonParseErrorChange: (error: string | null) => void;
-  isTestingDiscovery: boolean;
-  discoveryPreview: DiscoveryPreviewItem[] | null;
-  onClearDiscoveryPreview: () => void;
-  onTestAndDiscover: () => void;
   onSave: () => void;
   isSaving: boolean;
   isImporting: boolean;
@@ -27,10 +21,6 @@ export function JsonServerForm({
   onJsonValueChange,
   jsonParseError,
   onJsonParseErrorChange,
-  isTestingDiscovery,
-  discoveryPreview,
-  onClearDiscoveryPreview,
-  onTestAndDiscover,
   onSave,
   isSaving,
   isImporting,
@@ -75,41 +65,14 @@ export function JsonServerForm({
         </p>
       </div>
 
-      {discoveryPreview && (
-        <McpDiscoveryPreview results={discoveryPreview} onClear={onClearDiscoveryPreview} />
-      )}
-
       <div className="flex flex-col gap-3 pt-4">
-        {!editingServer && !discoveryPreview && jsonValue.trim() && (
+        {!editingServer && jsonValue.trim() && (
           <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
             <HelpCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>
-              Run &quot;Test &amp; Discover&quot; first to validate servers and discover available
-              tools before importing.
+              Servers are saved first, then their complete capabilities are discovered through the
+              same runtime used by workflows and Agents. Failed configurations remain editable.
             </span>
-          </div>
-        )}
-
-        {!editingServer && discoveryPreview && (
-          <div className="flex items-center justify-between text-sm bg-success/10 border border-success/20 rounded-md px-3 py-2">
-            <span className="text-success">
-              {discoveryPreview.filter((r) => r.status === 'completed').length} of{' '}
-              {discoveryPreview.length} servers ready
-              {discoveryPreview.some((r) => r.status === 'completed') && (
-                <span className="text-success ml-2">
-                  (
-                  {discoveryPreview
-                    .filter((r) => r.status === 'completed')
-                    .reduce((sum, r) => sum + (r.toolCount ?? 0), 0)}{' '}
-                  tools discovered)
-                </span>
-              )}
-            </span>
-            {discoveryPreview.some((r) => r.status === 'failed') && (
-              <span className="text-destructive">
-                {discoveryPreview.filter((r) => r.status === 'failed').length} failed
-              </span>
-            )}
           </div>
         )}
 
@@ -117,44 +80,21 @@ export function JsonServerForm({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          {!editingServer && (
-            <Button
-              variant="outline"
-              onClick={onTestAndDiscover}
-              disabled={isTestingDiscovery || !jsonValue.trim()}
-            >
-              {isTestingDiscovery ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Testing...
-                </>
+          <Button onClick={onSave} disabled={isSaving || isImporting || !jsonValue.trim()}>
+            {editingServer ? (
+              isSaving || isImporting ? (
+                'Updating & discovering...'
               ) : (
-                <>
-                  <Search className="h-4 w-4 mr-2" />
-                  Test & Discover
-                </>
-              )}
-            </Button>
-          )}
-          <Button
-            onClick={onSave}
-            disabled={
-              (editingServer ? isSaving : isImporting) ||
-              !jsonValue.trim() ||
-              (!editingServer && !discoveryPreview) ||
-              (!editingServer &&
-                discoveryPreview?.some((r) => r.status === 'discovering' || r.status === 'pending'))
-            }
-          >
-            {editingServer
-              ? isSaving
-                ? 'Saving...'
-                : 'Update'
-              : isImporting
-                ? 'Importing...'
-                : discoveryPreview && discoveryPreview.some((r) => r.status === 'completed')
-                  ? `Import ${discoveryPreview.filter((r) => r.status === 'completed').length} Server${discoveryPreview.filter((r) => r.status === 'completed').length === 1 ? '' : 's'}`
-                  : 'Import'}
+                'Update & Discover'
+              )
+            ) : isImporting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Importing & discovering...
+              </>
+            ) : (
+              'Import & Discover'
+            )}
           </Button>
         </div>
       </div>

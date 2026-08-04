@@ -2512,46 +2512,6 @@ export interface paths {
     patch: operations['McpGatewayController_handleGateway_patch'];
     trace?: never;
   };
-  '/api/v1/mcp/discover': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Start MCP tool discovery
-     * @description Initiates an asynchronous discovery workflow for an MCP server. Returns 202 ACCEPTED with a workflow ID for tracking progress.
-     */
-    post: operations['McpDiscoveryController_discover'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/mcp/discover/{workflowId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Get MCP discovery status
-     * @description Queries the status of an MCP discovery workflow by workflow ID. Returns current status and discovered tools if available.
-     */
-    get: operations['McpDiscoveryController_getStatus'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/mcp/discover-group': {
     parameters: {
       query?: never;
@@ -5567,81 +5527,6 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       sentAt: string | null;
-    };
-    DiscoveryInputDto: {
-      /**
-       * @description Transport type for MCP server
-       * @enum {string}
-       */
-      transport: 'http' | 'stdio';
-      /** @description Human-readable name for the MCP server */
-      name: string;
-      /**
-       * Format: uri
-       * @description HTTP endpoint for HTTP transport
-       */
-      endpoint?: string;
-      /** @description HTTP headers for authentication */
-      headers?: {
-        [key: string]: string;
-      };
-      /** @description Command to run for stdio transport */
-      command?: string;
-      /** @description Arguments for stdio command */
-      args?: string[];
-      /** @description Deprecated for single discovery; trusted-local stdio uses a same-worker loopback host proxy */
-      image?: string;
-      /**
-       * Format: uuid
-       * @description Cache token for storing/retrieving discovery results
-       */
-      cacheToken?: string;
-    };
-    DiscoveryStartResponseDto: {
-      /**
-       * Format: uuid
-       * @description Unique ID for tracking the discovery workflow
-       */
-      workflowId: string;
-      /**
-       * Format: uuid
-       * @description Cache token for retrieving cached discovery results
-       */
-      cacheToken?: string;
-      /**
-       * @description Status indicating workflow has started
-       * @enum {string}
-       */
-      status: 'started';
-    };
-    DiscoveryStatusDto: {
-      /**
-       * Format: uuid
-       * @description Workflow ID
-       */
-      workflowId: string;
-      /**
-       * @description Current status of discovery
-       * @enum {string}
-       */
-      status: 'running' | 'completed' | 'failed';
-      /** @description Discovered tools (available when completed) */
-      tools?: {
-        /** @description Tool name */
-        name: string;
-        /** @description Tool description */
-        description?: string;
-        /** @description JSON Schema for tool input */
-        inputSchema?: {
-          [key: string]: unknown;
-        };
-      }[];
-      /** @description Number of tools discovered */
-      toolCount?: number;
-      /** @description Error message if discovery failed */
-      error?: string;
-      /** @description Error code for categorizing failures */
-      errorCode?: string;
     };
     GroupDiscoveryInputDto: {
       /** @description Docker image for stdio transport */
@@ -11184,66 +11069,6 @@ export interface operations {
     requestBody?: never;
     responses: {
       200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  McpDiscoveryController_discover: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['DiscoveryInputDto'];
-      };
-    };
-    responses: {
-      /** @description Discovery workflow started successfully */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DiscoveryStartResponseDto'];
-        };
-      };
-      /** @description Invalid input parameters */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  McpDiscoveryController_getStatus: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        workflowId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Discovery status retrieved successfully */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DiscoveryStatusDto'];
-        };
-      };
-      /** @description Workflow not found */
-      404: {
         headers: {
           [name: string]: unknown;
         };

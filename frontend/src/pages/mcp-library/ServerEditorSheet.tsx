@@ -7,12 +7,7 @@ import {
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileJson } from 'lucide-react';
-import type {
-  ServerFormData,
-  HeaderEntry,
-  DiscoveryPreviewItem,
-  DiscoveryStatusState,
-} from './types';
+import type { ServerFormData, HeaderEntry, DiscoveryStatusState } from './types';
 import { ManualServerForm } from './ManualServerForm';
 import { JsonServerForm } from './JsonServerForm';
 
@@ -33,16 +28,11 @@ interface ServerEditorSheetProps {
   onUpdateHeader: (index: number, field: 'key' | 'value' | 'secretId', value: string) => void;
   onRemoveHeader: (index: number) => void;
   discoveryStatus: DiscoveryStatusState | null;
-  onTestAndDiscover: () => void;
   onSave: () => void;
   jsonValue: string;
   onJsonValueChange: (value: string) => void;
   jsonParseError: string | null;
   onJsonParseErrorChange: (error: string | null) => void;
-  isTestingDiscovery: boolean;
-  discoveryPreview: DiscoveryPreviewItem[] | null;
-  onClearDiscoveryPreview: () => void;
-  onJsonTestAndDiscover: () => void;
   onJsonSave: () => void;
 }
 
@@ -63,16 +53,11 @@ export function ServerEditorSheet({
   onUpdateHeader,
   onRemoveHeader,
   discoveryStatus,
-  onTestAndDiscover,
   onSave,
   jsonValue,
   onJsonValueChange,
   jsonParseError,
   onJsonParseErrorChange,
-  isTestingDiscovery,
-  discoveryPreview,
-  onClearDiscoveryPreview,
-  onJsonTestAndDiscover,
   onJsonSave,
 }: ServerEditorSheetProps) {
   return (
@@ -109,7 +94,6 @@ export function ServerEditorSheet({
               onUpdateHeader={onUpdateHeader}
               onRemoveHeader={onRemoveHeader}
               discoveryStatus={discoveryStatus}
-              onTestAndDiscover={onTestAndDiscover}
               onSave={onSave}
               isSaving={isSaving}
               editingServer={editingServer}
@@ -124,10 +108,6 @@ export function ServerEditorSheet({
               onJsonValueChange={onJsonValueChange}
               jsonParseError={jsonParseError}
               onJsonParseErrorChange={onJsonParseErrorChange}
-              isTestingDiscovery={isTestingDiscovery}
-              discoveryPreview={discoveryPreview}
-              onClearDiscoveryPreview={onClearDiscoveryPreview}
-              onTestAndDiscover={onJsonTestAndDiscover}
               onSave={onJsonSave}
               isSaving={isSaving}
               isImporting={isImporting}

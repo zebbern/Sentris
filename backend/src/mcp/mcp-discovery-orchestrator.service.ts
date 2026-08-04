@@ -11,9 +11,6 @@ import type Redis from 'ioredis';
 
 import { TemporalService } from '../temporal/temporal.service';
 import type {
-  DiscoveryInputDto,
-  DiscoveryStatusDto,
-  DiscoveryStartResponseDto,
   GroupDiscoveryInputDto,
   GroupDiscoveryStartResponseDto,
   GroupDiscoveryStatusDto,
@@ -107,76 +104,6 @@ export class McpDiscoveryOrchestratorService implements OnModuleDestroy {
       }
       throw new ForbiddenException('Discovery workflow access denied');
     }
-  }
-
-  async startDiscovery(
-    input: DiscoveryInputDto,
-    auth: AuthContext | null,
-  ): Promise<DiscoveryStartResponseDto> {
-    const organizationId = this.requireDiscoveryAdmin(auth);
-    const workflowId = randomUUID();
-    const cacheToken = randomUUID();
-
-    this.logger.log(
-      `Starting MCP discovery workflow ${workflowId} for ${input.transport} server: ${input.name} (cache: ${cacheToken})`,
-    );
-
-    // Store cache token in Redis (worker populates final result); expire in 5 minutes.
-    const generatedKeys = await this.storePendingRecords([
-      {
-        key: this.cacheKey(cacheToken),
-        ttlSeconds: DISCOVERY_CACHE_TTL_SECONDS,
-        value: JSON.stringify({ status: 'pending', workflowId, organizationId }),
-      },
-      {
-        key: this.ownerKey(workflowId),
-        ttlSeconds: DISCOVERY_OWNER_TTL_SECONDS,
-        value: JSON.stringify({ organizationId }),
-      },
-    ]);
-
-    try {
-      await this.temporalService.startWorkflow({
-        workflowType: 'mcpDiscoveryWorkflow',
-        workflowId,
-        taskQueue: this.temporalService.getDefaultTaskQueue(),
-        args: [{ ...input, cacheToken }],
-      });
-    } catch (error) {
-      await this.deleteGeneratedKeys(generatedKeys, error);
-      throw error;
-    }
-
-    return { workflowId, cacheToken, status: 'started' };
-  }
-
-  async getStatus(workflowId: string, auth: AuthContext | null): Promise<DiscoveryStatusDto> {
-    this.logger.debug(`Querying MCP discovery status for workflow ${workflowId}`);
-    await this.assertWorkflowOwner(workflowId, auth);
-
-    const result = await this.temporalService.queryWorkflow<{
-      status: 'running' | 'completed' | 'failed';
-      tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
-      toolCount?: number;
-      error?: string;
-      errorCode?: string;
-    }>({
-      workflowId,
-      queryType: 'getDiscoveryResult',
-    });
-
-    if (!result) {
-      return { workflowId, status: 'running' };
-    }
-
-    return {
-      workflowId,
-      status: result.status,
-      tools: result.tools,
-      toolCount: result.toolCount,
-      error: result.error,
-      errorCode: result.errorCode,
-    };
   }
 
   async startGroupDiscovery(

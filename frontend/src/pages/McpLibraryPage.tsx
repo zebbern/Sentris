@@ -76,7 +76,6 @@ export function McpLibraryPage() {
     setEditingServer: editor.setEditingServer,
     setFormData: editor.setFormData,
     setCheckingServers,
-    setDiscoveringServerIds: actions.setDiscoveringServerIds,
   });
   const groupActions = useGroupActions({ groupCount: groups.length, confirm });
 
@@ -249,16 +248,11 @@ export function McpLibraryPage() {
             onUpdateHeader={editor.updateHeaderEntry}
             onRemoveHeader={editor.removeHeaderEntry}
             discoveryStatus={editor.discoveryStatus}
-            onTestAndDiscover={editor.handleTestAndDiscover}
             onSave={editor.handleSave}
             jsonValue={jsonImport.jsonValue}
             onJsonValueChange={jsonImport.setJsonValue}
             jsonParseError={jsonImport.jsonParseError}
             onJsonParseErrorChange={jsonImport.setJsonParseError}
-            isTestingDiscovery={jsonImport.isTestingDiscovery}
-            discoveryPreview={jsonImport.discoveryPreview}
-            onClearDiscoveryPreview={() => jsonImport.setDiscoveryPreview(null)}
-            onJsonTestAndDiscover={jsonImport.handleJsonTestAndDiscover}
             onJsonSave={jsonImport.handleJsonSave}
           />
 

@@ -49,16 +49,8 @@ export interface DiscoveryPreviewItem {
 }
 
 export interface DiscoveryStatusState {
-  workflowId?: string;
-  status?: 'running' | 'completed' | 'failed';
-  tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
-  toolCount?: number;
+  status: 'running' | 'failed';
   error?: string;
-}
-
-export interface DiscoveryCacheEntry {
-  cacheToken: string;
-  tools: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
 }
 
 export interface ConnectionInfo {
