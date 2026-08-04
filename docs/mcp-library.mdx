@@ -34,6 +34,12 @@ are labeled separately from exact resource URIs, and prompt arguments identify r
 values with an asterisk. Rediscovery updates this catalog and the tool enablement rows in
 one database transaction; opening the dialog does not start a live MCP runtime.
 
+Use **Preview** to read an exact resource, expand and read a resource template, or retrieve
+a prompt with its arguments. Preview is an explicit user action: only then does Sentris
+acquire the selected saved server through the canonical worker-owned runtime. Text, binary
+metadata, embedded resource content, and prompt message roles remain visible alongside the
+bounded raw MCP response.
+
 ### 1. Add MCP Library Node
 
 1. Open the workflow editor
@@ -263,10 +269,10 @@ Some servers are marked with a gold star badge, indicating they are **curated, s
 
 Each server in the registry has one of two types:
 
-| Type | Label | Description |
-|------|-------|-------------|
+| Type     | Label  | Description                                                                                                 |
+| -------- | ------ | ----------------------------------------------------------------------------------------------------------- |
 | `server` | Docker | Container-based MCP server. Sentris automatically pulls and runs the Docker image in an isolated container. |
-| `remote` | Remote | HTTP-based MCP server. Sentris connects to a remote URL endpoint using streamable HTTP or SSE transport. |
+| `remote` | Remote | HTTP-based MCP server. Sentris connects to a remote URL endpoint using streamable HTTP or SSE transport.    |
 
 ### Importing a Server
 
@@ -340,15 +346,15 @@ curl http://localhost/api/v1/mcp-registry/sync/status \
 
 Response fields:
 
-| Field | Description |
-|-------|-------------|
-| `lastSyncAt` | Timestamp of the last completed sync |
+| Field            | Description                                              |
+| ---------------- | -------------------------------------------------------- |
+| `lastSyncAt`     | Timestamp of the last completed sync                     |
 | `lastSyncStatus` | Result of the last sync (`success`, `partial`, `failed`) |
-| `serversSynced` | Total servers in the catalog after the last sync |
-| `serversAdded` | Number of servers added in the last sync |
-| `serversRemoved` | Number of servers removed in the last sync |
-| `serversUpdated` | Number of servers updated in the last sync |
-| `lastError` | Error message if the last sync failed (otherwise `null`) |
+| `serversSynced`  | Total servers in the catalog after the last sync         |
+| `serversAdded`   | Number of servers added in the last sync                 |
+| `serversRemoved` | Number of servers removed in the last sync               |
+| `serversUpdated` | Number of servers updated in the last sync               |
+| `lastError`      | Error message if the last sync failed (otherwise `null`) |
 
 ### Registry Environment Variables
 
@@ -366,14 +372,16 @@ MCP_REGISTRY_SYNC_ENABLED="true"
 MCP_REGISTRY_REPO="docker/mcp-registry"
 ```
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GITHUB_REGISTRY_TOKEN` | No | — | GitHub personal access token. Increases API rate limit from 60 to 5,000 requests/hour for catalog sync. |
-| `MCP_REGISTRY_SYNC_ENABLED` | No | `true` | Set to `false` to disable the daily automatic sync at 3 AM UTC. |
-| `MCP_REGISTRY_REPO` | No | `docker/mcp-registry` | Override the GitHub repository used as the registry source. |
+| Variable                    | Required | Default               | Description                                                                                             |
+| --------------------------- | -------- | --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `GITHUB_REGISTRY_TOKEN`     | No       | —                     | GitHub personal access token. Increases API rate limit from 60 to 5,000 requests/hour for catalog sync. |
+| `MCP_REGISTRY_SYNC_ENABLED` | No       | `true`                | Set to `false` to disable the daily automatic sync at 3 AM UTC.                                         |
+| `MCP_REGISTRY_REPO`         | No       | `docker/mcp-registry` | Override the GitHub repository used as the registry source.                                             |
 
 <Note>
-  Without a `GITHUB_REGISTRY_TOKEN`, sync uses GitHub's unauthenticated rate limit of 60 requests per hour. This is sufficient for the daily sync schedule, but may be insufficient if you trigger manual syncs frequently.
+  Without a `GITHUB_REGISTRY_TOKEN`, sync uses GitHub's unauthenticated rate limit of 60 requests
+  per hour. This is sufficient for the daily sync schedule, but may be insufficient if you trigger
+  manual syncs frequently.
 </Note>
 
 ## Future Enhancements

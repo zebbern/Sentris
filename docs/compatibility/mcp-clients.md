@@ -28,13 +28,11 @@ server, `Mcp-Session-Id`, affinity cookie, Redis session registration, or sticky
 Studio remains v1 sessionful and sticky pending its own migration, so Studio sessions in
 the administrative session registry are expected.
 
-The gateway's outbound proxy is still an explicit v1 compatibility pool keyed by run
-and endpoint. Its replacement belongs to the worker runtime-manager and canonical
-outbound-client plan. New runs materialize an immutable grant/catalog snapshot, advertise
-that persisted snapshot, and invoke component tools through one keyed Workflow Update
-with durable logical-invocation and attempt rows. External snapshot tools deliberately
-remain on the named v1 backend adapter, selected by their immutable source ID and
-upstream tool name.
+New runs materialize an immutable grant/catalog snapshot and execute saved-server tools,
+resource reads, and prompt retrieval through keyed Workflow Updates plus the worker-owned
+runtime manager and official v2 client. The backend v1 outbound pool is now a named
+compatibility boundary only for pre-deployment histories and contract-v2 sources that have
+not yet been migrated to immutable saved-source runtime bindings.
 
 The live-catalog/signal path is retained only for pre-deployment Workflow histories that
 do not register the invocation protocol query and for already-issued tokens without
@@ -42,10 +40,11 @@ do not register the invocation protocol query and for already-issued tokens with
 or retired and Redis has no remaining `mcp:session:*` record without a snapshot ID. A
 legacy token can live for at most three hours, and this branch receives no new behavior.
 
-Remaining migration work is canonical outbound runtime ownership, durable external
-invocation attempts, resources/prompts runtime behavior, Continue-As-New rollover,
-MCP Tasks, and workflow-granular durable agent turns. Studio's v1 sessionful route is a
-separate compatibility boundary.
+The MCP Library browses the persisted catalog without acquiring a runtime and performs
+explicit resource, expanded-template, and prompt previews through the canonical worker
+runtime on demand. Workflow Agents and Operator use the same durable operation boundary.
+Remaining migration work is MCP Tasks, the Task 8 unbound-source/database cleanup, and the
+separately bounded Studio v1 sessionful migration.
 
 ## Supported-client acceptance matrix
 

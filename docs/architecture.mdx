@@ -519,10 +519,10 @@ canonical outbound client are implemented.
 
 Saved-server discovery persists its latest validated complete catalog separately from
 run/turn authority snapshots. The MCP Library reads that catalog to browse tools, exact
-resources, resource templates, and prompts without opening a live runtime. The remaining
-target includes direct resource/prompt content previews outside Operator and workflow
-Agents, Continue-As-New for unbounded agent turns, MCP Tasks, the bounded Studio migration,
-and compatibility cleanup. See
+resources, resource templates, and prompts without opening a live runtime. User-triggered
+resource, expanded-template, and prompt previews then execute against the selected saved
+server through the canonical worker-owned runtime. The remaining target is MCP Tasks, the
+bounded Studio migration, and compatibility cleanup. See
 [ADR: Stateless MCP Facade, Runtime Leases, and Durable Agents](./architecture/adr-stateless-mcp-runtime-and-temporal-agents.md).
 
 ---

@@ -416,11 +416,12 @@ in-process agent loop or route these calls back through the legacy run gateway.
 
 Saved-server discovery now persists the latest validated complete catalog for product
 browsing, and the MCP Library presents tools, exact resources, resource templates, and
-prompts without opening another runtime. Durable graph Agents Continue-As-New from compact
-checkpoint references under the same child Workflow ID and public run identity; bounded
-Operator turns and finite run schedulers do not roll over. Remaining work is MCP Tasks,
-the Task 8 compatibility cleanup, the bounded Studio migration, and direct resource/prompt
-content previews outside Operator and workflow Agents. See
+prompts without opening another runtime. Explicit resource, expanded-template, and prompt
+previews acquire the canonical worker-owned runtime only after the user requests the live
+content. Durable graph Agents Continue-As-New from compact checkpoint references under the
+same child Workflow ID and public run identity; bounded Operator turns and finite run
+schedulers do not roll over. Remaining work is MCP Tasks, the Task 8 compatibility cleanup,
+and the bounded Studio migration. See
 `docs/architecture/adr-stateless-mcp-runtime-and-temporal-agents.md` and the linked
 design spec. Do not expand the legacy session architecture while this migration is in
 progress.
