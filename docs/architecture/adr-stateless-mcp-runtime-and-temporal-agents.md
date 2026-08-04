@@ -239,9 +239,8 @@ resource templates, and prompts as bounded model operations; every selected oper
 recorded and dispatched with its canonical typed identity through the same durable invocation
 path. A true follow-up turn for a completed workflow Agent remains
 separate work: it needs a new child turn, server-owned continuation state, and fresh run
-authority rather than a Signal to the closed child. Remaining work is Continue-As-New rollover and
-cross-run-ID deduplication, MCP Tasks, the Task 8 unbound-source migration, and the
-separately bounded Studio v1 sessionful migration.
+authority rather than a Signal to the closed child. Remaining work is MCP Tasks, the Task 8
+unbound-source migration, and the separately bounded Studio v1 sessionful migration.
 
 ### Protocol boundary
 
@@ -395,8 +394,11 @@ organization-scoped MinIO files. This preserves provider continuation metadata (
 Gemini thought signatures) while child Workflow history carries compact references and
 control state. Retry attempts use distinct model checkpoint identities so a late attempt
 cannot overwrite the result Temporal accepted. The loop remains bounded to 128 model
-steps; Continue-As-New is still required before unbounded/interactive graph-agent turns
-are introduced. Global timeouts are workload-specific. Human input uses Temporal signals;
+steps and continues as new after 32 completed model/tool checkpoints, or earlier when
+Temporal recommends it. The next run carries only the externalized state reference and
+next step under the same child Workflow ID and public Sentris run identity. Rollover never
+resets the total step budget and occurs only after a complete checkpoint. Global timeouts
+are workload-specific. Human input uses Temporal signals;
 model/MCP cancellation and idle-call heartbeats are acceptance requirements rather than
 assumed upstream behavior.
 The worker classifies the AI SDK's normalized provider-declared `error` finish reason at one
@@ -405,11 +407,13 @@ text-only recovery call from bounded durable action evidence; graph Agents fail 
 step instead of recording an empty success. Opaque provider finish details are bounded
 diagnostics only and never drive provider-specific control flow.
 
-Before Continue-As-New, a Workflow marks itself draining, rejects new invocation Updates
-with a retryable rollover response, and waits for accepted handlers to finish. The next
-run carries the compact manifest and recent invocation-result ledger. The backend retries
-the same invocation ID against the stable Workflow ID; a unique durable attempt record
-returns completed results, safely resumes prepared calls, and leaves
+The graph-Agent child has no message handlers, so its checkpoint-boundary rollover cannot
+abandon an accepted Update. Any future unbounded Workflow that accepts Updates must first
+mark itself draining, reject new invocation Updates with a retryable rollover response,
+and wait for accepted handlers to finish. The next run carries the compact manifest and
+recent invocation-result ledger. The backend retries the same invocation ID against the
+stable Workflow ID; a unique durable attempt record returns completed results, safely
+resumes prepared calls, and leaves
 dispatched-without-result calls ambiguous instead of redispatching them.
 
 Inbound modern input-required results end the request with integrity-protected,
@@ -501,8 +505,8 @@ boundaries rather than by maintaining weaker parallel implementations.
 - A mismatched capability grant/snapshot or unlisted source fails before dispatch.
 - Temporal replay and worker restart do not repeat recorded completed tools; unrecorded
   post-dispatch outcomes remain ambiguous.
-- Bounded graph-agent runs externalize native model messages and tool results before
-  history/payload limits; unbounded turns require Continue-As-New before release.
+- Graph-agent runs externalize native model messages and tool results and Continue-As-New
+  from complete checkpoints before history/payload limits.
 - Models can issue multiple bounded-concurrent tool calls with deterministic result
   ordering.
 - Human input and cancellation survive worker/backend restart.

@@ -39,8 +39,15 @@ export interface WorkflowAgentSetupOutput {
   authority?: WorkflowAgentAuthorityRef;
 }
 
+export interface WorkflowAgentContinuation {
+  state: WorkflowAgentStateRef;
+  nextStep: number;
+}
+
 export interface WorkflowAgentChildInput extends WorkflowAgentTurnInput {
   setup: WorkflowAgentSetupOutput;
+  /** Present after Continue-As-New; the original setup remains immutable. */
+  continuation?: WorkflowAgentContinuation;
 }
 
 export interface WorkflowAgentModelStepInput extends WorkflowAgentTurnInput {

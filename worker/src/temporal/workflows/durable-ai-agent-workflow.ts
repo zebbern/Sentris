@@ -2,9 +2,14 @@ import {
   ActivityCancellationType,
   ApplicationFailure,
   CancellationScope,
+  ContinueAsNew,
+  continueAsNew,
   isCancellation,
+  log,
+  patched,
   proxyActivities,
   uuid4,
+  workflowInfo,
 } from '@temporalio/workflow';
 
 import type {
@@ -15,6 +20,8 @@ import type {
 } from '../workflow-agent-types.js';
 
 const TOOL_CONCURRENCY = 4;
+const AGENT_CONTINUE_AS_NEW_PATCH_ID = 'sentris-agent-continue-as-new-v1';
+const AGENT_STEPS_PER_TEMPORAL_RUN = 32;
 
 const lifecycleActivities = proxyActivities<
   Pick<
@@ -82,9 +89,19 @@ export async function durableAiAgentWorkflow(input: WorkflowAgentChildInput) {
 
   try {
     const setup = input.setup;
-    let state = setup.state;
+    const continueAsNewEnabled = patched(AGENT_CONTINUE_AS_NEW_PATCH_ID);
+    const startStep = continueAsNewEnabled ? (input.continuation?.nextStep ?? 0) : 0;
+    let state = continueAsNewEnabled ? (input.continuation?.state ?? setup.state) : setup.state;
+    let completedStepsInRun = 0;
 
-    for (let step = 0; step < setup.stepLimit; step += 1) {
+    if (!Number.isInteger(startStep) || startStep < 0 || startStep > setup.stepLimit) {
+      throw ApplicationFailure.nonRetryable(
+        `AI Agent continuation step ${startStep} is outside the configured step limit.`,
+        'AgentContinuationInvalid',
+      );
+    }
+
+    for (let step = startStep; step < setup.stepLimit; step += 1) {
       const modelStep = await modelActivities.workflowAgentModelStepActivity({
         ...input,
         state,
@@ -180,6 +197,31 @@ export async function durableAiAgentWorkflow(input: WorkflowAgentChildInput) {
         step,
         executions,
       });
+      completedStepsInRun += 1;
+
+      const nextStep = step + 1;
+      if (continueAsNewEnabled && nextStep < setup.stepLimit) {
+        const info = workflowInfo();
+        const reason = info.continueAsNewSuggested
+          ? 'server-suggested'
+          : completedStepsInRun >= AGENT_STEPS_PER_TEMPORAL_RUN
+            ? 'step-threshold'
+            : undefined;
+        if (reason) {
+          log.info('Continuing durable AI Agent with a fresh Temporal history', {
+            agentRunId: input.agentRunId,
+            completedStepsInRun,
+            historyLength: info.historyLength,
+            historySize: info.historySize,
+            nextStep,
+            reason,
+          });
+          await continueAsNew<typeof durableAiAgentWorkflow>({
+            ...input,
+            continuation: { state, nextStep },
+          });
+        }
+      }
     }
 
     return lifecycleActivities.workflowAgentFinalizeActivity({
@@ -189,6 +231,7 @@ export async function durableAiAgentWorkflow(input: WorkflowAgentChildInput) {
       outputFileId: uuid4(),
     });
   } catch (error: unknown) {
+    if (error instanceof ContinueAsNew) throw error;
     const cancelled = isCancellation(error);
     await CancellationScope.nonCancellable(() =>
       lifecycleActivities.workflowAgentFailActivity({

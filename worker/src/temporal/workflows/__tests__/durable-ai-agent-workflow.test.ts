@@ -7,6 +7,18 @@ const workflowAgentReconcileToolActivity = vi.fn();
 const workflowAgentCheckpointActivity = vi.fn();
 const workflowAgentFinalizeActivity = vi.fn();
 const workflowAgentFailActivity = vi.fn();
+const patched = vi.fn(() => true);
+
+class MockContinueAsNew extends Error {}
+
+const continueAsNew = vi.fn(async (): Promise<never> => {
+  throw new MockContinueAsNew();
+});
+const workflowInfo = vi.fn(() => ({
+  continueAsNewSuggested: false,
+  historyLength: 20,
+  historySize: 10_000,
+}));
 
 const activities = {
   workflowAgentModelStepActivity,
@@ -41,9 +53,14 @@ mock.module('@temporalio/workflow', () => ({
     nonCancellable: (callback: () => unknown) => callback(),
     withTimeout: (_timeout: number, callback: () => unknown) => callback(),
   },
+  ContinueAsNew: MockContinueAsNew,
+  continueAsNew,
   isCancellation: vi.fn(() => cancellation),
+  log: { info: vi.fn() },
+  patched,
   proxyActivities,
   uuid4: vi.fn(() => `00000000-0000-4000-8000-${String(++uuidSequence).padStart(12, '0')}`),
+  workflowInfo,
 }));
 
 let durableAiAgentWorkflow: typeof import('../durable-ai-agent-workflow').durableAiAgentWorkflow;
@@ -79,10 +96,92 @@ beforeEach(() => {
   vi.clearAllMocks();
   uuidSequence = 0;
   cancellation = false;
+  patched.mockReturnValue(true);
+  workflowInfo.mockReturnValue({
+    continueAsNewSuggested: false,
+    historyLength: 20,
+    historySize: 10_000,
+  });
   workflowAgentFailActivity.mockResolvedValue(undefined);
 });
 
 describe('durableAiAgentWorkflow', () => {
+  test('rolls over at the application threshold and resumes from its compact state', async () => {
+    const authority = {
+      scope: {
+        kind: 'run' as const,
+        organizationId: 'org-1',
+        runId: 'run-1',
+        capabilityGrantId: '11111111-1111-4111-8111-111111111111',
+        invokingNodeId: 'agent-1',
+      },
+      capabilitySnapshotId: '22222222-2222-4222-8222-222222222222',
+    };
+    const durableInput = {
+      ...input,
+      setup: { ...input.setup, authority, stepLimit: 34 },
+    };
+    workflowInfo.mockReturnValue({
+      continueAsNewSuggested: false,
+      historyLength: 800,
+      historySize: 1_000_000,
+    });
+    workflowAgentModelStepActivity.mockResolvedValue({
+      state: { fileId: 'model-0', rootFileId: 'root' },
+      finishReason: 'tool-calls',
+      toolCalls: [{ modelToolCallId: 'provider-call-1', toolName: 'lookup' }],
+    });
+    workflowAgentPrepareToolActivity.mockResolvedValue({
+      kind: 'terminal',
+      result: { resultFileId: 'result-1', kind: 'completed' },
+    });
+    workflowAgentCheckpointActivity.mockResolvedValue({
+      fileId: 'tool-0',
+      rootFileId: 'root',
+    });
+
+    await expect(durableAiAgentWorkflow(durableInput)).rejects.toBeInstanceOf(MockContinueAsNew);
+
+    expect(workflowAgentModelStepActivity).toHaveBeenCalledTimes(32);
+    expect(continueAsNew).toHaveBeenCalledWith({
+      ...durableInput,
+      continuation: {
+        state: { fileId: 'tool-0', rootFileId: 'root' },
+        nextStep: 32,
+      },
+    });
+    expect(workflowAgentFailActivity).not.toHaveBeenCalled();
+    expect(workflowAgentFinalizeActivity).not.toHaveBeenCalled();
+
+    workflowInfo.mockReturnValue({
+      continueAsNewSuggested: false,
+      historyLength: 4,
+      historySize: 2_000,
+    });
+    workflowAgentModelStepActivity.mockReset().mockResolvedValue({
+      state: { fileId: 'model-final', rootFileId: 'root' },
+      finishReason: 'stop',
+      toolCalls: [],
+    });
+    workflowAgentFinalizeActivity.mockResolvedValue({ output: { responseText: 'done' } });
+
+    await durableAiAgentWorkflow({
+      ...durableInput,
+      continuation: {
+        state: { fileId: 'tool-0', rootFileId: 'root' },
+        nextStep: 32,
+      },
+    });
+
+    expect(workflowAgentModelStepActivity).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        agentRunId: durableInput.agentRunId,
+        state: { fileId: 'tool-0', rootFileId: 'root' },
+        step: 32,
+      }),
+    );
+  });
+
   test('checkpoints model and tool steps as separate durable operations', async () => {
     const authority = {
       scope: {
