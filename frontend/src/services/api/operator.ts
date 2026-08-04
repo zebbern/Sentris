@@ -19,6 +19,15 @@ const sessionPath = (sessionId: string) => `/operator/sessions/${encodeURICompon
 export const operatorApi = {
   listSessions: () => httpGet<OperatorSessionSummary[]>('/operator/sessions'),
 
+  streamActivity: async (): Promise<EventSource> => {
+    const { FetchEventSource } = await import('@/utils/sse-client');
+    const headers = await getAuthHeaders();
+    return new FetchEventSource(`${API_V1_URL}/operator/activity/stream`, {
+      headers,
+      withCredentials: true,
+    });
+  },
+
   getRunImprovement: (sourceRunId: string) =>
     httpGet<OperatorRunImprovementLookup>(
       `/operator/run-improvements/${encodeURIComponent(sourceRunId)}`,

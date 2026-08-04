@@ -17,8 +17,8 @@ import {
   Settings2,
   Sparkles,
 } from 'lucide-react';
-import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -50,6 +50,7 @@ import {
   useUpdateOperatorSession,
 } from '@/hooks/queries/useOperatorQueries';
 import { cn } from '@/lib/utils';
+import { useNotificationStore } from '@/store/notificationStore';
 import {
   createOperatorTurnFromHandoff,
   readOperatorTurnHandoff,
@@ -75,10 +76,12 @@ function SessionRail({
   sessionId,
   sessions,
   isLoading,
+  unreadSessionIds,
 }: {
   sessionId?: string;
   sessions: ReturnType<typeof useOperatorSessions>['data'];
   isLoading: boolean;
+  unreadSessionIds: ReadonlySet<string>;
 }) {
   return (
     <aside className="hidden w-56 shrink-0 flex-col border-r border-border/70 bg-app-chrome/35 md:flex lg:w-64">
@@ -106,6 +109,7 @@ function SessionRail({
             key={session.id}
             to={`/operator/${session.id}`}
             aria-current={session.id === sessionId ? 'page' : undefined}
+            aria-label={`${session.title}${unreadSessionIds.has(session.id) ? ', unread activity' : ''}`}
             className={cn(
               'block rounded-md border border-transparent px-2.5 py-2 transition-colors',
               session.id === sessionId
@@ -113,7 +117,12 @@ function SessionRail({
                 : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
             )}
           >
-            <span className="block truncate text-xs font-medium">{session.title}</span>
+            <span className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-xs font-medium">{session.title}</span>
+              {unreadSessionIds.has(session.id) ? (
+                <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+              ) : null}
+            </span>
             <span className="mt-1 block text-[10px] text-muted-foreground">
               {formatUpdatedAt(session.updatedAt)}
             </span>
@@ -127,9 +136,11 @@ function SessionRail({
 function MobileSessionPicker({
   sessionId,
   sessions,
+  unreadSessionIds,
 }: {
   sessionId?: string;
   sessions: ReturnType<typeof useOperatorSessions>['data'];
+  unreadSessionIds: ReadonlySet<string>;
 }) {
   const navigate = useNavigate();
 
@@ -149,7 +160,7 @@ function MobileSessionPicker({
           <option value="__new__">New session</option>
           {sessions?.map((session) => (
             <option key={session.id} value={session.id}>
-              {session.title}
+              {unreadSessionIds.has(session.id) ? `• ${session.title}` : session.title}
             </option>
           ))}
         </select>
@@ -316,9 +327,11 @@ function SessionModelSettings({ session }: { session: OperatorSessionDetail }) {
 function ActiveSession({
   session,
   handoff,
+  focusTurnId,
 }: {
   session: OperatorSessionDetail;
   handoff: OperatorTurnHandoff | null;
+  focusTurnId: string | null;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -329,6 +342,7 @@ function ActiveSession({
   const [message, setMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedHandoffRef = useRef<string | null>(null);
+  const focusedTurnRef = useRef<string | null>(null);
   const isActive = operatorSessionHasActiveTurn(session);
   const latestTurnError = getOperatorSessionLatestTurnError(session);
   const expectedWorkflowDraftCount = session.actions.filter(
@@ -346,6 +360,17 @@ function ActiveSession({
     if (!viewport) return;
     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
   }, [session.messages.length, session.actions.length, isActive]);
+
+  useEffect(() => {
+    if (!focusTurnId || focusedTurnRef.current === focusTurnId) return;
+    const viewport = scrollRef.current;
+    const target = Array.from(
+      viewport?.querySelectorAll<HTMLElement>('[data-operator-turn-id]') ?? [],
+    ).find((element) => element.dataset.operatorTurnId === focusTurnId);
+    if (!target || typeof target.scrollIntoView !== 'function') return;
+    focusedTurnRef.current = focusTurnId;
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [focusTurnId, session.actions.length, session.messages.length]);
 
   const sendTurn = useCallback(
     async (
@@ -518,10 +543,27 @@ export function OperatorPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const notifications = useNotificationStore((state) => state.notifications);
+  const markOperatorSessionRead = useNotificationStore((state) => state.markOperatorSessionRead);
   const handoff = readOperatorTurnHandoff(location.state);
   const sessionsQuery = useOperatorSessions();
   const sessionQuery = useOperatorSessionStream(sessionId);
   const latestSessionId = sessionsQuery.data?.[0]?.id;
+  const focusTurnId = searchParams.get('turnId');
+  const unreadSessionIds = useMemo(
+    () =>
+      new Set(
+        notifications.flatMap((notification) =>
+          !notification.read && notification.sessionId ? [notification.sessionId] : [],
+        ),
+      ),
+    [notifications],
+  );
+
+  useEffect(() => {
+    if (sessionId) markOperatorSessionRead(sessionId);
+  }, [markOperatorSessionRead, sessionId]);
 
   useEffect(() => {
     if (sessionId || !handoff || !latestSessionId) return;
@@ -541,10 +583,15 @@ export function OperatorPage() {
         sessionId={sessionId}
         sessions={sessionsQuery.data}
         isLoading={sessionsQuery.isLoading}
+        unreadSessionIds={unreadSessionIds}
       />
 
       <section className="flex min-w-0 flex-1 flex-col" aria-busy={sessionQuery.isFetching}>
-        <MobileSessionPicker sessionId={sessionId} sessions={sessionsQuery.data} />
+        <MobileSessionPicker
+          sessionId={sessionId}
+          sessions={sessionsQuery.data}
+          unreadSessionIds={unreadSessionIds}
+        />
 
         {!sessionId && !isResolvingHandoff ? <NewOperatorSession handoff={handoff} /> : null}
 
@@ -577,7 +624,9 @@ export function OperatorPage() {
           </div>
         ) : null}
 
-        {sessionQuery.data ? <ActiveSession session={sessionQuery.data} handoff={handoff} /> : null}
+        {sessionQuery.data ? (
+          <ActiveSession session={sessionQuery.data} handoff={handoff} focusTurnId={focusTurnId} />
+        ) : null}
       </section>
     </div>
   );

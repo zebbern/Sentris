@@ -3162,6 +3162,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/operator/activity/stream': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Stream compact Operator activity for the current user via SSE */
+    get: operations['OperatorController_streamActivity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/operator/sessions': {
     parameters: {
       query?: never;
@@ -6226,6 +6243,11 @@ export interface components {
             kind: 'execute_plan';
             /** Format: uuid */
             planActionId: string;
+          }
+        | {
+            /** @enum {string} */
+            kind: 'run_follow_up';
+            runId: string;
           };
     };
     OperatorActionDecisionDto: {
@@ -12066,6 +12088,24 @@ export interface operations {
       };
       /** @description Dead-lettered outbox event not found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_streamActivity: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Server-sent Operator activity snapshots */
+      200: {
         headers: {
           [name: string]: unknown;
         };

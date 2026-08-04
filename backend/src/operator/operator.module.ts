@@ -9,6 +9,7 @@ import { SecretsModule } from '../secrets/secrets.module';
 import { StorageModule } from '../storage/storage.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { InternalOperatorController } from './internal-operator.controller';
+import { OperatorActivityStreamService } from './operator-activity-stream.service';
 import { OperatorCommandService } from './operator-command.service';
 import { OperatorController } from './operator.controller';
 import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
@@ -31,6 +32,7 @@ import { OperatorWorkflowAuthoringService } from './operator-workflow-authoring.
   controllers: [InternalOperatorController, OperatorController],
   providers: [
     OperatorService,
+    OperatorActivityStreamService,
     OperatorCommandService,
     OperatorMcpAuthorityService,
     OperatorRunFollowUpListener,

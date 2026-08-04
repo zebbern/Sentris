@@ -78,7 +78,7 @@ export class OperatorService {
       model: input.model,
       auth: user,
     });
-    return this.toSessionSummary(session);
+    return this.toSessionSummary(session, null);
   }
 
   async listSessions(auth: AuthContext | null): Promise<OperatorSessionSummary[]> {
@@ -87,7 +87,13 @@ export class OperatorService {
       organizationId: user.organizationId,
       userId: user.userId,
     });
-    return sessions.map((session) => this.toSessionSummary(session));
+    const latestTurns = await this.repository.listLatestTurns(
+      sessions.map((session) => session.id),
+    );
+    const latestTurnBySessionId = new Map(latestTurns.map((turn) => [turn.sessionId, turn]));
+    return sessions.map((session) =>
+      this.toSessionSummary(session, latestTurnBySessionId.get(session.id) ?? null),
+    );
   }
 
   async getRunImprovement(
@@ -128,7 +134,7 @@ export class OperatorService {
       ]);
     }
     return {
-      ...this.toSessionSummary(session),
+      ...this.toSessionSummary(session, turns.at(-1) ?? null),
       turns: turns.map((turn) => this.toTurnView(turn)),
       messages: messages.map((message) => this.toMessageView(message)),
       actions: actions.map((action) => this.toActionView(action)),
@@ -161,7 +167,8 @@ export class OperatorService {
       auth: user,
     });
     if (!updated) throw new NotFoundException('Operator session not found');
-    return this.toSessionSummary(updated);
+    const latestTurn = await this.repository.findLatestTurn(updated.id);
+    return this.toSessionSummary(updated, latestTurn ?? null);
   }
 
   async createTurn(
@@ -371,7 +378,7 @@ export class OperatorService {
     ]);
     return {
       session: {
-        ...this.toSessionSummary(session),
+        ...this.toSessionSummary(session, turn),
         organizationId: session.organizationId,
         userId: session.userId,
       },
@@ -777,7 +784,10 @@ export class OperatorService {
     };
   }
 
-  private toSessionSummary(session: OperatorSessionRecord): OperatorSessionSummary {
+  private toSessionSummary(
+    session: OperatorSessionRecord,
+    latestTurn: OperatorTurnRecord | null,
+  ): OperatorSessionSummary {
     return {
       id: session.id,
       title: session.title,
@@ -789,6 +799,15 @@ export class OperatorService {
         apiKeySecretId: session.apiKeySecretId,
         baseUrl: session.baseUrl,
       },
+      latestTurn: latestTurn
+        ? {
+            id: latestTurn.id,
+            status: latestTurn.status,
+            error: latestTurn.error,
+            createdAt: latestTurn.createdAt.toISOString(),
+            completedAt: latestTurn.completedAt?.toISOString() ?? null,
+          }
+        : null,
       createdAt: session.createdAt.toISOString(),
       updatedAt: session.updatedAt.toISOString(),
     };

@@ -121,6 +121,29 @@ export class OperatorRepository {
       .orderBy(desc(operatorSessionsTable.updatedAt));
   }
 
+  listLatestTurns(sessionIds: string[]): Promise<OperatorTurnRecord[]> {
+    if (sessionIds.length === 0) return Promise.resolve([]);
+    return this.db
+      .selectDistinctOn([operatorTurnsTable.sessionId])
+      .from(operatorTurnsTable)
+      .where(inArray(operatorTurnsTable.sessionId, sessionIds))
+      .orderBy(
+        operatorTurnsTable.sessionId,
+        desc(operatorTurnsTable.createdAt),
+        desc(operatorTurnsTable.id),
+      );
+  }
+
+  async findLatestTurn(sessionId: string): Promise<OperatorTurnRecord | undefined> {
+    const [turn] = await this.db
+      .select()
+      .from(operatorTurnsTable)
+      .where(eq(operatorTurnsTable.sessionId, sessionId))
+      .orderBy(desc(operatorTurnsTable.createdAt))
+      .limit(1);
+    return turn;
+  }
+
   async findLatestRunImprovement(input: {
     organizationId: string;
     userId: string;

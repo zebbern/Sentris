@@ -48,6 +48,7 @@ import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import { usePrefetchOnIdle } from '@/hooks/usePrefetchOnIdle';
 import { prefetchIdleRoutes } from '@/lib/prefetch-routes';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useOperatorNotifications } from '@/hooks/useOperatorNotifications';
 import { useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
 import { useToast } from '@/components/ui/use-toast';
 import { OpenSearchTelemetryLink } from '@/components/analytics/OpenSearchTelemetryLink';
@@ -530,6 +531,7 @@ const navigationItems: NavItem[] = [
 export function AppLayout({ children }: AppLayoutProps) {
   usePrefetchOnIdle();
   useNotifications();
+  useOperatorNotifications();
 
   useEffect(() => {
     prefetchIdleRoutes();

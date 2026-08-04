@@ -1,6 +1,9 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import {
+  OperatorActivityStreamErrorSchema,
+  OperatorActivityStreamReadySchema,
+  OperatorActivityStreamSnapshotSchema,
   OperatorSessionStreamErrorSchema,
   OperatorSessionStreamReadySchema,
   OperatorSessionStreamSnapshotSchema,
@@ -28,6 +31,7 @@ const TERMINAL_RUN_STATUSES = new Set<string>(TERMINAL_STATUSES);
 const OPERATOR_RUN_POLL_INTERVAL_MS = 1_500;
 const OPERATOR_LIVE_BACKUP_POLL_INTERVAL_MS = 5_000;
 const OPERATOR_STREAM_RECONNECT_MS = 5_000;
+const OPERATOR_ACTIVITY_FALLBACK_POLL_INTERVAL_MS = 5_000;
 export const OPERATOR_RUN_TRACE_SETTLE_MS = 30_000;
 
 export type OperatorStreamState = 'connecting' | 'live' | 'polling' | 'closed';
@@ -88,6 +92,92 @@ export function useOperatorSessions() {
         (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
       ),
   });
+}
+
+export function useOperatorActivityStream() {
+  const queryClient = useQueryClient();
+  const [streamState, setStreamState] = useState<OperatorStreamState>('connecting');
+  const query = useQuery({
+    queryKey: queryKeys.operator.sessions(),
+    queryFn: () => api.operator.listSessions(),
+    staleTime: 15_000,
+    refetchInterval:
+      streamState === 'live'
+        ? OPERATOR_LIVE_BACKUP_POLL_INTERVAL_MS
+        : OPERATOR_ACTIVITY_FALLBACK_POLL_INTERVAL_MS,
+    select: (sessions) =>
+      [...sessions].sort(
+        (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+      ),
+  });
+
+  useEffect(() => {
+    let disposed = false;
+    let source: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const fallBackToPolling = () => {
+      if (disposed) return;
+      source?.close();
+      source = null;
+      setStreamState('polling');
+      if (!reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          if (disposed) return;
+          setStreamState('connecting');
+          connect();
+        }, OPERATOR_STREAM_RECONNECT_MS);
+      }
+    };
+
+    function connect() {
+      void api.operator
+        .streamActivity()
+        .then((nextSource) => {
+          if (disposed) {
+            nextSource.close();
+            return;
+          }
+          source = nextSource;
+          source.addEventListener('ready', (event) => {
+            const parsed = OperatorActivityStreamReadySchema.safeParse(readEventPayload(event));
+            if (parsed.success) setStreamState('live');
+          });
+          source.addEventListener('snapshot', (event) => {
+            const parsed = OperatorActivityStreamSnapshotSchema.safeParse(readEventPayload(event));
+            if (!parsed.success) return;
+            const sessionsKey = queryKeys.operator.sessions();
+            void queryClient.cancelQueries({ queryKey: sessionsKey, exact: true });
+            queryClient.setQueryData(sessionsKey, parsed.data.sessions);
+          });
+          source.addEventListener('error', (event) => {
+            const payload = readEventPayload(event);
+            if (payload !== null) {
+              const parsed = OperatorActivityStreamErrorSchema.safeParse(payload);
+              if (!parsed.success) {
+                logger.warn('Ignored malformed Operator activity stream error', parsed.error);
+              }
+            }
+            fallBackToPolling();
+          });
+          source.onerror = fallBackToPolling;
+        })
+        .catch((error: unknown) => {
+          logger.warn('Failed to open Operator activity stream', error);
+          fallBackToPolling();
+        });
+    }
+
+    connect();
+    return () => {
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      source?.close();
+    };
+  }, [queryClient]);
+
+  return { ...query, streamState };
 }
 
 export function useOperatorRunImprovement(sourceRunId: string | null | undefined) {

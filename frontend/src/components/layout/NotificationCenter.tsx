@@ -27,8 +27,10 @@ export function NotificationPanelContent({ onClose }: NotificationPanelContentPr
 
   const handleNotificationClick = (notification: NotificationItem) => {
     markRead(notification.id);
-    if (notification.runId) {
-      navigate(`/workflows?runId=${notification.runId}`);
+    const href =
+      notification.href ?? (notification.runId ? `/workflows?runId=${notification.runId}` : null);
+    if (href) {
+      navigate(href);
       onClose?.();
     }
   };
@@ -87,6 +89,8 @@ export function NotificationPanelContent({ onClose }: NotificationPanelContentPr
                   <div className="mt-0.5 flex-shrink-0">
                     {notification.variant === 'success' ? (
                       <CircleCheck className="h-4 w-4 text-emerald-500" />
+                    ) : notification.variant === 'warning' ? (
+                      <CircleAlert className="h-4 w-4 text-amber-500" />
                     ) : (
                       <CircleAlert className="h-4 w-4 text-destructive" />
                     )}

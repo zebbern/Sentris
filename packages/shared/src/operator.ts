@@ -1415,12 +1415,22 @@ export const OperatorActionDecisionSchema = z
   .strict();
 export type OperatorActionDecision = z.infer<typeof OperatorActionDecisionSchema>;
 
+export interface OperatorLatestTurnSummary {
+  id: string;
+  status: OperatorTurnStatus;
+  error: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
 export interface OperatorSessionSummary {
   id: string;
   title: string;
   approvalMode: OperatorApprovalMode;
   status: OperatorSessionStatus;
   model: OperatorModelConfig;
+  /** Optional while clients can still hold pre-field cached session snapshots. */
+  latestTurn?: OperatorLatestTurnSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1485,6 +1495,17 @@ const OperatorSessionSummaryStreamSchema = z
     approvalMode: OperatorApprovalModeSchema,
     status: OperatorSessionStatusSchema,
     model: OperatorModelConfigSchema,
+    latestTurn: z
+      .object({
+        id: z.string().uuid(),
+        status: OperatorTurnStatusSchema,
+        error: z.string().nullable(),
+        createdAt: z.string(),
+        completedAt: z.string().nullable(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -1572,6 +1593,34 @@ export const OperatorSessionStreamErrorSchema = z
   })
   .strict();
 export type OperatorSessionStreamError = z.infer<typeof OperatorSessionStreamErrorSchema>;
+
+export const OPERATOR_ACTIVITY_STREAM_VERSION = 1 as const;
+
+export const OperatorActivityStreamReadySchema = z
+  .object({
+    version: z.literal(OPERATOR_ACTIVITY_STREAM_VERSION),
+    mode: z.literal('polling'),
+    intervalMs: z.number().int().min(750).max(2_000),
+  })
+  .strict();
+export type OperatorActivityStreamReady = z.infer<typeof OperatorActivityStreamReadySchema>;
+
+export const OperatorActivityStreamSnapshotSchema = z
+  .object({
+    version: z.literal(OPERATOR_ACTIVITY_STREAM_VERSION),
+    sessions: z.array(OperatorSessionSummaryStreamSchema),
+  })
+  .strict();
+export type OperatorActivityStreamSnapshot = z.infer<typeof OperatorActivityStreamSnapshotSchema>;
+
+export const OperatorActivityStreamErrorSchema = z
+  .object({
+    version: z.literal(OPERATOR_ACTIVITY_STREAM_VERSION),
+    code: z.literal('activity_read_failed'),
+    message: z.literal('Operator activity update could not be read'),
+  })
+  .strict();
+export type OperatorActivityStreamError = z.infer<typeof OperatorActivityStreamErrorSchema>;
 
 export interface OperatorTurnAccepted {
   turnId: string;

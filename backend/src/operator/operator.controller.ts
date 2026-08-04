@@ -45,6 +45,7 @@ import {
   UpdateOperatorSessionDto,
 } from './dto/operator.dto';
 import { OperatorSessionStreamService } from './operator-session-stream.service';
+import { OperatorActivityStreamService } from './operator-activity-stream.service';
 import { OperatorService } from './operator.service';
 
 @ApiTags('operator')
@@ -53,7 +54,18 @@ export class OperatorController {
   constructor(
     private readonly operatorService: OperatorService,
     private readonly operatorSessionStreamService: OperatorSessionStreamService,
+    private readonly operatorActivityStreamService: OperatorActivityStreamService,
   ) {}
+
+  @Get('activity/stream')
+  @ApiOperation({ summary: 'Stream compact Operator activity for the current user via SSE' })
+  @ApiOkResponse({ description: 'Server-sent Operator activity snapshots' })
+  streamActivity(
+    @CurrentAuth() auth: AuthContext | null,
+    @Res() response: Response,
+  ): Promise<void> {
+    return this.operatorActivityStreamService.streamActivity(auth, response);
+  }
 
   @Get('sessions')
   @ApiOperation({ summary: 'List Operator sessions owned by the current user' })

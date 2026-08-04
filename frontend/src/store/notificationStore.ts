@@ -7,16 +7,20 @@ export interface NotificationItem {
   id: string;
   title: string;
   description?: string;
-  variant: 'success' | 'destructive';
+  variant: 'success' | 'warning' | 'destructive';
   timestamp: string; // ISO string
   read: boolean;
   runId?: string;
+  href?: string;
+  sessionId?: string;
+  turnId?: string;
 }
 
 interface NotificationStoreState {
   notifications: NotificationItem[];
   push: (item: Omit<NotificationItem, 'id' | 'timestamp' | 'read'>) => void;
   markRead: (id: string) => void;
+  markOperatorSessionRead: (sessionId: string) => void;
   markAllRead: () => void;
   dismiss: (id: string) => void;
   clearAll: () => void;
@@ -42,6 +46,15 @@ export const useNotificationStore = create<NotificationStoreState>()(
       markRead: (id) =>
         set((state) => ({
           notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+        })),
+
+      markOperatorSessionRead: (sessionId) =>
+        set((state) => ({
+          notifications: state.notifications.map((notification) =>
+            notification.sessionId === sessionId && !notification.read
+              ? { ...notification, read: true }
+              : notification,
+          ),
         })),
 
       markAllRead: () =>

@@ -129,14 +129,20 @@ function formatPreview(value: unknown): string | null {
 function MessageEvent({ message }: { message: OperatorMessageView }) {
   if (message.role === 'user') {
     return (
-      <article className="ml-auto max-w-[85%] rounded-xl rounded-br-sm bg-primary px-3.5 py-2.5 text-sm text-primary-foreground shadow-sm md:max-w-[72%]">
+      <article
+        data-operator-turn-id={message.turnId}
+        className="ml-auto max-w-[85%] rounded-xl rounded-br-sm bg-primary px-3.5 py-2.5 text-sm text-primary-foreground shadow-sm md:max-w-[72%]"
+      >
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
       </article>
     );
   }
 
   return (
-    <article className="flex max-w-[92%] items-start gap-2.5 md:max-w-[82%]">
+    <article
+      data-operator-turn-id={message.turnId}
+      className="flex max-w-[92%] items-start gap-2.5 md:max-w-[82%]"
+    >
       <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-card text-primary">
         <Bot className="h-4 w-4" />
       </div>
@@ -346,6 +352,7 @@ function ActionEvent({
 
   return (
     <article
+      data-operator-turn-id={action.turnId}
       className={cn(
         'ml-9 max-w-[calc(100%-2.25rem)] overflow-hidden rounded-lg border bg-card/50',
         action.status === 'pending_approval' && 'border-amber-500/40 bg-amber-500/[0.04]',

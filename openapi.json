@@ -9594,6 +9594,21 @@
         ]
       }
     },
+    "/api/v1/operator/activity/stream": {
+      "get": {
+        "operationId": "OperatorController_streamActivity",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Server-sent Operator activity snapshots"
+          }
+        },
+        "summary": "Stream compact Operator activity for the current user via SSE",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
     "/api/v1/operator/sessions": {
       "get": {
         "operationId": "OperatorController_listSessions",
@@ -20223,6 +20238,27 @@
                 "required": [
                   "kind",
                   "planActionId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run_follow_up"
+                    ]
+                  },
+                  "runId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 191
+                  }
+                },
+                "required": [
+                  "kind",
+                  "runId"
                 ],
                 "additionalProperties": false
               }
