@@ -27,6 +27,7 @@ interface OperatorWorkflowDraftCardProps {
   disabled?: boolean;
   applied?: boolean;
   onApply: (draft: OperatorWorkflowDraftResult) => void;
+  onRunSavedVersion?: (result: OperatorWorkflowApplyResult) => void;
   onRunImprovedVersion?: (result: OperatorWorkflowApplyResult) => void;
 }
 
@@ -86,9 +87,11 @@ export function OperatorWorkflowDraftCard({
   disabled = false,
   applied = false,
   onApply,
+  onRunSavedVersion,
   onRunImprovedVersion,
 }: OperatorWorkflowDraftCardProps) {
   if (result.kind === 'workflow-applied') {
+    const canRunSavedVersion = !result.staged && Boolean(onRunSavedVersion);
     const canRunImprovedVersion =
       !result.created && Boolean(result.sourceRunId) && Boolean(onRunImprovedVersion);
 
@@ -115,6 +118,18 @@ export function OperatorWorkflowDraftCard({
               Open workflow
             </Link>
           </Button>
+          {canRunSavedVersion ? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-[11px]"
+              disabled={disabled}
+              onClick={() => onRunSavedVersion?.(result)}
+            >
+              <Play className="h-3 w-3" />
+              Run now
+            </Button>
+          ) : null}
           {canRunImprovedVersion ? (
             <Button
               type="button"

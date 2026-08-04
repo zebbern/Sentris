@@ -235,4 +235,24 @@ describe('RunWorkflowDialog', () => {
       screen.getByText('Provide the required inputs to start the workflow.'),
     ).toBeInTheDocument();
   });
+
+  it('blocks a run when workflow readiness requires configuration', () => {
+    const props = createDefaultProps({
+      readinessRows: [
+        {
+          kind: 'credential',
+          state: 'needs-mapping',
+          label: 'AI Agent: Credential mapping',
+          detail: 'Select a stored secret.',
+          blocksCreation: true,
+          blocksExecution: true,
+        },
+      ],
+      readinessIssues: [],
+    });
+    render(<RunWorkflowDialog {...props} />);
+
+    expect(screen.getByText('Run readiness')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run Workflow' })).toBeDisabled();
+  });
 });

@@ -139,6 +139,8 @@ export const queryKeys = {
     runtimeInputs: (workflowId: string) =>
       ['workflowRuntimeInputs', getOrgScope(), workflowId] as const,
     versions: (workflowId: string) => ['workflowVersions', getOrgScope(), workflowId] as const,
+    version: (workflowId: string, versionId: string) =>
+      ['workflowVersion', getOrgScope(), workflowId, versionId] as const,
   },
   workflowTags: {
     all: () => ['workflowTags', getOrgScope()] as const,

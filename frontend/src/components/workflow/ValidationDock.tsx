@@ -5,10 +5,9 @@ import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
 import { useMcpAllTools, useMcpServers } from '@/hooks/queries/useMcpServerQueries';
 import {
-  evaluateWorkflowAgentNodeReadiness,
+  evaluateWorkflowRunReadiness,
   hasConnectedWorkflowMcpCustom,
 } from '@/features/agent-readiness/workflowAdapter';
-import { getNodeValidationWarnings } from '@/utils/connectionValidation';
 import type { Node, Edge } from '@xyflow/react';
 import type { NodeData, FrontendNodeData } from '@/schemas/node';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -64,65 +63,26 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
 
   const validationIssues = useMemo<ValidationIssue[]>(() => {
     if (!isDesignMode) return [];
-
-    const issues: ValidationIssue[] = [];
-
-    for (const node of nodes) {
-      const nodeData = node.data as FrontendNodeData;
-      const component = getComponent(nodeData.componentId ?? nodeData.componentSlug);
-
-      if (!component) continue;
-
-      // Get validation warnings using the existing utility
-      // FrontendNodeData extends NodeData, so this cast is safe
-      const warnings = getNodeValidationWarnings(
-        node as Node<FrontendNodeData>,
-        edges,
-        component,
-        secretsQuery.data ?? [],
-      );
-
-      warnings.forEach((warning: string) => {
-        issues.push({
-          nodeId: node.id,
-          nodeLabel: nodeData.label || component.name || node.id,
-          message: warning,
-        });
-      });
-
-      const nodeLabel = nodeData.label || component.name || node.id;
-      const readinessIssues = evaluateWorkflowAgentNodeReadiness({
-        node: node as Node<FrontendNodeData>,
-        component,
-        nodes: nodes as Node<FrontendNodeData>[],
-        edges,
-        getComponent,
-        secrets: {
-          items: secretsQuery.data ?? [],
-          isLoading: secretsQuery.isLoading,
-          error: secretsQuery.error,
-        },
-        mcpServers: {
-          items: mcpServersQuery.data ?? [],
-          isLoading: mcpServersQuery.isLoading,
-          error: mcpServersQuery.error,
-        },
-        mcpTools: {
-          items: mcpToolsQuery.data ?? [],
-          isLoading: mcpToolsQuery.isLoading,
-          error: mcpToolsQuery.error,
-        },
-      })
-        .filter((row) => row.blocksExecution)
-        .map((row) => ({
-          nodeId: node.id,
-          nodeLabel,
-          message: `${row.label}: ${row.detail}`,
-        }));
-      issues.push(...readinessIssues);
-    }
-
-    return issues;
+    return evaluateWorkflowRunReadiness({
+      nodes: nodes as Node<FrontendNodeData>[],
+      edges,
+      getComponent,
+      secrets: {
+        items: secretsQuery.data ?? [],
+        isLoading: secretsQuery.isLoading,
+        error: secretsQuery.error,
+      },
+      mcpServers: {
+        items: mcpServersQuery.data ?? [],
+        isLoading: mcpServersQuery.isLoading,
+        error: mcpServersQuery.error,
+      },
+      mcpTools: {
+        items: mcpToolsQuery.data ?? [],
+        isLoading: mcpToolsQuery.isLoading,
+        error: mcpToolsQuery.error,
+      },
+    }).issues;
   }, [
     nodes,
     edges,

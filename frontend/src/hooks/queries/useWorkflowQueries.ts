@@ -47,6 +47,16 @@ export function useWorkflowVersions(workflowId: string | undefined) {
   });
 }
 
+export function useWorkflowVersion(workflowId: string | undefined, versionId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.workflows.version(workflowId ?? '', versionId ?? ''),
+    queryFn:
+      workflowId && versionId ? () => api.workflows.getVersion(workflowId, versionId) : skipToken,
+    staleTime: Infinity,
+    ...(workflowId && versionId ? {} : { gcTime: 0 }),
+  });
+}
+
 export function useDeleteWorkflow() {
   const qc = useQueryClient();
   return useMutation({

@@ -3,6 +3,7 @@ import type { McpServerResponse, McpToolResponse } from '@/hooks/queries/useMcpS
 import type { ComponentMetadata } from '@/schemas/component';
 import type { FrontendNodeData } from '@/schemas/node';
 import type { SecretSummary } from '@/schemas/secret';
+import { getNodeValidationWarnings } from '@/utils/connectionValidation';
 import {
   evaluateLlmProviderReadiness,
   evaluateMcpToolsReadiness,
@@ -152,4 +153,71 @@ export function evaluateWorkflowAgentNodeReadiness(input: {
       });
     }),
   ];
+}
+
+export interface WorkflowRunReadinessIssue {
+  nodeId: string;
+  nodeLabel: string;
+  message: string;
+}
+
+export interface WorkflowRunReadiness {
+  rows: AgentReadinessRow[];
+  issues: WorkflowRunReadinessIssue[];
+  configurationIssues: WorkflowRunReadinessIssue[];
+}
+
+export function evaluateWorkflowRunReadiness(input: {
+  nodes: readonly Node<FrontendNodeData>[];
+  edges: readonly Edge[];
+  getComponent: (ref: string | undefined) => ComponentMetadata | null;
+  secrets: CatalogState<SecretSummary>;
+  mcpServers: CatalogState<McpServerResponse>;
+  mcpTools: CatalogState<McpToolResponse>;
+}): WorkflowRunReadiness {
+  const rows: AgentReadinessRow[] = [];
+  const issues: WorkflowRunReadinessIssue[] = [];
+  const configurationIssues: WorkflowRunReadinessIssue[] = [];
+
+  for (const node of input.nodes) {
+    const component = input.getComponent(componentRef(node));
+    if (!component) continue;
+
+    const nodeLabel = node.data.label || component.name || node.id;
+    for (const message of getNodeValidationWarnings(node, [...input.edges], component, [
+      ...input.secrets.items,
+    ])) {
+      const issue = { nodeId: node.id, nodeLabel, message };
+      issues.push(issue);
+      configurationIssues.push(issue);
+    }
+
+    const nodeRows = evaluateWorkflowAgentNodeReadiness({
+      node,
+      component,
+      nodes: input.nodes,
+      edges: input.edges,
+      getComponent: input.getComponent,
+      secrets: input.secrets,
+      mcpServers: input.mcpServers,
+      mcpTools: input.mcpTools,
+    });
+    rows.push(
+      ...nodeRows.map((row, index) => ({
+        ...row,
+        id: `${node.id}:${row.kind}:${index}`,
+        label: `${nodeLabel}: ${row.label}`,
+      })),
+    );
+    for (const row of nodeRows) {
+      if (!row.blocksExecution) continue;
+      issues.push({
+        nodeId: node.id,
+        nodeLabel,
+        message: `${row.label}: ${row.detail}`,
+      });
+    }
+  }
+
+  return { rows, issues, configurationIssues };
 }

@@ -15,6 +15,7 @@ import {
   type FindingTriageStatus,
   type OperatorMessageView,
   type OperatorTurnView,
+  type OperatorWorkflowApplyResult,
   type OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
 import {
@@ -266,6 +267,7 @@ interface ActionEventProps {
   runCommandDisabled: boolean;
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
   onRunCommand: (request: OperatorRunCommandRequest) => void;
+  onRunSavedWorkflow: (workflow: OperatorWorkflowApplyResult) => void;
   workflowDrafts: OperatorWorkflowDraftDetail[];
   appliedDraftIds: ReadonlySet<string>;
   keptVersionIds: ReadonlySet<string>;
@@ -281,6 +283,7 @@ function ActionEvent({
   runCommandDisabled,
   onDecision,
   onRunCommand,
+  onRunSavedWorkflow,
   workflowDrafts,
   appliedDraftIds,
   keptVersionIds,
@@ -393,6 +396,7 @@ function ActionEvent({
                 },
               })
             }
+            onRunSavedVersion={onRunSavedWorkflow}
             onRunImprovedVersion={(savedWorkflow) =>
               onRunCommand({
                 message: `Run improved workflow version ${savedWorkflow.versionId} using inputs from run ${savedWorkflow.sourceRunId}`,
@@ -496,6 +500,7 @@ interface OperatorTimelineProps {
   workflowDrafts?: OperatorWorkflowDraftDetail[];
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
   onRunCommand?: (request: OperatorRunCommandRequest) => void;
+  onRunSavedWorkflow?: (workflow: OperatorWorkflowApplyResult) => void;
   pendingCancelTurnId?: string;
   onCancelTurn?: (turnId: string) => void;
 }
@@ -510,6 +515,7 @@ export function OperatorTimeline({
   workflowDrafts = [],
   onDecision,
   onRunCommand = () => {},
+  onRunSavedWorkflow = () => {},
   pendingCancelTurnId,
   onCancelTurn = () => {},
 }: OperatorTimelineProps) {
@@ -556,6 +562,7 @@ export function OperatorTimeline({
             runCommandDisabled={runCommandDisabled}
             onDecision={onDecision}
             onRunCommand={onRunCommand}
+            onRunSavedWorkflow={onRunSavedWorkflow}
             workflowDrafts={workflowDrafts}
             appliedDraftIds={appliedDraftIds}
             keptVersionIds={keptVersionIds}

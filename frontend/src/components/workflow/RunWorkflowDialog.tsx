@@ -20,10 +20,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Play, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink, Play, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { useScopes } from '@/hooks/queries/useScopeQueries';
+import { ReadinessSummary } from '@/features/agent-readiness/ReadinessSummary';
+import type { AgentReadinessRow } from '@/features/agent-readiness/readiness';
 import { mergeScopeValues } from './scopeInputMapping';
 
 type RuntimeInputType =
@@ -46,12 +49,13 @@ const hasRuntimeInputValue = (value: unknown): boolean => {
   return true;
 };
 
-interface RuntimeInputDefinition {
+export interface RuntimeInputDefinition {
   id: string;
   label: string;
   type: RuntimeInputType;
   required: boolean;
   description?: string;
+  defaultValue?: unknown;
 }
 
 interface RunWorkflowDialogProps {
@@ -61,6 +65,11 @@ interface RunWorkflowDialogProps {
   onRun: (inputs: Record<string, unknown>, scopeId?: string | null) => void;
   initialValues?: Record<string, unknown>;
   initialScopeId?: string | null;
+  readinessRows?: readonly AgentReadinessRow[];
+  readinessIssues?: readonly string[];
+  readinessPending?: boolean;
+  readinessError?: string | null;
+  configurationHref?: string;
 }
 
 export function RunWorkflowDialog({
@@ -70,6 +79,11 @@ export function RunWorkflowDialog({
   onRun,
   initialValues = {},
   initialScopeId = null,
+  readinessRows,
+  readinessIssues = [],
+  readinessPending = false,
+  readinessError = null,
+  configurationHref,
 }: RunWorkflowDialogProps) {
   const [inputs, setInputs] = useState<Record<string, unknown>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
@@ -81,6 +95,13 @@ export function RunWorkflowDialog({
     ? scopes.find((scope) => scope.id === initialScopeId)
     : undefined;
   const isRequestedScopeUnavailable = Boolean(initialScopeId && !requestedScope);
+  const hasReadiness = readinessRows !== undefined;
+  const readinessBlocksRun = Boolean(
+    readinessPending ||
+    readinessError ||
+    readinessIssues.length > 0 ||
+    readinessRows?.some((row) => row.blocksExecution),
+  );
 
   // Reset inputs when dialog opens
   useEffect(() => {
@@ -441,6 +462,54 @@ export function RunWorkflowDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {hasReadiness ? (
+          <section aria-label="Run readiness" className="space-y-2">
+            <p className="text-xs font-medium text-foreground">Run readiness</p>
+            {readinessPending ? (
+              <p className="flex items-center gap-2 rounded-md border p-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                Checking the saved version and its dependencies…
+              </p>
+            ) : null}
+            {readinessError ? (
+              <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {readinessError}
+              </p>
+            ) : null}
+            {!readinessPending && !readinessError && readinessRows.length > 0 ? (
+              <ReadinessSummary rows={readinessRows} />
+            ) : null}
+            {!readinessPending && !readinessError && readinessIssues.length > 0 ? (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+                <p className="font-medium">Resolve configuration before running</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  {readinessIssues.map((issue) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {!readinessPending &&
+            !readinessError &&
+            readinessRows.length === 0 &&
+            readinessIssues.length === 0 ? (
+              <p className="flex items-center gap-2 rounded-md border p-2 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                Configuration and dependencies are ready.
+              </p>
+            ) : null}
+            {readinessBlocksRun && configurationHref ? (
+              <Button asChild type="button" variant="outline" size="sm" className="h-7 gap-1.5">
+                <Link to={configurationHref}>
+                  Open in Builder
+                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                </Link>
+              </Button>
+            ) : null}
+          </section>
+        ) : null}
+
         {initialScopeId && !requestedScope && (
           <div
             role={isLoadingScopes ? 'status' : 'alert'}
@@ -493,7 +562,11 @@ export function RunWorkflowDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleRun} className="gap-2" disabled={isRequestedScopeUnavailable}>
+          <Button
+            onClick={handleRun}
+            className="gap-2"
+            disabled={isRequestedScopeUnavailable || readinessBlocksRun}
+          >
             <Play className="h-4 w-4" />
             Run Workflow
           </Button>

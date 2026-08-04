@@ -7,6 +7,7 @@ import {
   type OperatorRouteContext,
   type OperatorSessionDetail,
   type OperatorSessionSummary,
+  type OperatorWorkflowApplyResult,
 } from '@sentris/shared';
 import { formatDistanceToNowStrict } from 'date-fns';
 import {
@@ -31,6 +32,7 @@ import { OperatorModelForm } from '@/features/operator/OperatorModelForm';
 import { OperatorModeSelect } from '@/features/operator/OperatorModeSelect';
 import { OperatorJourneyPipeline } from '@/features/operator/OperatorJourneyPipeline';
 import { OperatorTimeline } from '@/features/operator/OperatorTimeline';
+import { OperatorWorkflowRunDialog } from '@/features/operator/OperatorWorkflowRunDialog';
 import { projectOperatorJourneyPipeline } from '@/features/operator/operatorJourneyPipelineProjector';
 import {
   createDefaultOperatorModelDraft,
@@ -345,6 +347,7 @@ function ActiveSession({
   const cancelTurn = useCancelOperatorTurn();
   const decideAction = useDecideOperatorAction();
   const [message, setMessage] = useState('');
+  const [workflowToRun, setWorkflowToRun] = useState<OperatorWorkflowApplyResult | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedHandoffRef = useRef<string | null>(null);
   const focusedTurnRef = useRef<string | null>(null);
@@ -490,6 +493,7 @@ function ActiveSession({
             onRunCommand={(request) =>
               void sendTurn(request.message, request.directCommand, request.journey)
             }
+            onRunSavedWorkflow={setWorkflowToRun}
             pendingCancelTurnId={cancelTurn.variables?.turnId}
             onCancelTurn={(turnId) => void cancel(turnId)}
           />
@@ -543,6 +547,25 @@ function ActiveSession({
           </p>
         </form>
       </div>
+
+      <OperatorWorkflowRunDialog
+        workflow={workflowToRun}
+        onOpenChange={(open) => {
+          if (!open) setWorkflowToRun(null);
+        }}
+        onRun={(workflow, inputs, scopeId) => {
+          setWorkflowToRun(null);
+          void sendTurn(`Run saved workflow ${workflow.name} version ${workflow.version}`, {
+            commandName: 'run_workflow',
+            arguments: {
+              workflowId: workflow.workflowId,
+              versionId: workflow.versionId,
+              inputs,
+              ...(scopeId ? { scopeId } : {}),
+            },
+          });
+        }}
+      />
     </div>
   );
 }

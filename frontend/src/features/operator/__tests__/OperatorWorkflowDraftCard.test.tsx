@@ -135,9 +135,15 @@ describe('OperatorWorkflowDraftCard', () => {
       staged: false,
       name: 'NPM package investigation',
     };
+    const onRunSavedVersion = mock(() => {});
 
     renderWithProviders(
-      <OperatorWorkflowDraftCard sessionId={SESSION_ID} result={result} onApply={mock(() => {})} />,
+      <OperatorWorkflowDraftCard
+        sessionId={SESSION_ID}
+        result={result}
+        onApply={mock(() => {})}
+        onRunSavedVersion={onRunSavedVersion}
+      />,
     );
 
     expect(screen.getByText('Saved as v4')).toBeInTheDocument();
@@ -145,6 +151,8 @@ describe('OperatorWorkflowDraftCard', () => {
       'href',
       `/workflows/${WORKFLOW_ID}`,
     );
+    fireEvent.click(screen.getByRole('button', { name: /run now/i }));
+    expect(onRunSavedVersion).toHaveBeenCalledWith(result);
     expect(screen.queryByRole('button', { name: /run improved version/i })).not.toBeInTheDocument();
   });
 
