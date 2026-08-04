@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { McpCatalogSchema } from '@sentris/shared';
+import { McpCatalogSchema, McpSavedServerPreviewRequestSchema } from '@sentris/shared';
 
 import { mcpServers } from '../../database/schema/mcp-servers';
 
@@ -116,10 +116,41 @@ export class McpToolResponseDto extends createZodDto(McpToolResponseSchema) {
 export const McpServerCapabilitiesResponseSchema = z.object({
   catalog: McpCatalogSchema.nullable(),
   discoveredAt: z.string().datetime().nullable(),
+  resourceTemplateVariables: z.record(z.string(), z.array(z.string())),
 });
 
 export class McpServerCapabilitiesResponseDto extends createZodDto(
   McpServerCapabilitiesResponseSchema,
+) {}
+
+const McpSavedServerPreviewBodySchema = z
+  .object({
+    kind: z.enum(['resource', 'resource-template', 'prompt']),
+    uri: z.string().min(1).optional(),
+    uriTemplate: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
+    arguments: z.record(z.string(), z.string()).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const result = McpSavedServerPreviewRequestSchema.safeParse(value);
+    if (!result.success) {
+      for (const issue of result.error.issues) context.addIssue({ ...issue });
+    }
+  });
+
+export class McpSavedServerPreviewRequestDto extends createZodDto(
+  McpSavedServerPreviewBodySchema,
+) {}
+
+const McpSavedServerPreviewOpenApiResponseSchema = z.object({
+  kind: z.enum(['resource', 'prompt']),
+  target: z.string().min(1),
+  output: z.unknown(),
+});
+
+export class McpSavedServerPreviewResponseDto extends createZodDto(
+  McpSavedServerPreviewOpenApiResponseSchema,
 ) {}
 
 export const TestConnectionResponseSchema = z.object({
@@ -154,6 +185,7 @@ export class HealthStatusResponseDto extends createZodDto(HealthStatusResponseSc
 export const McpServerResponse = McpServerResponseDto;
 export const McpToolResponse = McpToolResponseDto;
 export const McpServerCapabilitiesResponse = McpServerCapabilitiesResponseDto;
+export const McpSavedServerPreviewResponse = McpSavedServerPreviewResponseDto;
 export const TestConnectionResponse = TestConnectionResponseDto;
 export const TestEnabledServerResponse = TestEnabledServerResponseDto;
 export const HealthStatusResponse = HealthStatusResponseDto;
@@ -162,6 +194,8 @@ export const HealthStatusResponse = HealthStatusResponseDto;
 export type McpServerResponse = McpServerResponseDto;
 export type McpToolResponse = McpToolResponseDto;
 export type McpServerCapabilitiesResponse = McpServerCapabilitiesResponseDto;
+export type McpSavedServerPreviewRequest = McpSavedServerPreviewRequestDto;
+export type McpSavedServerPreviewResponse = McpSavedServerPreviewResponseDto;
 export type TestConnectionResponse = TestConnectionResponseDto;
 export type TestEnabledServerResponse = TestEnabledServerResponseDto;
 export type HealthStatusResponse = HealthStatusResponseDto;

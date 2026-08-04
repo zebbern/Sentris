@@ -164,6 +164,7 @@ export class TemporalService implements OnModuleDestroy {
       case 'scheduleTriggerWorkflow':
       case 'mcpDiscoveryWorkflow':
       case 'mcpGroupDiscoveryWorkflow':
+      case 'mcpSavedServerPreviewWorkflow':
       case 'webhookParsingWorkflow':
       case 'operatorTurnWorkflow':
       case 'operatorRunFollowUpWorkflow':

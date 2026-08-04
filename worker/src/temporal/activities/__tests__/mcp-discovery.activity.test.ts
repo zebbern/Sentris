@@ -5,7 +5,10 @@ import type {
   McpRuntimeKey,
   McpRuntimeRef,
 } from '@sentris/shared';
-import type { McpRuntimeRouter } from '../../../mcp-runtime/mcp-runtime-router';
+import type {
+  McpRuntimeOperation,
+  McpRuntimeRouter,
+} from '../../../mcp-runtime/mcp-runtime-router';
 
 const redisSetex = vi.fn(async (_key: string, _ttlSeconds: number, _value: string) => 'OK');
 const redisGet = vi.fn(async (_key: string): Promise<string | null> => null);
@@ -134,6 +137,7 @@ const originalTrustProfile = process.env.SENTRIS_TRUST_PROFILE;
 const originalFetch = globalThis.fetch;
 let cacheDiscoveryResultActivity: typeof import('../mcp-discovery.activity').cacheDiscoveryResultActivity;
 let discoverSavedMcpRuntimeActivity: typeof import('../mcp-discovery.activity').discoverSavedMcpRuntimeActivity;
+let previewSavedMcpRuntimeActivity: typeof import('../mcp-discovery.activity').previewSavedMcpRuntimeActivity;
 let discoverMcpToolsActivity: typeof import('../mcp-discovery.activity').discoverMcpToolsActivity;
 let discoverMcpGroupToolsActivity: typeof import('../mcp-discovery.activity').discoverMcpGroupToolsActivity;
 let initializeMcpRuntimeDiscoveryActivities: typeof import('../mcp-discovery.activity').initializeMcpRuntimeDiscoveryActivities;
@@ -245,6 +249,7 @@ describe('MCP discovery activity diagnostics', () => {
     ({
       cacheDiscoveryResultActivity,
       discoverSavedMcpRuntimeActivity,
+      previewSavedMcpRuntimeActivity,
       discoverMcpToolsActivity,
       discoverMcpGroupToolsActivity,
       initializeMcpRuntimeDiscoveryActivities,
@@ -363,6 +368,37 @@ describe('MCP discovery activity diagnostics', () => {
     expect(result).not.toHaveProperty('fence');
   });
 
+  test('previews saved resources through the same acquired runtime and fenced release', async () => {
+    const acquire = vi.fn(async () => savedRuntimeAcquisition);
+    const execute = vi.fn(async (_ref: McpRuntimeAcquisition, operation: McpRuntimeOperation) => {
+      if (operation.kind === 'read') {
+        return { contents: [{ uri: 'sentris://reports/latest', text: 'latest report' }] };
+      }
+      return undefined;
+    });
+    initializeMcpRuntimeDiscoveryActivities({ acquire, execute } as unknown as McpRuntimeRouter);
+
+    await expect(
+      previewSavedMcpRuntimeActivity({
+        runtimeKey: savedRuntimeKey,
+        operation: { kind: 'resource-read', uri: 'sentris://reports/latest' },
+      }),
+    ).resolves.toEqual({
+      kind: 'resource',
+      target: 'sentris://reports/latest',
+      output: { contents: [{ uri: 'sentris://reports/latest', text: 'latest report' }] },
+    });
+
+    expect(execute.mock.calls.map(([, operation]) => operation)).toEqual([
+      {
+        kind: 'read',
+        uri: 'sentris://reports/latest',
+        context: { idleTimeoutMs: 30_000, maxTotalTimeoutMs: 120_000 },
+      },
+      { kind: 'release' },
+    ]);
+  });
+
   test('passes Temporal activity cancellation to saved-server discovery', async () => {
     const cancellation = new Error('Temporal activity cancelled');
     const controller = new AbortController();
@@ -404,7 +440,7 @@ describe('MCP discovery activity diagnostics', () => {
     expect(acquire.mock.calls[0]?.[1]).toBe(acquire.mock.calls[1]?.[1]);
   });
 
-  test('uses a new holder incarnation when Temporal retries after a lost release response', async () => {
+  test('reuses the stable holder when Temporal retries after a lost release response', async () => {
     const holderIds: string[] = [];
     const acquire = vi.fn(
       async (_runtimeKey: McpRuntimeKey, holderId: string, _signal: AbortSignal) => {
@@ -430,7 +466,7 @@ describe('MCP discovery activity diagnostics', () => {
     );
 
     expect(holderIds).toHaveLength(2);
-    expect(holderIds[0]).not.toBe(holderIds[1]);
+    expect(holderIds[0]).toBe(holderIds[1]);
   });
 
   test('serializes holder keepalives and stops them before fenced release', async () => {
@@ -614,13 +650,22 @@ describe('MCP discovery activity diagnostics', () => {
   });
 
   test('blocks a private HTTP MCP endpoint before constructing an MCP transport', async () => {
-    await expect(
-      discoverMcpToolsActivity({
+    let failure: unknown;
+    try {
+      await discoverMcpToolsActivity({
         transport: 'http',
         endpoint: 'http://127.0.0.1:3000/mcp',
-      }),
-    ).rejects.toThrow(/SSRF blocked/);
+      });
+    } catch (error: unknown) {
+      failure = error;
+    }
 
+    expect(failure).toBeInstanceOf(MockApplicationFailure);
+    expect(failure).toMatchObject({
+      message: expect.stringMatching(/SSRF blocked/),
+      type: 'SsrfBlockedError',
+      nonRetryable: true,
+    });
     expect(mockMcpTransport).not.toHaveBeenCalled();
   });
 

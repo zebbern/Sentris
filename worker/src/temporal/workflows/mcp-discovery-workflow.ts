@@ -5,7 +5,13 @@ import {
   setHandler,
   workflowInfo,
 } from '@temporalio/workflow';
-import type { McpCatalog, McpRuntimeKey } from '@sentris/shared';
+import type {
+  McpCatalog,
+  McpPromptGetOperation,
+  McpResourceReadOperation,
+  McpRuntimeKey,
+  McpSavedServerPreviewResponse,
+} from '@sentris/shared';
 import {
   SAVED_MCP_RUNTIME_DISCOVERY_RETRY,
   SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS,
@@ -150,6 +156,25 @@ const { discoverSavedMcpRuntimeActivity } = proxyActivities<{
   heartbeatTimeout: '20 seconds',
   retry: { ...SAVED_MCP_RUNTIME_DISCOVERY_RETRY },
 });
+
+const { previewSavedMcpRuntimeActivity } = proxyActivities<{
+  previewSavedMcpRuntimeActivity(input: {
+    runtimeKey: McpRuntimeKey;
+    operation: McpResourceReadOperation | McpPromptGetOperation;
+  }): Promise<McpSavedServerPreviewResponse>;
+}>({
+  startToCloseTimeout: SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS,
+  scheduleToCloseTimeout: SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS * 2,
+  heartbeatTimeout: '20 seconds',
+  retry: { ...SAVED_MCP_RUNTIME_DISCOVERY_RETRY },
+});
+
+export async function mcpSavedServerPreviewWorkflow(input: {
+  runtimeKey: McpRuntimeKey;
+  operation: McpResourceReadOperation | McpPromptGetOperation;
+}): Promise<McpSavedServerPreviewResponse> {
+  return previewSavedMcpRuntimeActivity(input);
+}
 
 /**
  * MCP Discovery Workflow

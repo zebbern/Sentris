@@ -13,7 +13,7 @@ import {
 } from '@sentris/shared';
 
 import type { AuthContext } from '../auth/types';
-import { McpSavedServerDiscoveryService } from '../mcp-servers/mcp-saved-server-discovery.service';
+import { McpSavedServerRuntimeService } from '../mcp-servers/mcp-saved-server-runtime.service';
 import { McpServerRuntimeConfigService } from '../mcp-servers/mcp-server-runtime-config.service';
 import { McpLegacyOutboundCompatibilityService } from '../mcp/mcp-legacy-outbound-compatibility.service';
 import { ToolRegistryService, type RegisteredTool } from '../mcp/tool-registry.service';
@@ -35,7 +35,7 @@ export class McpRunCatalogService {
     private readonly toolRegistry: ToolRegistryService,
     private readonly legacyOutbound: McpLegacyOutboundCompatibilityService,
     private readonly runtimeConfig: McpServerRuntimeConfigService,
-    private readonly savedServerDiscovery: McpSavedServerDiscoveryService,
+    private readonly savedServerDiscovery: McpSavedServerRuntimeService,
   ) {}
 
   async build(input: {

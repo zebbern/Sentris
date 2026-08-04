@@ -2073,6 +2073,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/mcp-servers/{id}/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Preview a saved MCP resource or prompt */
+    post: operations['McpServersController_previewCapability'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/mcp-servers/{id}/toggle': {
     parameters: {
       query?: never;
@@ -5203,6 +5220,25 @@ export interface components {
       } | null;
       /** Format: date-time */
       discoveredAt: string | null;
+      resourceTemplateVariables: {
+        [key: string]: string[];
+      };
+    };
+    McpSavedServerPreviewRequestDto: {
+      /** @enum {string} */
+      kind: 'resource' | 'resource-template' | 'prompt';
+      uri?: string;
+      uriTemplate?: string;
+      name?: string;
+      arguments?: {
+        [key: string]: string;
+      };
+    };
+    McpSavedServerPreviewResponseDto: {
+      /** @enum {string} */
+      kind: 'resource' | 'prompt';
+      target: string;
+      output: unknown;
     };
     CreateMcpServerDto: {
       name: string;
@@ -10342,6 +10378,31 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['McpServerCapabilitiesResponseDto'];
+        };
+      };
+    };
+  };
+  McpServersController_previewCapability: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['McpSavedServerPreviewRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpSavedServerPreviewResponseDto'];
         };
       };
     };

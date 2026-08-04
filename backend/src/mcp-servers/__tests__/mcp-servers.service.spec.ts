@@ -8,7 +8,7 @@ import type { AuthContext } from '../../auth/types';
 import type { McpServerRecord, McpServerToolRecord } from '../../database/schema';
 import type { SecretResolver } from '../../secrets/secret-resolver';
 import type { McpServerRuntimeConfigService } from '../mcp-server-runtime-config.service';
-import type { McpSavedServerDiscoveryService } from '../mcp-saved-server-discovery.service';
+import type { McpSavedServerRuntimeService } from '../mcp-saved-server-runtime.service';
 import type { McpServersEncryptionService } from '../mcp-servers.encryption';
 import type { McpServersRepository } from '../mcp-servers.repository';
 import { McpServersService } from '../mcp-servers.service';
@@ -163,6 +163,11 @@ describe('McpServersService', () => {
     };
     savedServerDiscovery = {
       discover: vi.fn(async () => makeCatalog()),
+      preview: vi.fn(async () => ({
+        kind: 'resource',
+        target: 'sentris://packages/react',
+        output: { contents: [{ uri: 'sentris://packages/react', text: 'React' }] },
+      })),
     };
 
     service = new McpServersService(
@@ -172,7 +177,7 @@ describe('McpServersService', () => {
       redis as any,
       auditLog as unknown as AuditLogService,
       runtimeConfigService as unknown as McpServerRuntimeConfigService,
-      savedServerDiscovery as unknown as McpSavedServerDiscoveryService,
+      savedServerDiscovery as unknown as McpSavedServerRuntimeService,
     );
   });
 
@@ -653,7 +658,12 @@ describe('McpServersService', () => {
   });
 
   it('returns the latest complete saved-server capability catalog', async () => {
-    const catalog = makeCatalog();
+    const catalog = {
+      ...makeCatalog(),
+      resourceTemplates: [
+        { sourceId: 'server-1', uriTemplate: 'sentris://packages/{name}', name: 'Package' },
+      ],
+    };
     repo.findById.mockResolvedValue(
       makeServerRecord({
         capabilityCatalog: catalog,
@@ -664,10 +674,64 @@ describe('McpServersService', () => {
     await expect(service.getServerCapabilities(authContext, 'server-1')).resolves.toEqual({
       catalog,
       discoveredAt: '2026-08-04T12:34:56.000Z',
+      resourceTemplateVariables: { 'sentris://packages/{name}': ['name'] },
     });
     expect(repo.findById).toHaveBeenCalledWith('server-1', {
       organizationId: DEFAULT_ORGANIZATION_ID,
     });
+  });
+
+  it('expands a catalog-backed resource template before previewing the saved runtime', async () => {
+    const runtimeKey = makeRuntimeKey('http');
+    runtimeConfigService.buildRuntimeKey.mockResolvedValue(runtimeKey);
+    repo.findById.mockResolvedValue(
+      makeServerRecord({
+        capabilityCatalog: {
+          ...makeCatalog(),
+          resourceTemplates: [
+            { sourceId: 'server-1', uriTemplate: 'sentris://packages/{name}', name: 'Package' },
+          ],
+        },
+      }),
+    );
+
+    await service.previewCapability(authContext, 'server-1', {
+      kind: 'resource-template',
+      uriTemplate: 'sentris://packages/{name}',
+      arguments: { name: 'react' },
+    });
+
+    expect(savedServerDiscovery.preview).toHaveBeenCalledWith(runtimeKey, {
+      kind: 'resource-read',
+      uri: 'sentris://packages/react',
+    });
+  });
+
+  it('rejects missing required prompt arguments before acquiring a runtime', async () => {
+    repo.findById.mockResolvedValue(
+      makeServerRecord({
+        capabilityCatalog: {
+          ...makeCatalog(),
+          prompts: [
+            {
+              sourceId: 'server-1',
+              name: 'investigate',
+              arguments: [{ name: 'package', required: true }],
+            },
+          ],
+        },
+      }),
+    );
+
+    await expect(
+      service.previewCapability(authContext, 'server-1', {
+        kind: 'prompt',
+        name: 'investigate',
+        arguments: {},
+      }),
+    ).rejects.toThrow('Missing required prompt arguments: package');
+    expect(runtimeConfigService.buildRuntimeKey).not.toHaveBeenCalled();
+    expect(savedServerDiscovery.preview).not.toHaveBeenCalled();
   });
 
   it('tests HTTP MCP servers through the secret-free saved-server workflow input', async () => {

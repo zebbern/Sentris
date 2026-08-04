@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'bun:test';
 import type { McpCatalog, McpRuntimeKey } from '@sentris/shared';
 
-import { McpSavedServerDiscoveryService } from '../mcp-saved-server-discovery.service';
+import { McpSavedServerRuntimeService } from '../mcp-saved-server-runtime.service';
 
 const runtimeKey: McpRuntimeKey = {
   sourceId: 'server-1',
@@ -50,7 +50,7 @@ const catalog: McpCatalog = {
   ],
 };
 
-describe('McpSavedServerDiscoveryService', () => {
+describe('McpSavedServerRuntimeService', () => {
   it('returns the complete catalog through a secret-free saved-server workflow input', async () => {
     const temporal = {
       startWorkflow: vi.fn(async (_options: unknown) => ({
@@ -62,7 +62,7 @@ describe('McpSavedServerDiscoveryService', () => {
       getDefaultTaskQueue: vi.fn(() => 'sentris-worker-0'),
       cancelWorkflow: vi.fn(async () => undefined),
     };
-    const service = new McpSavedServerDiscoveryService(temporal as never);
+    const service = new McpSavedServerRuntimeService(temporal as never);
 
     await expect(service.discover(runtimeKey)).resolves.toEqual(catalog);
     expect(temporal.startWorkflow).toHaveBeenCalledWith({
@@ -95,10 +95,37 @@ describe('McpSavedServerDiscoveryService', () => {
       getDefaultTaskQueue: vi.fn(() => 'sentris-worker-0'),
       cancelWorkflow: vi.fn(async () => undefined),
     };
-    const service = new McpSavedServerDiscoveryService(temporal as never);
+    const service = new McpSavedServerRuntimeService(temporal as never);
 
     await expect(service.discover(runtimeKey)).rejects.toThrow();
     expect(temporal.cancelWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('previews through a dedicated secret-free workflow and validates its result', async () => {
+    const previewResult = {
+      kind: 'resource' as const,
+      target: 'sentris://event/42',
+      output: { contents: [{ uri: 'sentris://event/42', text: 'event 42' }] },
+    };
+    const temporal = {
+      startWorkflow: vi.fn(async () => ({
+        workflowId: 'preview-1',
+        runId: 'temporal-run-1',
+        taskQueue: 'sentris-worker-0',
+      })),
+      getWorkflowResult: vi.fn(async () => previewResult),
+      getDefaultTaskQueue: vi.fn(() => 'sentris-worker-0'),
+      cancelWorkflow: vi.fn(async () => undefined),
+    };
+    const service = new McpSavedServerRuntimeService(temporal as never);
+    const operation = { kind: 'resource-read' as const, uri: 'sentris://event/42' };
+
+    await expect(service.preview(runtimeKey, operation)).resolves.toEqual(previewResult);
+    expect(temporal.startWorkflow).toHaveBeenCalledWith({
+      workflowType: 'mcpSavedServerPreviewWorkflow',
+      taskQueue: 'sentris-worker-0',
+      args: [{ runtimeKey, operation }],
+    });
   });
 
   it('cancels the exact Temporal run on timeout while preserving the timeout error', async () => {
@@ -124,7 +151,7 @@ describe('McpSavedServerDiscoveryService', () => {
         throw new Error('Temporal cancellation unavailable');
       }),
     };
-    const service = new McpSavedServerDiscoveryService(temporal as never);
+    const service = new McpSavedServerRuntimeService(temporal as never);
 
     try {
       const discovery = service.discover(runtimeKey);

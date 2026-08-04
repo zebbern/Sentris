@@ -7,6 +7,12 @@ import {
   Optional,
 } from '@nestjs/common';
 import Redis from 'ioredis';
+import { UriTemplate } from '@modelcontextprotocol/server';
+import type {
+  McpPromptGetOperation,
+  McpResourceReadOperation,
+  McpSavedServerPreviewRequest,
+} from '@sentris/shared';
 
 import { McpServersEncryptionService } from './mcp-servers.encryption';
 import { McpServersRepository, type McpServerUpdateData } from './mcp-servers.repository';
@@ -19,6 +25,7 @@ import type {
   McpServerResponse,
   McpToolResponse,
   McpServerCapabilitiesResponse,
+  McpSavedServerPreviewResponse,
   TransportType,
   HealthStatus,
   TestEnabledServerResponse,
@@ -26,7 +33,7 @@ import type {
 import type { McpServerRecord, McpServerToolRecord } from '../database/schema';
 import { SecretResolver, extractMcpSecretReferences } from '../secrets/secret-resolver';
 import { McpServerRuntimeConfigService } from './mcp-server-runtime-config.service';
-import { McpSavedServerDiscoveryService } from './mcp-saved-server-discovery.service';
+import { McpSavedServerRuntimeService } from './mcp-saved-server-runtime.service';
 
 // Redis injection token - defined as const to avoid circular dependency
 const MCP_SERVERS_REDIS = 'MCP_SERVERS_REDIS';
@@ -42,7 +49,7 @@ export class McpServersService {
     @Optional() @Inject(MCP_SERVERS_REDIS) private readonly redis: Redis | null,
     private readonly auditLogService: AuditLogService,
     private readonly runtimeConfigService: McpServerRuntimeConfigService,
-    private readonly savedServerDiscovery: McpSavedServerDiscoveryService,
+    private readonly savedServerRuntime: McpSavedServerRuntimeService,
   ) {}
 
   private mapServerToResponse(
@@ -193,7 +200,95 @@ export class McpServersService {
     return {
       catalog: server.capabilityCatalog,
       discoveredAt: server.capabilityCatalogDiscoveredAt?.toISOString() ?? null,
+      resourceTemplateVariables: Object.fromEntries(
+        (server.capabilityCatalog?.resourceTemplates ?? []).map((template) => [
+          template.uriTemplate,
+          new UriTemplate(template.uriTemplate).variableNames,
+        ]),
+      ),
     };
+  }
+
+  async previewCapability(
+    auth: AuthContext | null,
+    id: string,
+    request: McpSavedServerPreviewRequest,
+  ): Promise<McpSavedServerPreviewResponse> {
+    const organizationId = requireOrganizationId(auth);
+    const server = await this.repository.findById(id, { organizationId });
+    const catalog = server.capabilityCatalog;
+    if (!catalog) {
+      throw new BadRequestException('Discover this MCP server before previewing capabilities');
+    }
+
+    let operation: McpResourceReadOperation | McpPromptGetOperation;
+    switch (request.kind) {
+      case 'resource': {
+        const matches = catalog.resources.filter(
+          (resource) => resource.sourceId === id && resource.uri === request.uri,
+        );
+        if (matches.length !== 1) {
+          throw new BadRequestException('Resource is not present in the saved capability catalog');
+        }
+        operation = { kind: 'resource-read', uri: request.uri };
+        break;
+      }
+      case 'resource-template': {
+        const matches = catalog.resourceTemplates.filter(
+          (template) => template.sourceId === id && template.uriTemplate === request.uriTemplate,
+        );
+        if (matches.length !== 1) {
+          throw new BadRequestException(
+            'Resource template is not present in the saved capability catalog',
+          );
+        }
+        const template = new UriTemplate(request.uriTemplate);
+        const unknownArguments = Object.keys(request.arguments).filter(
+          (name) => !template.variableNames.includes(name),
+        );
+        if (unknownArguments.length > 0) {
+          throw new BadRequestException(
+            `Unknown resource template arguments: ${unknownArguments.join(', ')}`,
+          );
+        }
+        operation = { kind: 'resource-read', uri: template.expand(request.arguments) };
+        break;
+      }
+      case 'prompt': {
+        const matches = catalog.prompts.filter(
+          (prompt) => prompt.sourceId === id && prompt.name === request.name,
+        );
+        if (matches.length !== 1) {
+          throw new BadRequestException('Prompt is not present in the saved capability catalog');
+        }
+        const prompt = matches[0]!;
+        const argumentNames = new Set(prompt.arguments.map((argument) => argument.name));
+        const unknownArguments = Object.keys(request.arguments).filter(
+          (name) => !argumentNames.has(name),
+        );
+        if (unknownArguments.length > 0) {
+          throw new BadRequestException(`Unknown prompt arguments: ${unknownArguments.join(', ')}`);
+        }
+        const missingArguments = prompt.arguments
+          .filter((argument) => argument.required && !request.arguments[argument.name])
+          .map((argument) => argument.name);
+        if (missingArguments.length > 0) {
+          throw new BadRequestException(
+            `Missing required prompt arguments: ${missingArguments.join(', ')}`,
+          );
+        }
+        operation = { kind: 'prompt-get', name: request.name, arguments: request.arguments };
+        break;
+      }
+      default: {
+        const exhaustive: never = request;
+        throw new BadRequestException(`Unsupported preview request: ${String(exhaustive)}`);
+      }
+    }
+
+    if (!auth) throw new BadRequestException('MCP runtime services are unavailable');
+    const runtimeKey = await this.runtimeConfigService.buildRuntimeKey(auth, server.id);
+    return this.savedServerRuntime.preview(runtimeKey, operation);
   }
 
   async createServer(
@@ -680,7 +775,7 @@ export class McpServersService {
       const runtimeKey = await this.runtimeConfigService.buildRuntimeKey(auth, server.id);
       this.logger.log(`Testing MCP server ${server.id} through a worker-owned runtime`);
 
-      const catalog = await this.savedServerDiscovery.discover(runtimeKey);
+      const catalog = await this.savedServerRuntime.discover(runtimeKey);
       await this.repository.persistDiscovery(id, catalog);
       return {
         success: true,

@@ -6,6 +6,7 @@ const discoverMcpToolsActivity = vi.fn();
 const discoverMcpGroupToolsActivity = vi.fn();
 const cacheDiscoveryResultActivity = vi.fn();
 const discoverSavedMcpRuntimeActivity = vi.fn();
+const previewSavedMcpRuntimeActivity = vi.fn();
 const setHandler = vi.fn();
 const registeredActivityOptions: unknown[] = [];
 
@@ -14,6 +15,7 @@ const activityImplementations = {
   discoverMcpGroupToolsActivity,
   cacheDiscoveryResultActivity,
   discoverSavedMcpRuntimeActivity,
+  previewSavedMcpRuntimeActivity,
 };
 
 const proxyActivities = vi.fn((options: unknown) => {
@@ -111,9 +113,11 @@ const legacyProjection: McpTool[] = [
 ];
 
 let mcpDiscoveryWorkflow: typeof import('../mcp-discovery-workflow').mcpDiscoveryWorkflow;
+let mcpSavedServerPreviewWorkflow: typeof import('../mcp-discovery-workflow').mcpSavedServerPreviewWorkflow;
 
 beforeAll(async () => {
-  ({ mcpDiscoveryWorkflow } = await import('../mcp-discovery-workflow'));
+  ({ mcpDiscoveryWorkflow, mcpSavedServerPreviewWorkflow } =
+    await import('../mcp-discovery-workflow'));
 });
 
 beforeEach(() => {
@@ -122,6 +126,11 @@ beforeEach(() => {
   discoverMcpToolsActivity.mockResolvedValue({ tools: legacyProjection });
   discoverMcpGroupToolsActivity.mockResolvedValue({ results: [] });
   cacheDiscoveryResultActivity.mockResolvedValue(undefined);
+  previewSavedMcpRuntimeActivity.mockResolvedValue({
+    kind: 'prompt',
+    target: 'summarize_report',
+    output: { messages: [{ role: 'user', content: { type: 'text', text: 'Summarize 42' } }] },
+  });
 });
 
 describe('mcpDiscoveryWorkflow', () => {
@@ -197,5 +206,25 @@ describe('mcpDiscoveryWorkflow', () => {
       toolCount: 1,
     });
     expect(result).not.toHaveProperty('catalog');
+  });
+});
+
+describe('mcpSavedServerPreviewWorkflow', () => {
+  test('forwards a secret-free prompt preview through the durable saved-runtime activity', async () => {
+    const input = {
+      runtimeKey,
+      operation: {
+        kind: 'prompt-get' as const,
+        name: 'summarize_report',
+        arguments: { reportId: '42' },
+      },
+    };
+
+    await expect(mcpSavedServerPreviewWorkflow(input)).resolves.toEqual({
+      kind: 'prompt',
+      target: 'summarize_report',
+      output: { messages: [{ role: 'user', content: { type: 'text', text: 'Summarize 42' } }] },
+    });
+    expect(previewSavedMcpRuntimeActivity).toHaveBeenCalledWith(input);
   });
 });

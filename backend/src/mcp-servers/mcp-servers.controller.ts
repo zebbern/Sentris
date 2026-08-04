@@ -31,10 +31,13 @@ import {
   McpServerResponse,
   McpToolResponse,
   McpServerCapabilitiesResponse,
+  McpSavedServerPreviewRequestDto,
+  McpSavedServerPreviewResponse,
   TestConnectionResponse,
   TestEnabledServerResponse,
   HealthStatusResponse,
 } from './dto/mcp-servers.dto';
+import { McpSavedServerPreviewRequestSchema } from '@sentris/shared';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
 
@@ -107,6 +110,22 @@ export class McpServersController {
     @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<McpServerCapabilitiesResponse> {
     return this.mcpServersService.getServerCapabilities(auth, id);
+  }
+
+  @Post(':id/preview')
+  @ApiOperation({ summary: 'Preview a saved MCP resource or prompt' })
+  @ApiOkResponse({ type: McpSavedServerPreviewResponse })
+  async previewCapability(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body(new ZodValidationPipe(McpSavedServerPreviewRequestSchema))
+    body: McpSavedServerPreviewRequestDto,
+  ): Promise<McpSavedServerPreviewResponse> {
+    return this.mcpServersService.previewCapability(
+      auth,
+      id,
+      McpSavedServerPreviewRequestSchema.parse(body),
+    );
   }
 
   @Post()

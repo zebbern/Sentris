@@ -60,7 +60,7 @@ const mockQueryState: {
 } = {
   servers: [],
   tools: [],
-  capabilities: { catalog: null, discoveredAt: null },
+  capabilities: { catalog: null, discoveredAt: null, resourceTemplateVariables: {} },
   groups: [],
   groupTemplates: [],
   isLoading: false,
@@ -88,6 +88,13 @@ mock.module('@/hooks/queries/useMcpServerQueries', () => ({
     data: mockQueryState.capabilities,
     isLoading: false,
     error: null,
+  }),
+  usePreviewMcpCapability: () => ({
+    mutate: mock(),
+    reset: mock(),
+    isPending: false,
+    error: null,
+    data: null,
   }),
   useDeleteMcpServer: () => ({
     mutateAsync: mockQueryState.deleteServer,
@@ -224,7 +231,11 @@ interface MockQueryOverrides {
 const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.servers = overrides.servers ?? [baseServer, secondServer];
   mockQueryState.tools = overrides.tools ?? [baseTool];
-  mockQueryState.capabilities = overrides.capabilities ?? { catalog: null, discoveredAt: null };
+  mockQueryState.capabilities = overrides.capabilities ?? {
+    catalog: null,
+    discoveredAt: null,
+    resourceTemplateVariables: {},
+  };
   mockQueryState.groups = overrides.groups ?? [];
   mockQueryState.groupTemplates = overrides.groupTemplates ?? [];
   mockQueryState.isLoading = overrides.isLoading ?? false;
@@ -423,6 +434,7 @@ describe('McpLibraryPage', () => {
       servers: [baseServer],
       capabilities: {
         discoveredAt: ISO,
+        resourceTemplateVariables: { 'sentris://packages/{name}': ['name'] },
         catalog: {
           protocolEra: 'modern',
           protocolVersion: '2026-07-28',

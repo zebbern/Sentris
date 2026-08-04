@@ -8,9 +8,10 @@ import {
   MCP_DOCKER_PROXY_AUTH_HEADER,
   removeMcpDockerProxyTarget,
 } from '../../components/core/mcp-docker-proxy';
-import { Context } from '@temporalio/activity';
+import { ApplicationFailure, Context } from '@temporalio/activity';
 import {
   createExecutionContext,
+  SsrfBlockedError,
   validateUrlForSsrf,
   type LogEventInput,
 } from '@sentris/component-sdk';
@@ -32,11 +33,17 @@ import { workflowDiagnosticLog } from '../workflow-diagnostics';
 import Redis from 'ioredis';
 import {
   McpCatalogSchema,
+  McpPromptGetOperationSchema,
+  McpResourceReadOperationSchema,
   McpRuntimeKeySchema,
+  McpSavedServerPreviewResponseSchema,
   resolveSentrisTrustProfile,
   type McpCatalog,
+  type McpPromptGetOperation,
+  type McpResourceReadOperation,
   type McpRuntimeAcquisition,
   type McpRuntimeKey,
+  type McpSavedServerPreviewResponse,
 } from '@sentris/shared';
 import type { McpRuntimeRouter } from '../../mcp-runtime/mcp-runtime-router';
 import { SAVED_MCP_RUNTIME_DISCOVERY_RELEASE_TIMEOUT_MS } from '../../mcp-runtime/mcp-runtime-limits';
@@ -62,42 +69,95 @@ export interface SavedMcpRuntimeDiscoveryOutput {
   catalog: McpCatalog;
 }
 
+export interface SavedMcpRuntimePreviewInput {
+  runtimeKey: McpRuntimeKey;
+  operation: McpResourceReadOperation | McpPromptGetOperation;
+}
+
 /** Canonical saved-server discovery path. Its Temporal boundary is secret-free. */
 export async function discoverSavedMcpRuntimeActivity(
   input: SavedMcpRuntimeDiscoveryInput,
 ): Promise<SavedMcpRuntimeDiscoveryOutput> {
-  if (!mcpRuntimeRouter) throw new Error('MCP runtime discovery activities are not initialized');
+  return withSavedMcpRuntime(input.runtimeKey, 'discover', async (router, acquisition, signal) => {
+    Context.current().heartbeat('mcp-runtime:discover');
+    const catalog = await router.execute(acquisition, { kind: 'discover' }, signal);
+    Context.current().heartbeat('mcp-runtime:catalog-ready');
+    return { catalog: McpCatalogSchema.parse(catalog) };
+  });
+}
+
+/** Read-only saved-server preview through the same fenced runtime used by discovery and runs. */
+export async function previewSavedMcpRuntimeActivity(
+  input: SavedMcpRuntimePreviewInput,
+): Promise<McpSavedServerPreviewResponse> {
+  const operation =
+    input.operation.kind === 'resource-read'
+      ? McpResourceReadOperationSchema.parse(input.operation)
+      : McpPromptGetOperationSchema.parse(input.operation);
+
+  return withSavedMcpRuntime(input.runtimeKey, 'preview', async (router, acquisition, signal) => {
+    Context.current().heartbeat('mcp-runtime:preview');
+    const output =
+      operation.kind === 'resource-read'
+        ? await router.execute(
+            acquisition,
+            {
+              kind: 'read',
+              uri: operation.uri,
+              context: { idleTimeoutMs: 30_000, maxTotalTimeoutMs: 120_000 },
+            },
+            signal,
+          )
+        : await router.execute(
+            acquisition,
+            {
+              kind: 'get-prompt',
+              name: operation.name,
+              args: operation.arguments,
+              context: { idleTimeoutMs: 30_000, maxTotalTimeoutMs: 120_000 },
+            },
+            signal,
+          );
+    Context.current().heartbeat('mcp-runtime:preview-ready');
+    return McpSavedServerPreviewResponseSchema.parse({
+      kind: operation.kind === 'resource-read' ? 'resource' : 'prompt',
+      target: operation.kind === 'resource-read' ? operation.uri : operation.name,
+      output,
+    });
+  });
+}
+
+async function withSavedMcpRuntime<T>(
+  runtimeKeyInput: McpRuntimeKey,
+  operationName: string,
+  execute: (
+    router: McpRuntimeRouter,
+    acquisition: McpRuntimeAcquisition,
+    signal: AbortSignal,
+  ) => Promise<T>,
+): Promise<T> {
+  if (!mcpRuntimeRouter) throw new Error('MCP saved runtime activities are not initialized');
+  const router = mcpRuntimeRouter;
   const context = Context.current();
-  const runtimeKey = McpRuntimeKeySchema.parse(input.runtimeKey);
-  const holderId = savedDiscoveryHolderId(context.info, runtimeKey);
+  const runtimeKey = McpRuntimeKeySchema.parse(runtimeKeyInput);
+  const holderId = savedRuntimeHolderId(context.info, runtimeKey);
   const heartbeatTimer = setInterval(() => context.heartbeat('mcp-runtime:starting'), 5_000);
   heartbeatTimer.unref?.();
   let runtimeAcquisition: McpRuntimeAcquisition | undefined;
   let holderKeepalive: McpRuntimeHolderKeepalive | undefined;
   let primaryError: unknown;
-  let output: SavedMcpRuntimeDiscoveryOutput | undefined;
+  let output: T | undefined;
   try {
     try {
       context.heartbeat('mcp-runtime:acquire');
-      runtimeAcquisition = await mcpRuntimeRouter.acquire(
-        runtimeKey,
-        holderId,
-        context.cancellationSignal,
-      );
+      runtimeAcquisition = await router.acquire(runtimeKey, holderId, context.cancellationSignal);
       holderKeepalive = startMcpRuntimeHolderKeepalive(
-        mcpRuntimeRouter,
+        router,
         runtimeAcquisition,
         context.cancellationSignal,
         context.heartbeat.bind(context),
       );
-      context.heartbeat('mcp-runtime:discover');
-      const catalog = await mcpRuntimeRouter.execute(
-        runtimeAcquisition,
-        { kind: 'discover' },
-        context.cancellationSignal,
-      );
-      context.heartbeat('mcp-runtime:catalog-ready');
-      output = { catalog: McpCatalogSchema.parse(catalog) };
+      output = await execute(router, runtimeAcquisition, context.cancellationSignal);
     } catch (error: unknown) {
       primaryError = error;
     }
@@ -109,7 +169,7 @@ export async function discoverSavedMcpRuntimeActivity(
           primaryError = keepaliveError;
         } else {
           console.error(
-            '[MCP Runtime Discovery] Holder keepalive failed after the primary activity failure:',
+            '[MCP Saved Runtime] Holder keepalive failed after the primary activity failure:',
             keepaliveError instanceof Error ? keepaliveError.name : 'UnknownError',
           );
         }
@@ -118,7 +178,7 @@ export async function discoverSavedMcpRuntimeActivity(
     if (runtimeAcquisition) {
       context.heartbeat('mcp-runtime:release');
       try {
-        await mcpRuntimeRouter.execute(
+        await router.execute(
           runtimeAcquisition,
           { kind: 'release' },
           AbortSignal.timeout(SAVED_MCP_RUNTIME_DISCOVERY_RELEASE_TIMEOUT_MS),
@@ -126,13 +186,15 @@ export async function discoverSavedMcpRuntimeActivity(
       } catch (cleanupError: unknown) {
         if (primaryError === undefined) throw cleanupError;
         console.error(
-          '[MCP Runtime Discovery] Fenced release failed after the primary activity failure:',
+          '[MCP Saved Runtime] Fenced release failed after the primary activity failure:',
           cleanupError instanceof Error ? cleanupError.name : 'UnknownError',
         );
       }
     }
     if (primaryError !== undefined) throw primaryError;
-    if (!output) throw new Error('MCP runtime discovery completed without a catalog');
+    if (output === undefined) {
+      throw new Error(`MCP saved runtime ${operationName} completed without a result`);
+    }
     return output;
   } finally {
     clearInterval(heartbeatTimer);
@@ -222,18 +284,17 @@ function waitForAbortableDelay(milliseconds: number, signal: AbortSignal): Promi
   });
 }
 
-function savedDiscoveryHolderId(
+function savedRuntimeHolderId(
   activityInfo: ReturnType<typeof Context.current>['info'],
   runtimeKey: McpRuntimeKey,
 ): McpRuntimeAcquisition['holderId'] {
   const digest = createHash('sha256')
     .update(
       JSON.stringify([
-        'sentris:mcp-runtime-holder:v2',
+        'sentris:mcp-runtime-holder:v3',
         activityInfo.workflowExecution.workflowId,
         activityInfo.workflowExecution.runId,
         activityInfo.activityId,
-        activityInfo.attempt,
         runtimeKey.sourceId,
         runtimeKey.configFingerprint,
         runtimeKey.organizationId,
@@ -543,6 +604,11 @@ export async function discoverMcpToolsActivity(
     );
     ctx.heartbeat('tools-discovered');
     return { tools };
+  } catch (error: unknown) {
+    if (error instanceof SsrfBlockedError) {
+      throw ApplicationFailure.nonRetryable(error.message, error.name);
+    }
+    throw error;
   } finally {
     if (hostProxyId) {
       await stopMcpStdioHostProxy(hostProxyId);

@@ -277,6 +277,7 @@ export function McpLibraryPage() {
             tools={data.serverTools}
             catalog={capabilitiesQuery.data?.catalog ?? null}
             catalogDiscoveredAt={capabilitiesQuery.data?.discoveredAt ?? null}
+            resourceTemplateVariables={capabilitiesQuery.data?.resourceTemplateVariables ?? {}}
             isLoadingCatalog={capabilitiesQuery.isLoading}
             catalogError={capabilitiesQuery.error?.message}
             selectedServerId={actions.selectedServerForCapabilities}

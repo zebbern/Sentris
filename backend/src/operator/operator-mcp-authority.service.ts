@@ -10,7 +10,7 @@ import {
 } from '@sentris/shared';
 
 import type { AuthContext } from '../auth/types';
-import { McpSavedServerDiscoveryService } from '../mcp-servers/mcp-saved-server-discovery.service';
+import { McpSavedServerRuntimeService } from '../mcp-servers/mcp-saved-server-runtime.service';
 import { McpServerRuntimeConfigService } from '../mcp-servers/mcp-server-runtime-config.service';
 import { McpServersService } from '../mcp-servers/mcp-servers.service';
 import { stableMcpAuthorityUuid } from '../mcp-runtime/mcp-authority-identity';
@@ -28,7 +28,7 @@ export class OperatorMcpAuthorityService {
   constructor(
     private readonly servers: McpServersService,
     private readonly runtimeConfig: McpServerRuntimeConfigService,
-    private readonly discovery: McpSavedServerDiscoveryService,
+    private readonly discovery: McpSavedServerRuntimeService,
     private readonly repository: McpRuntimeRepository,
   ) {}
 

@@ -1,5 +1,11 @@
 import { skipToken, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { CreateMcpServer, McpCatalog, UpdateMcpServer } from '@sentris/shared';
+import type {
+  CreateMcpServer,
+  McpCatalog,
+  McpSavedServerPreviewRequest,
+  McpSavedServerPreviewResponse,
+  UpdateMcpServer,
+} from '@sentris/shared';
 import { getApiAuthHeaders, API_BASE_URL } from '@/services/api';
 import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
 import { queryKeys } from '@/lib/queryKeys';
@@ -46,6 +52,7 @@ export interface TestEnabledMcpServerResponse {
 export interface McpServerCapabilitiesResponse {
   catalog: McpCatalog | null;
   discoveredAt: string | null;
+  resourceTemplateVariables: Record<string, string[]>;
 }
 
 async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -102,6 +109,18 @@ export function useMcpServerCapabilities(serverId: string | null, options?: { en
             )
         : skipToken,
     staleTime: 120_000,
+  });
+}
+
+export function usePreviewMcpCapability(serverId: string | null) {
+  return useMutation({
+    mutationFn: (request: McpSavedServerPreviewRequest) => {
+      if (!serverId) throw new Error('Select an MCP server before previewing a capability');
+      return apiRequest<McpSavedServerPreviewResponse>(`/api/v1/mcp-servers/${serverId}/preview`, {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+    },
   });
 }
 

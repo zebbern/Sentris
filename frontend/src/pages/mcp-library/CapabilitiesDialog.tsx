@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { CapabilityPreview } from './CapabilityPreview';
 
 interface ToolItem {
   id: string;
@@ -39,6 +40,7 @@ interface CapabilitiesDialogProps {
   tools: ToolItem[];
   catalog: McpCatalog | null;
   catalogDiscoveredAt: string | null;
+  resourceTemplateVariables: Record<string, string[]>;
   isLoadingCatalog: boolean;
   catalogError?: string;
   selectedServerId: string | null;
@@ -54,6 +56,7 @@ export function CapabilitiesDialog({
   tools,
   catalog,
   catalogDiscoveredAt,
+  resourceTemplateVariables,
   isLoadingCatalog,
   catalogError,
   selectedServerId,
@@ -127,11 +130,13 @@ export function CapabilitiesDialog({
                 <ResourcesList
                   resources={catalog?.resources ?? []}
                   templates={catalog?.resourceTemplates ?? []}
+                  resourceTemplateVariables={resourceTemplateVariables}
+                  serverId={selectedServerId}
                 />
               </TabsContent>
 
               <TabsContent value="prompts" className="mt-0 space-y-3">
-                <PromptsList prompts={catalog?.prompts ?? []} />
+                <PromptsList prompts={catalog?.prompts ?? []} serverId={selectedServerId} />
               </TabsContent>
             </div>
           </Tabs>
@@ -195,9 +200,13 @@ function ToolsList({
 function ResourcesList({
   resources,
   templates,
+  resourceTemplateVariables,
+  serverId,
 }: {
   resources: ResourceDescriptor[];
   templates: ResourceTemplateDescriptor[];
+  resourceTemplateVariables: Record<string, string[]>;
+  serverId: string | null;
 }) {
   if (resources.length === 0 && templates.length === 0) {
     return (
@@ -219,7 +228,14 @@ function ResourcesList({
           target={resource.uri}
           badge="Resource"
           mimeType={resource.mimeType}
-        />
+        >
+          {serverId && (
+            <CapabilityPreview
+              serverId={serverId}
+              buildRequest={() => ({ kind: 'resource', uri: resource.uri })}
+            />
+          )}
+        </CapabilityCard>
       ))}
       {templates.map((template) => (
         <CapabilityCard
@@ -229,13 +245,33 @@ function ResourcesList({
           target={template.uriTemplate}
           badge="Template"
           mimeType={template.mimeType}
-        />
+        >
+          {serverId && (
+            <CapabilityPreview
+              serverId={serverId}
+              variables={(resourceTemplateVariables[template.uriTemplate] ?? []).map((name) => ({
+                name,
+              }))}
+              buildRequest={(argumentsByName) => ({
+                kind: 'resource-template',
+                uriTemplate: template.uriTemplate,
+                arguments: argumentsByName,
+              })}
+            />
+          )}
+        </CapabilityCard>
       ))}
     </>
   );
 }
 
-function PromptsList({ prompts }: { prompts: PromptDescriptor[] }) {
+function PromptsList({
+  prompts,
+  serverId,
+}: {
+  prompts: PromptDescriptor[];
+  serverId: string | null;
+}) {
   if (prompts.length === 0) {
     return (
       <CapabilityEmptyState
@@ -251,15 +287,16 @@ function PromptsList({ prompts }: { prompts: PromptDescriptor[] }) {
       {prompts.map((prompt) => (
         <div key={prompt.name} className="rounded-lg border p-3">
           <CapabilitySummary name={prompt.title ?? prompt.name} description={prompt.description} />
-          {prompt.arguments.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {prompt.arguments.map((argument) => (
-                <Badge key={argument.name} variant="outline" className="font-mono text-xs">
-                  {argument.name}
-                  {argument.required ? ' *' : ''}
-                </Badge>
-              ))}
-            </div>
+          {serverId && (
+            <CapabilityPreview
+              serverId={serverId}
+              variables={prompt.arguments}
+              buildRequest={(argumentsByName) => ({
+                kind: 'prompt',
+                name: prompt.name,
+                arguments: argumentsByName,
+              })}
+            />
           )}
         </div>
       ))}
@@ -273,12 +310,14 @@ function CapabilityCard({
   target,
   badge,
   mimeType,
+  children,
 }: {
   name: string;
   description?: string;
   target: string;
   badge: string;
   mimeType?: string;
+  children?: ReactNode;
 }) {
   return (
     <div className="rounded-lg border p-3">
@@ -288,6 +327,7 @@ function CapabilityCard({
       </div>
       <code className="mt-3 block break-all rounded bg-muted px-2 py-1.5 text-xs">{target}</code>
       {mimeType && <p className="mt-2 text-xs text-muted-foreground">{mimeType}</p>}
+      {children}
     </div>
   );
 }

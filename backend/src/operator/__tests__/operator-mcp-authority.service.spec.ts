@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'bun:test';
 
 import type { AuthContext } from '../../auth/types';
-import type { McpSavedServerDiscoveryService } from '../../mcp-servers/mcp-saved-server-discovery.service';
+import type { McpSavedServerRuntimeService } from '../../mcp-servers/mcp-saved-server-runtime.service';
 import type { McpServerRuntimeConfigService } from '../../mcp-servers/mcp-server-runtime-config.service';
 import type { McpServersService } from '../../mcp-servers/mcp-servers.service';
 import type { McpRuntimeRepository } from '../../mcp-runtime/mcp-runtime.repository';
@@ -75,7 +75,7 @@ function createService() {
     service: new OperatorMcpAuthorityService(
       servers as unknown as McpServersService,
       runtimeConfig as unknown as McpServerRuntimeConfigService,
-      discovery as unknown as McpSavedServerDiscoveryService,
+      discovery as unknown as McpSavedServerRuntimeService,
       repository as unknown as McpRuntimeRepository,
     ),
     repository,

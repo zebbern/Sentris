@@ -175,35 +175,74 @@ const BoundedMcpOperationArgumentsSchema = JsonObjectSchema.refine(
   { message: 'MCP operation input exceeds 262144 UTF-8 bytes' },
 );
 
-const PromptArgumentsSchema = z
+export const PromptArgumentsSchema = z
   .record(z.string(), z.string())
   .refine((input) => isWithinInlineJsonByteLimit(input, MAX_INLINE_INVOCATION_INPUT_BYTES), {
     message: 'MCP operation input exceeds 262144 UTF-8 bytes',
   });
 
+export const McpToolCallOperationSchema = z
+  .object({
+    kind: z.literal('tool-call'),
+    name: z.string().min(1),
+    arguments: BoundedMcpOperationArgumentsSchema,
+  })
+  .strict();
+
+export const McpResourceReadOperationSchema = z
+  .object({
+    kind: z.literal('resource-read'),
+    uri: z.string().min(1),
+  })
+  .strict();
+export type McpResourceReadOperation = z.infer<typeof McpResourceReadOperationSchema>;
+
+export const McpPromptGetOperationSchema = z
+  .object({
+    kind: z.literal('prompt-get'),
+    name: z.string().min(1),
+    arguments: PromptArgumentsSchema,
+  })
+  .strict();
+export type McpPromptGetOperation = z.infer<typeof McpPromptGetOperationSchema>;
+
 export const McpOperationSchema = z.discriminatedUnion('kind', [
+  McpToolCallOperationSchema,
+  McpResourceReadOperationSchema,
+  McpPromptGetOperationSchema,
+]);
+export type McpOperation = z.infer<typeof McpOperationSchema>;
+
+export const McpSavedServerPreviewRequestSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('resource'), uri: z.string().min(1) }).strict(),
   z
     .object({
-      kind: z.literal('tool-call'),
-      name: z.string().min(1),
-      arguments: BoundedMcpOperationArgumentsSchema,
+      kind: z.literal('resource-template'),
+      uriTemplate: z.string().min(1),
+      arguments: PromptArgumentsSchema,
     })
     .strict(),
   z
     .object({
-      kind: z.literal('resource-read'),
-      uri: z.string().min(1),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('prompt-get'),
+      kind: z.literal('prompt'),
       name: z.string().min(1),
       arguments: PromptArgumentsSchema,
     })
     .strict(),
 ]);
-export type McpOperation = z.infer<typeof McpOperationSchema>;
+export type McpSavedServerPreviewRequest = z.infer<typeof McpSavedServerPreviewRequestSchema>;
+
+export const McpSavedServerPreviewResponseSchema = z
+  .object({
+    kind: z.enum(['resource', 'prompt']),
+    target: z.string().min(1),
+    output: JsonValueSchema.refine(
+      (output) => isWithinInlineJsonByteLimit(output, MAX_INLINE_INVOCATION_OUTPUT_BYTES),
+      { message: 'MCP preview output exceeds 1048576 UTF-8 bytes' },
+    ),
+  })
+  .strict();
+export type McpSavedServerPreviewResponse = z.infer<typeof McpSavedServerPreviewResponseSchema>;
 
 export const McpOperationInvocationRequestSchema = z
   .object({

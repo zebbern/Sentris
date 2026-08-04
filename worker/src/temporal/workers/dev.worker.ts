@@ -35,6 +35,7 @@ import {
   discoverMcpToolsActivity,
   discoverMcpGroupToolsActivity,
   discoverSavedMcpRuntimeActivity,
+  previewSavedMcpRuntimeActivity,
   cacheDiscoveryResultActivity,
   initializeMcpRuntimeDiscoveryActivities,
 } from '../activities/mcp-discovery.activity';
@@ -277,6 +278,7 @@ async function main() {
       discoverMcpToolsActivity,
       discoverMcpGroupToolsActivity,
       discoverSavedMcpRuntimeActivity,
+      previewSavedMcpRuntimeActivity,
       cacheDiscoveryResultActivity,
       executeWebhookParsingScriptActivity,
       prepareToolInvocationActivity,

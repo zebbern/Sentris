@@ -972,7 +972,11 @@ export async function scheduleTriggerWorkflow(
 }
 
 // Export MCP discovery workflow
-export { mcpDiscoveryWorkflow, mcpGroupDiscoveryWorkflow } from './mcp-discovery-workflow.js';
+export {
+  mcpDiscoveryWorkflow,
+  mcpGroupDiscoveryWorkflow,
+  mcpSavedServerPreviewWorkflow,
+} from './mcp-discovery-workflow.js';
 
 // Export webhook parsing workflow (Docker execution must run in worker).
 export { webhookParsingWorkflow } from './webhook-parsing-workflow.js';

@@ -36,11 +36,11 @@ import { resolve4, resolve6 } from 'dns/promises';
 /**
  * Custom error thrown when an SSRF-blocked URL is detected.
  *
- * Marked as `nonRetryable` so Temporal workflows do not retry requests
- * that are guaranteed to be blocked by policy.
+ * Marked as `nonRetryable` so execution adapters can translate policy
+ * rejections into their framework's native non-retryable failure type.
  */
 export class SsrfBlockedError extends Error {
-  /** Signals Temporal (and similar retry frameworks) to skip retries. */
+  /** Signals execution adapters that retrying cannot change this outcome. */
   readonly nonRetryable = true as const;
 
   constructor(message: string) {
