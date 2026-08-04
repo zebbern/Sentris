@@ -986,3 +986,8 @@ export {
   type OperatorActionDecisionUpdateResult,
   type OperatorTurnWorkflowInput,
 } from './operator-turn-workflow.js';
+
+export {
+  operatorRunFollowUpWorkflow,
+  type OperatorRunFollowUpWorkflowInput,
+} from './operator-run-follow-up-workflow.js';

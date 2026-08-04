@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ArtifactMetadataSchema } from './artifacts.js';
 import { ExecutionStatusSchema } from './execution.js';
 import { LLM_PROVIDER_IDS } from './ai-model-catalog.js';
 import { FindingTriageStatusSchema, UpdateFindingTriageSchema } from './finding-triage.js';
@@ -451,6 +452,73 @@ export const OperatorListRunsInputSchema = z
   .strict();
 
 export const OperatorGetRunInputSchema = z.object({ runId: RunIdSchema }).strict();
+
+export const OperatorRunFindingSummarySchema = z
+  .object({
+    id: FindingIdSchema,
+    timestamp: z.string().optional(),
+    severity: z.string().optional(),
+    name: z.string().optional(),
+    asset_key: z.string().optional(),
+    workflow_name: z.string().optional(),
+    workflow_id: z.string().optional(),
+    run_id: z.string().optional(),
+    component_id: z.string().optional(),
+    node_ref: z.string().optional(),
+  })
+  .passthrough();
+export type OperatorRunFindingSummary = z.infer<typeof OperatorRunFindingSummarySchema>;
+
+const OperatorRunTraceEvidenceSchema = z
+  .object({
+    availability: z.enum(['available', 'unavailable']),
+    totalEvents: z.number().int().nonnegative().optional(),
+    failedEventCount: z.number().int().nonnegative().optional(),
+  })
+  .passthrough();
+
+const OperatorRunFindingEvidenceSchema = z
+  .object({
+    availability: FindingDataAvailabilitySchema,
+    total: z.number().int().nonnegative().nullable(),
+    items: z.array(z.unknown()),
+  })
+  .passthrough();
+
+const OperatorRunArtifactEvidenceSchema = z
+  .object({
+    availability: z.enum(['available', 'unavailable']),
+    total: z.number().int().nonnegative().nullable(),
+    items: z.array(ArtifactMetadataSchema),
+  })
+  .passthrough();
+
+export const OperatorRunInspectionResultSchema = z
+  .object({
+    run: z
+      .object({
+        id: RunIdSchema,
+        workflowId: WorkflowIdSchema,
+        workflowVersionId: z.string().uuid().nullable().optional(),
+        workflowName: z.string().optional(),
+        status: ExecutionStatusSchema.optional(),
+      })
+      .passthrough(),
+    status: z.object({ status: ExecutionStatusSchema }).passthrough(),
+    terminal: z.boolean(),
+    result: z.unknown().optional(),
+    diagnostics: z
+      .object({
+        trace: OperatorRunTraceEvidenceSchema,
+        findings: OperatorRunFindingEvidenceSchema,
+        artifacts: OperatorRunArtifactEvidenceSchema.optional(),
+      })
+      .strict()
+      .optional(),
+    invocation: z.unknown().optional(),
+  })
+  .passthrough();
+export type OperatorRunInspectionResult = z.infer<typeof OperatorRunInspectionResultSchema>;
 
 export const OPERATOR_RUN_INPUT_CHANGE_OPERATIONS = ['set', 'unset'] as const;
 export const OperatorRunInputChangeSchema = z.discriminatedUnion('operation', [
@@ -1246,6 +1314,12 @@ export const OperatorJourneySchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('execute_plan'),
       planActionId: z.string().uuid(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('run_follow_up'),
+      runId: RunIdSchema,
     })
     .strict(),
 ]);

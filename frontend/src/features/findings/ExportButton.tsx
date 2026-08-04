@@ -20,6 +20,7 @@ interface ExportButtonProps {
   severity?: string;
   search?: string;
   workflowId?: string;
+  runId?: string;
   componentId?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -52,6 +53,7 @@ export function ExportButton({
   severity,
   search,
   workflowId,
+  runId,
   componentId,
   dateFrom,
   dateTo,
@@ -72,6 +74,7 @@ export function ExportButton({
           severity,
           search,
           workflowId,
+          runId,
           componentId,
           dateFrom,
           dateTo,
@@ -112,6 +115,7 @@ export function ExportButton({
       severity,
       search,
       workflowId,
+      runId,
       componentId,
       dateFrom,
       dateTo,

@@ -6,12 +6,14 @@ import { FindingTriageModule } from '../findings/finding-triage.module';
 import { McpRuntimeModule } from '../mcp-runtime/mcp-runtime.module';
 import { McpServersModule } from '../mcp-servers/mcp-servers.module';
 import { SecretsModule } from '../secrets/secrets.module';
+import { StorageModule } from '../storage/storage.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { InternalOperatorController } from './internal-operator.controller';
 import { OperatorCommandService } from './operator-command.service';
 import { OperatorController } from './operator.controller';
 import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
 import { OperatorRepository } from './operator.repository';
+import { OperatorRunFollowUpListener } from './operator-run-follow-up.listener';
 import { OperatorSessionStreamService } from './operator-session-stream.service';
 import { OperatorService } from './operator.service';
 import { OperatorWorkflowAuthoringService } from './operator-workflow-authoring.service';
@@ -23,6 +25,7 @@ import { OperatorWorkflowAuthoringService } from './operator-workflow-authoring.
     McpRuntimeModule,
     McpServersModule,
     SecretsModule,
+    StorageModule,
     WorkflowsModule,
   ],
   controllers: [InternalOperatorController, OperatorController],
@@ -30,6 +33,7 @@ import { OperatorWorkflowAuthoringService } from './operator-workflow-authoring.
     OperatorService,
     OperatorCommandService,
     OperatorMcpAuthorityService,
+    OperatorRunFollowUpListener,
     OperatorSessionStreamService,
     OperatorWorkflowAuthoringService,
     OperatorRepository,

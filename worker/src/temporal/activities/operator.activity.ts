@@ -144,6 +144,13 @@ const runObservationSchema = z
   })
   .strict();
 
+const runFollowUpResultSchema = z
+  .object({
+    disposition: z.enum(['started', 'ignored']),
+    turnId: z.string().uuid().optional(),
+  })
+  .strict();
+
 interface OperatorActivityServices {
   secrets: Pick<SecretsAdapter, 'forOrganization'>;
   fetchImpl?: typeof fetch;
@@ -165,7 +172,12 @@ export interface OperatorActivityInput {
 
 export interface OperatorModelStepInput extends OperatorActivityInput {
   step: number;
-  mode?: 'standard' | 'improve_run_proposal' | 'improve_run_summary' | 'plan_summary';
+  mode?:
+    | 'standard'
+    | 'improve_run_proposal'
+    | 'improve_run_summary'
+    | 'plan_summary'
+    | 'run_follow_up_summary';
   sourceRunId?: string;
   planTitle?: string;
   observations?: OperatorRunObservation[];
@@ -226,6 +238,12 @@ export interface OperatorObserveRunInput extends OperatorActivityInput {
 
 export interface OperatorLoadPlanInput extends OperatorActivityInput {
   planActionId: string;
+}
+
+export interface OperatorRunFollowUpActivityInput extends OperatorActivityInput {
+  sourceActionId: string;
+  runId: string;
+  workflowId: string;
 }
 
 function getServices(): OperatorActivityServices {
@@ -346,6 +364,25 @@ export async function operatorLoadPlanActivity(
   );
 }
 
+export async function operatorCreateRunFollowUpActivity(
+  input: OperatorRunFollowUpActivityInput,
+): Promise<{ disposition: 'started' | 'ignored'; turnId?: string }> {
+  return callInternalJson(
+    input,
+    'operator/internal/run-follow-ups',
+    'POST',
+    runFollowUpResultSchema,
+    {
+      organizationId: input.organizationId,
+      sourceActionId: input.sourceActionId,
+      sourceSessionId: input.sessionId,
+      sourceTurnId: input.turnId,
+      runId: input.runId,
+      workflowId: input.workflowId,
+    },
+  );
+}
+
 export async function operatorModelStepActivity(
   input: OperatorModelStepInput,
 ): Promise<OperatorModelStepOutput> {
@@ -388,8 +425,9 @@ export async function operatorModelStepActivity(
       mode === 'improve_run_proposal'
         ? (['get_workflow', 'list_components', 'get_component', 'propose_workflow_edits'] as const)
         : OPERATOR_COMMAND_NAMES;
+    const compactSummary = mode === 'plan_summary' || mode === 'run_follow_up_summary';
     const tools =
-      mode === 'improve_run_summary' || mode === 'plan_summary'
+      mode === 'improve_run_summary' || compactSummary
         ? undefined
         : buildOperatorTools(commandNames);
     const system = buildSystemPrompt(
@@ -422,7 +460,7 @@ export async function operatorModelStepActivity(
       'Operator',
     );
     if (providerFailure) {
-      if (mode === 'plan_summary') throw providerFailure;
+      if (compactSummary) throw providerFailure;
       const recovery = await generate({
         model,
         system: buildRecoverySystemPrompt(),
@@ -439,11 +477,12 @@ export async function operatorModelStepActivity(
         'Operator',
       );
       if (recoveryFailure || !recoveryText) throw recoveryFailure ?? providerFailure;
+      const recoverySuffix =
+        mode === 'improve_run_proposal'
+          ? '\n\nNo workflow draft was proposed or applied by this recovery response.'
+          : '';
       return {
-        text: `${recoveryText}\n\nNo workflow draft was proposed or applied by this recovery response.`.slice(
-          0,
-          MAX_MODEL_TEXT_LENGTH,
-        ),
+        text: `${recoveryText}${recoverySuffix}`.slice(0, MAX_MODEL_TEXT_LENGTH),
         finishReason: String(recovery.finishReason),
         toolCalls: [],
       };
@@ -463,10 +502,7 @@ export async function operatorModelStepActivity(
     }
 
     return {
-      text: result.text.slice(
-        0,
-        mode === 'plan_summary' ? MAX_PLAN_SUMMARY_LENGTH : MAX_MODEL_TEXT_LENGTH,
-      ),
+      text: result.text.slice(0, compactSummary ? MAX_PLAN_SUMMARY_LENGTH : MAX_MODEL_TEXT_LENGTH),
       finishReason: String(result.finishReason),
       toolCalls,
     };
@@ -701,7 +737,16 @@ function buildSystemPrompt(
               'When the durable results contain exact identifiers, add relevant product-relative Markdown links using /workflows/{workflowId} or /workflows/{workflowId}/runs/{runId}. Never invent identifiers, labels, results, or URLs; omit a link if its required IDs are unavailable.',
               'Keep the entire response under 2,000 characters. This is a text-only summary; do not emit tool-call syntax.',
             ]
-          : [];
+          : mode === 'run_follow_up_summary'
+            ? [
+                `Workflow run ${sourceRunId ?? 'unknown'} has reached a terminal state and its bounded get_run inspection is recorded in the action evidence.`,
+                'State the actual terminal outcome first. Summarize the most important trace failures and findings, distinguishing unavailable evidence from zero results.',
+                'Use only recorded evidence; do not invent root causes or claim semantic success beyond the workflow result and declared criteria.',
+                'Add the exact product-relative workflow and run links when their IDs are present. Suggest at most three next actions using only recorded findings or artifacts and the existing run controls: Change inputs, Run again, or Improve with Operator.',
+                'Never invent an input ID, value, batch mode, workflow capability, artifact, or finding. Do not prescribe rerun arguments; direct the user to Change inputs instead.',
+                'Keep the entire response under 2,000 characters. This is a text-only summary; do not emit tool-call syntax.',
+              ]
+            : [];
   return [
     'You are the Sentris Operator. Help the user operate their existing security workflows and inspect results.',
     'Use only the provided typed commands. Never claim a command ran unless its action ledger shows success.',

@@ -34,6 +34,7 @@ export function useFindingsQuery(params: FindingsQueryParams = {}) {
     search: params.search,
     sortOrder: params.sortOrder ?? 'desc',
     workflowId: params.workflowId,
+    runId: params.runId,
     componentId: params.componentId,
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,

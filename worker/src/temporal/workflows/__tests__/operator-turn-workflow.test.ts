@@ -90,6 +90,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  for (const activity of Object.values(activityImplementations)) activity.mockReset();
   events.length = 0;
   earlyDecision = undefined;
   detachedRunFollowing = true;
@@ -109,6 +110,110 @@ beforeEach(() => {
 });
 
 describe('operatorTurnWorkflow', () => {
+  test('completes a structured plan proposal without asking the model to restate it', async () => {
+    const actionId = '44444444-4444-4444-8444-444444444444';
+    operatorModelStepActivity.mockResolvedValue({
+      text: '',
+      finishReason: 'tool-calls',
+      toolCalls: [
+        {
+          toolCallId: `${input.turnId}:0:0`,
+          commandName: 'propose_operator_plan',
+          arguments: {},
+        },
+      ],
+    });
+    operatorPrepareActionActivity.mockResolvedValue({
+      actionId,
+      actionVersion: 0,
+      disposition: 'execute',
+    });
+    operatorExecuteActionActivity.mockResolvedValue({
+      actionId,
+      actionStatus: 'succeeded',
+      result: {
+        kind: 'operator-plan',
+        planId: actionId,
+        title: 'Inspect workflow activity',
+        steps: [
+          {
+            id: 'list-workflows',
+            label: 'List workflows',
+            commandName: 'list_workflows',
+            arguments: { limit: 1 },
+            effect: 'read',
+          },
+          {
+            id: 'list-runs',
+            label: 'List recent runs',
+            commandName: 'list_runs',
+            arguments: { limit: 5 },
+            effect: 'read',
+          },
+          {
+            id: 'list-findings',
+            label: 'List recent findings',
+            commandName: 'list_findings',
+            arguments: { limit: 20 },
+            effect: 'read',
+          },
+        ],
+      },
+    });
+
+    await operatorTurnWorkflow(input);
+
+    expect(operatorModelStepActivity).toHaveBeenCalledTimes(1);
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message: 'Plan ready for review. Select Run plan or Revise.',
+    });
+  });
+
+  test('inspects and summarizes an automatic terminal-run follow-up without extra actions', async () => {
+    const runId = 'sentris-run-finished';
+    const actionId = '44444444-4444-4444-8444-444444444444';
+    operatorPrepareActionActivity.mockResolvedValue({
+      actionId,
+      actionVersion: 0,
+      disposition: 'execute',
+    });
+    operatorExecuteActionActivity.mockResolvedValue({
+      actionId,
+      actionStatus: 'succeeded',
+      result: { terminal: true, status: { status: 'COMPLETED' } },
+    });
+    operatorModelStepActivity.mockResolvedValue({
+      text: 'The workflow completed successfully with no trace failures.',
+      finishReason: 'stop',
+      toolCalls: [],
+    });
+
+    await operatorTurnWorkflow({
+      ...input,
+      journey: { kind: 'run_follow_up', runId },
+    });
+
+    expect(operatorPrepareActionActivity).toHaveBeenCalledWith({
+      ...input,
+      toolCallId: `${input.turnId}:journey:inspect-run`,
+      commandName: 'get_run',
+      arguments: { runId },
+      userConfirmed: true,
+    });
+    expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(1);
+    expect(operatorModelStepActivity).toHaveBeenCalledWith({
+      ...input,
+      step: 1,
+      mode: 'run_follow_up_summary',
+      sourceRunId: runId,
+    });
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message: 'The workflow completed successfully with no trace failures.',
+    });
+  });
+
   test('executes an immutable plan sequentially through the canonical action boundary', async () => {
     const planActionId = '44444444-4444-4444-8444-444444444444';
     const workflowId = '55555555-5555-4555-8555-555555555555';
@@ -293,27 +398,21 @@ describe('operatorTurnWorkflow', () => {
   test('retains an early approval and releases the turn after launching a live-followed run', async () => {
     const actionId = '44444444-4444-4444-8444-444444444444';
     earlyDecision = { actionId, decision: 'approved', expectedVersion: 3 };
-    operatorModelStepActivity
-      .mockResolvedValueOnce({
-        text: '',
-        finishReason: 'tool-calls',
-        toolCalls: [
-          {
-            toolCallId: `${input.turnId}:0:0`,
-            modelToolCallId: 'provider-run-call',
-            providerOptions: {
-              google: { thoughtSignature: 'signed-run-thought' },
-            },
-            commandName: 'run_workflow',
-            arguments: { workflowId: '55555555-5555-4555-8555-555555555555' },
+    operatorModelStepActivity.mockResolvedValueOnce({
+      text: '',
+      finishReason: 'tool-calls',
+      toolCalls: [
+        {
+          toolCallId: `${input.turnId}:0:0`,
+          modelToolCallId: 'provider-run-call',
+          providerOptions: {
+            google: { thoughtSignature: 'signed-run-thought' },
           },
-        ],
-      })
-      .mockResolvedValueOnce({
-        text: 'The workflow completed and returned one finding.',
-        finishReason: 'stop',
-        toolCalls: [],
-      });
+          commandName: 'run_workflow',
+          arguments: { workflowId: '55555555-5555-4555-8555-555555555555' },
+        },
+      ],
+    });
     operatorPrepareActionActivity.mockResolvedValue({
       actionId,
       actionVersion: 3,
@@ -329,22 +428,11 @@ describe('operatorTurnWorkflow', () => {
 
     expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(1);
     expect(operatorObserveRunActivity).not.toHaveBeenCalled();
-    expect(operatorModelStepActivity).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        ...input,
-        step: 1,
-        toolCallHistory: [
-          expect.objectContaining({
-            toolCallId: `${input.turnId}:0:0`,
-            modelToolCallId: 'provider-run-call',
-            providerOptions: {
-              google: { thoughtSignature: 'signed-run-thought' },
-            },
-          }),
-        ],
-      }),
-    );
+    expect(operatorModelStepActivity).toHaveBeenCalledTimes(1);
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message: 'Workflow run started. Follow progress in the run card.',
+    });
   });
 
   test('retains blocking run observation only for pre-patch histories', async () => {
@@ -559,7 +647,7 @@ describe('operatorTurnWorkflow', () => {
     });
   });
 
-  test('executes a user-confirmed direct run control without another approval wait', async () => {
+  test('executes a user-confirmed direct run control without approval or model restatement', async () => {
     const actionId = '56565656-5656-4656-8656-565656565656';
     operatorPrepareActionActivity.mockResolvedValue({
       actionId,
@@ -571,12 +659,6 @@ describe('operatorTurnWorkflow', () => {
       actionStatus: 'succeeded',
       result: { cancelled: true },
     });
-    operatorModelStepActivity.mockResolvedValue({
-      text: 'The workflow run was cancelled.',
-      finishReason: 'stop',
-      toolCalls: [],
-    });
-
     await operatorTurnWorkflow({
       ...input,
       directCommand: {
@@ -594,9 +676,11 @@ describe('operatorTurnWorkflow', () => {
       userConfirmed: true,
     });
     expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(1);
-    expect(operatorModelStepActivity).toHaveBeenCalledWith(
-      expect.objectContaining({ ...input, step: 1 }),
-    );
+    expect(operatorModelStepActivity).not.toHaveBeenCalled();
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message: 'Cancellation requested. Follow the run card for its terminal status.',
+    });
   });
 
   test('does not execute an action rejected through an early decision', async () => {
@@ -712,8 +796,9 @@ describe('operatorTurnWorkflow', () => {
     });
   });
 
-  test('does not execute an identical completed mutation again on a later model step', async () => {
+  test('preserves mutation deduplication for pre-compact turn histories', async () => {
     const actionId = '99999999-9999-4999-8999-999999999999';
+    detachedRunFollowing = false;
     const firstToolCall = {
       toolCallId: `${input.turnId}:0:0`,
       commandName: 'run_workflow' as const,
@@ -744,15 +829,21 @@ describe('operatorTurnWorkflow', () => {
       result: { status: 'RUNNING' },
       launchedRunId: 'sentris-run-deduped',
     });
+    operatorObserveRunActivity.mockResolvedValue({
+      runId: 'sentris-run-deduped',
+      workflowId: '55555555-5555-4555-8555-555555555555',
+      status: 'COMPLETED',
+      terminal: true,
+    });
     await operatorTurnWorkflow(input);
 
     expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(1);
-    expect(operatorObserveRunActivity).not.toHaveBeenCalled();
+    expect(operatorObserveRunActivity).toHaveBeenCalledTimes(1);
     expect(operatorModelStepActivity).toHaveBeenCalledTimes(2);
     expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
       ...input,
       message:
-        'The requested action was already completed in this turn. Its durable result is available above.',
+        'Workflow run sentris-run-deduped completed with status COMPLETED. Its durable result is available above.',
     });
   });
 

@@ -73,6 +73,20 @@ export class InternalOperatorOrganizationDto extends createZodDto(
   InternalOperatorOrganizationSchema,
 ) {}
 
+export const InternalOperatorRunFollowUpSchema = z
+  .object({
+    organizationId: OrganizationIdSchema,
+    sourceActionId: z.string().uuid(),
+    sourceSessionId: z.string().uuid(),
+    sourceTurnId: z.string().uuid(),
+    runId: z.string().trim().min(1).max(191),
+    workflowId: z.string().uuid(),
+  })
+  .strict();
+export class InternalOperatorRunFollowUpDto extends createZodDto(
+  InternalOperatorRunFollowUpSchema,
+) {}
+
 export const InternalSettleOperatorMcpActionSchema = z
   .object({
     organizationId: OrganizationIdSchema,

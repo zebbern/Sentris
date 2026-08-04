@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ShieldAlert, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -146,6 +146,7 @@ export function FindingsPage() {
   const [workflowId, setWorkflowId] = useState<string | undefined>(undefined);
   const [componentId, setComponentId] = useState<string | undefined>(undefined);
   const scopeId = searchParams.get('scopeId') || undefined;
+  const runId = searchParams.get('runId') || undefined;
   const selectedFindingId = searchParams.get('findingId');
   const selectFinding = useCallback(
     (findingId: string) => {
@@ -161,6 +162,13 @@ export function FindingsPage() {
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous);
       next.delete('findingId');
+      return next;
+    });
+  }, [setSearchParams]);
+  const clearRunFilter = useCallback(() => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      next.delete('runId');
       return next;
     });
   }, [setSearchParams]);
@@ -208,6 +216,7 @@ export function FindingsPage() {
         severity: severity !== 'all' ? severity : null,
         search: debouncedSearch || null,
         workflowId: workflowId ?? null,
+        runId: runId ?? null,
         componentId: componentId ?? null,
         dateFrom: dateRange?.from?.toISOString() ?? null,
         dateTo: dateRange?.to?.toISOString() ?? null,
@@ -219,6 +228,7 @@ export function FindingsPage() {
       severity,
       debouncedSearch,
       workflowId,
+      runId,
       componentId,
       dateRange,
       triageStatus,
@@ -241,6 +251,7 @@ export function FindingsPage() {
       severity: severity !== 'all' ? severity : undefined,
       search: debouncedSearch || undefined,
       workflowId,
+      runId,
       componentId,
       dateFrom: dateRange?.from?.toISOString(),
       dateTo: dateRange?.to?.toISOString(),
@@ -252,6 +263,7 @@ export function FindingsPage() {
       severity,
       debouncedSearch,
       workflowId,
+      runId,
       componentId,
       dateRange,
       triageStatus,
@@ -296,6 +308,7 @@ export function FindingsPage() {
     triageStatus !== 'all' ||
     debouncedSearch.length > 0 ||
     !!workflowId ||
+    !!runId ||
     !!componentId ||
     !!dateRange ||
     !!scopeId;
@@ -394,6 +407,7 @@ export function FindingsPage() {
             severity={queryParams.severity}
             search={queryParams.search}
             workflowId={queryParams.workflowId}
+            runId={queryParams.runId}
             componentId={queryParams.componentId}
             dateFrom={queryParams.dateFrom}
             dateTo={queryParams.dateTo}
@@ -402,6 +416,24 @@ export function FindingsPage() {
             className="w-full"
           />
         </div>
+        {runId ? (
+          <div className="mt-2 flex min-w-0 items-center gap-2 rounded-md border border-primary/25 bg-primary/[0.04] px-2.5 py-1.5 text-[11px]">
+            <span className="text-muted-foreground">Filtered to run</span>
+            <code className="min-w-0 flex-1 truncate text-foreground" title={runId}>
+              {runId}
+            </code>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0"
+              onClick={clearRunFilter}
+              aria-label="Clear run filter"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {/* Severity Chart */}
@@ -409,6 +441,7 @@ export function FindingsPage() {
         severity={queryParams.severity}
         search={queryParams.search}
         workflowId={queryParams.workflowId}
+        runId={queryParams.runId}
         componentId={queryParams.componentId}
         dateFrom={queryParams.dateFrom}
         dateTo={queryParams.dateTo}

@@ -34,6 +34,7 @@ import type { AuthContext } from '../auth/types';
 import { FindingsQuerySchema } from '../analytics/dto/findings-query.dto';
 import { FindingsQueryService } from '../analytics/findings-query.service';
 import { FindingTriageService } from '../findings/finding-triage.service';
+import { ArtifactsService } from '../storage/artifacts.service';
 import { TraceService } from '../trace/trace.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
@@ -47,6 +48,7 @@ const MAX_COMMAND_RESULT_CHARS = 60_000;
 const MAX_RUN_FAILED_TRACE_EVENTS = 8;
 const MAX_RUN_RECENT_TRACE_EVENTS = 8;
 const MAX_RUN_FINDINGS = 10;
+const MAX_RUN_ARTIFACTS = 10;
 const MAX_RUN_RESULT_CHARS = 10_000;
 const MAX_RUN_FINDING_CHARS = 1_000;
 const MAX_EVIDENCE_TEXT_CHARS = 400;
@@ -68,6 +70,14 @@ type RunFindingEvidence =
       total: number;
       degradedReasons: string[];
       items: unknown[];
+    }
+  | { availability: 'unavailable'; total: null; items: []; error: string };
+
+type RunArtifactEvidence =
+  | {
+      availability: 'available';
+      total: number;
+      items: Awaited<ReturnType<ArtifactsService['listRunArtifacts']>>['artifacts'];
     }
   | { availability: 'unavailable'; total: null; items: []; error: string };
 
@@ -277,6 +287,7 @@ export class OperatorCommandService {
     private readonly operatorMcpAuthorityService: OperatorMcpAuthorityService,
     private readonly operatorWorkflowAuthoringService: OperatorWorkflowAuthoringService,
     private readonly traceService: TraceService,
+    private readonly artifactsService: ArtifactsService,
   ) {}
 
   async execute(input: {
@@ -630,10 +641,11 @@ export class OperatorCommandService {
       return { result: toBoundedJson({ run, status, terminal }) };
     }
 
-    const [result, trace, findings, invocation] = await Promise.all([
+    const [result, trace, findings, artifacts, invocation] = await Promise.all([
       this.workflowsService.getRunResult(input.runId, run.temporalRunId, auth),
       this.getRunTraceEvidence(input.runId, auth),
       this.getRunFindingEvidence(input.runId, auth),
+      this.getRunArtifactEvidence(input.runId, auth),
       this.getRunInputInspection(input.runId, auth),
     ]);
     return {
@@ -642,7 +654,7 @@ export class OperatorCommandService {
         status,
         terminal,
         result: toBoundedJson(result, MAX_RUN_RESULT_CHARS),
-        diagnostics: { trace, findings },
+        diagnostics: { trace, findings, artifacts },
         invocation,
       }),
     };
@@ -801,6 +813,29 @@ export class OperatorCommandService {
         items: page.items.map(({ raw: _raw, ...finding }) =>
           toBoundedJson(finding, MAX_RUN_FINDING_CHARS),
         ),
+      };
+    } catch (error) {
+      return {
+        availability: 'unavailable',
+        total: null,
+        items: [],
+        error: errorMessage(error),
+      };
+    }
+  }
+
+  private async getRunArtifactEvidence(
+    runId: string,
+    auth: AuthContext,
+  ): Promise<RunArtifactEvidence> {
+    try {
+      const response = await this.artifactsService.listRunArtifacts(auth, runId);
+      return {
+        availability: 'available',
+        total: response.artifacts.length,
+        items: response.artifacts
+          .slice(0, MAX_RUN_ARTIFACTS)
+          .map(({ metadata: _metadata, organizationId: _organizationId, ...item }) => item),
       };
     } catch (error) {
       return {

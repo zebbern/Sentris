@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { MarkdownView } from '@/components/ui/markdown';
 import { cn } from '@/lib/utils';
 import { OperatorRunActivity, type OperatorRunCommandRequest } from './OperatorRunActivity';
+import { OperatorRunEvidenceCard } from './OperatorRunEvidenceCard';
 import { OperatorRunComparisonCard } from './OperatorRunComparisonCard';
 import { OperatorRunInputProposalCard } from './OperatorRunInputProposalCard';
 import { OperatorPlanCard } from './OperatorPlanCard';
@@ -211,6 +212,12 @@ function InvestigationFollowUps({
           <ListChecks className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
           Suggested follow-ups
         </div>
+        <OperatorRunEvidenceCard
+          runId={runInput.data.runId}
+          result={action.result}
+          disabled={disabled}
+          onCommand={onCommand}
+        />
         <OperatorRunActivity
           runId={runInput.data.runId}
           disabled={disabled}

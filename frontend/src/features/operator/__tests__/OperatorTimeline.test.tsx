@@ -346,4 +346,93 @@ describe('OperatorTimeline', () => {
       journey: { kind: 'improve_run', sourceRunId: 'sentris-run-candidate' },
     });
   });
+
+  it('renders recorded run evidence with deterministic finding and artifact actions', () => {
+    const onRunCommand = mock(() => {});
+    const runId = 'sentris-run-evidence';
+    const findingId = 'fo_v1_operator-evidence';
+    const inspectionAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'inspection-action',
+      commandName: 'get_run',
+      effect: 'read',
+      status: 'succeeded',
+      approvalRequired: false,
+      runId: null,
+      arguments: { runId },
+      result: {
+        run: {
+          id: runId,
+          workflowId: '22222222-2222-4222-8222-222222222222',
+          status: 'COMPLETED',
+        },
+        status: { status: 'COMPLETED' },
+        terminal: true,
+        diagnostics: {
+          trace: { availability: 'available', totalEvents: 12, failedEventCount: 1 },
+          findings: {
+            availability: 'available',
+            total: 1,
+            items: [{ id: findingId, name: 'Exposed package token', severity: 'high' }],
+          },
+          artifacts: {
+            availability: 'available',
+            total: 1,
+            items: [
+              {
+                id: '77777777-7777-4777-8777-777777777777',
+                runId,
+                workflowId: '22222222-2222-4222-8222-222222222222',
+                workflowVersionId: '33333333-3333-4333-8333-333333333333',
+                componentRef: 'report',
+                fileId: '88888888-8888-4888-8888-888888888888',
+                name: 'report.json',
+                mimeType: 'application/json',
+                size: 512,
+                destinations: ['run'],
+                createdAt: '2026-08-02T10:01:00.000Z',
+              },
+            ],
+          },
+        },
+      },
+    };
+    const summaryMessage: OperatorMessageView = {
+      id: 'summary-message',
+      sessionId: 'session-1',
+      turnId: inspectionAction.turnId,
+      sequence: 3,
+      role: 'assistant',
+      content: 'The run completed with one finding and one artifact.',
+      createdAt: '2026-08-02T10:00:02.000Z',
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[summaryMessage]}
+        actions={[inspectionAction]}
+        isActive={false}
+        onDecision={mock(() => {})}
+        onRunCommand={onRunCommand}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getByRole('region', { name: 'Recorded run results' })).toBeInTheDocument();
+    expect(screen.getByText('Exposed package token')).toBeInTheDocument();
+    expect(screen.getByText('report.json')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /view all/i })).toHaveAttribute(
+      'href',
+      `/findings?runId=${runId}`,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect' }));
+    expect(onRunCommand).toHaveBeenCalledWith({
+      message: `Inspect finding ${findingId}`,
+      directCommand: {
+        commandName: 'get_finding',
+        arguments: { findingId },
+      },
+    });
+  });
 });

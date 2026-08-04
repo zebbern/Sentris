@@ -30,6 +30,8 @@ export interface StartWorkflowOptions {
   /** Correlation ID from the originating HTTP request (X-Request-Id). Propagated via workflow memo. */
   correlationId?: string;
   workflowExecutionTimeout?: WorkflowOptions['workflowExecutionTimeout'];
+  workflowIdConflictPolicy?: WorkflowOptions['workflowIdConflictPolicy'];
+  workflowIdReusePolicy?: WorkflowOptions['workflowIdReusePolicy'];
 }
 
 export interface WorkflowRunReference {
@@ -136,6 +138,12 @@ export class TemporalService implements OnModuleDestroy {
       ...(options.workflowExecutionTimeout === undefined
         ? {}
         : { workflowExecutionTimeout: options.workflowExecutionTimeout }),
+      ...(options.workflowIdConflictPolicy === undefined
+        ? {}
+        : { workflowIdConflictPolicy: options.workflowIdConflictPolicy }),
+      ...(options.workflowIdReusePolicy === undefined
+        ? {}
+        : { workflowIdReusePolicy: options.workflowIdReusePolicy }),
     });
 
     this.logger.log(
@@ -158,6 +166,7 @@ export class TemporalService implements OnModuleDestroy {
       case 'mcpGroupDiscoveryWorkflow':
       case 'webhookParsingWorkflow':
       case 'operatorTurnWorkflow':
+      case 'operatorRunFollowUpWorkflow':
         return workflowType;
       default:
         throw new Error(`Unknown workflow type: ${workflowType}`);

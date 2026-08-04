@@ -35,6 +35,8 @@ import {
   InternalOperatorObservationQuerySchema,
   InternalOperatorOrganizationDto,
   InternalOperatorOrganizationSchema,
+  InternalOperatorRunFollowUpDto,
+  InternalOperatorRunFollowUpSchema,
   InternalOperatorPlanParamDto,
   InternalOperatorPlanParamSchema,
   InternalOperatorStatusDto,
@@ -57,6 +59,17 @@ import { OperatorService } from './operator.service';
 @UseGuards(InternalOnlyGuard)
 export class InternalOperatorController {
   constructor(private readonly operatorService: OperatorService) {}
+
+  @Post('run-follow-ups')
+  @ApiOperation({ summary: 'Create one durable follow-up turn for an Operator-launched run' })
+  createRunFollowUp(
+    @CurrentAuth() auth: AuthContext | null,
+    @Body(new ZodValidationPipe(InternalOperatorRunFollowUpSchema))
+    body: InternalOperatorRunFollowUpDto,
+  ): Promise<{ disposition: 'started' | 'ignored'; turnId?: string }> {
+    const organizationId = this.requireInternalOrg(auth, body.organizationId);
+    return this.operatorService.createInternalRunFollowUp({ ...body, organizationId });
+  }
 
   @Get('turns/:turnId/context')
   @ApiOperation({ summary: 'Load bounded Operator model context for a worker activity' })

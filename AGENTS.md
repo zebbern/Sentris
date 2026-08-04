@@ -334,7 +334,13 @@ The in-app Operator now runs each user turn as a Temporal Workflow with durable 
 actions, ask-or-auto approvals, and turn-scoped immutable MCP authority. Ordinary new histories
 release the turn after launching a workflow and follow its run and Agent children through
 the canonical run trace/Agent SSE pipeline; a patch-gated blocking observer exists only for
-old-history replay. The explicit `improve_run` journey is the deliberate exception: one turn
+old-history replay. A terminal outbox event for an ordinary Operator-launched run starts one
+idempotent durable coordinator, which waits for session availability and creates a fresh bounded
+`get_run` summary turn; it does not reopen or block the launch turn. Terminal inspections include
+bounded trace, finding, and artifact evidence. The frontend renders that typed evidence as a
+deterministic result panel with run-scoped finding links, artifact downloads, and the existing
+typed run controls rather than relying on model-generated actions. The explicit `improve_run`
+journey is the deliberate exception: one turn
 proposes a bounded edit, applies it through the same Ask/Auto policy, reruns the source inputs,
 waits durably through retrying observations, compares recorded evidence, and summarizes the
 result. Explicit run-card inspect, cancel, and retry controls are structured,

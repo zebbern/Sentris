@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'bun:test';
 import type { AuthContext } from '../../auth/types';
 import type { FindingsQueryService } from '../../analytics/findings-query.service';
 import type { FindingTriageService } from '../../findings/finding-triage.service';
+import type { ArtifactsService } from '../../storage/artifacts.service';
 import type { TraceService } from '../../trace/trace.service';
 import type { WorkflowsService } from '../../workflows/workflows.service';
 import { OperatorCommandService } from '../operator-command.service';
@@ -32,6 +33,7 @@ describe('OperatorCommandService', () => {
   let mcpAuthority: Record<string, ReturnType<typeof vi.fn>>;
   let workflowAuthoring: Record<string, ReturnType<typeof vi.fn>>;
   let trace: Record<string, ReturnType<typeof vi.fn>>;
+  let artifacts: Record<string, ReturnType<typeof vi.fn>>;
   let service: OperatorCommandService;
 
   beforeEach(() => {
@@ -92,6 +94,9 @@ describe('OperatorCommandService', () => {
         recent: [],
       }),
     };
+    artifacts = {
+      listRunArtifacts: vi.fn().mockResolvedValue({ runId: 'sentris-run-1', artifacts: [] }),
+    };
     service = new OperatorCommandService(
       workflows as unknown as WorkflowsService,
       findings as unknown as FindingsQueryService,
@@ -99,6 +104,7 @@ describe('OperatorCommandService', () => {
       mcpAuthority as unknown as OperatorMcpAuthorityService,
       workflowAuthoring as unknown as OperatorWorkflowAuthoringService,
       trace as unknown as TraceService,
+      artifacts as unknown as ArtifactsService,
     );
   });
 
@@ -664,6 +670,25 @@ describe('OperatorCommandService', () => {
       schemaCoverage: { canonical: 1, legacy: 0, invalid: 0 },
       degradedReasons: [],
     });
+    artifacts.listRunArtifacts.mockResolvedValue({
+      runId,
+      artifacts: [
+        {
+          id: '77777777-7777-4777-8777-777777777777',
+          runId,
+          workflowId: WORKFLOW_ID,
+          workflowVersionId: WORKFLOW_VERSION_ID,
+          componentRef: 'report',
+          fileId: '88888888-8888-4888-8888-888888888888',
+          name: 'report.json',
+          mimeType: 'application/json',
+          size: 512,
+          destinations: ['run'],
+          metadata: { internal: 'not-needed-by-operator' },
+          createdAt: '2026-08-02T10:01:00.000Z',
+        },
+      ],
+    });
 
     const response = await service.execute({
       commandName: 'get_run',
@@ -709,6 +734,12 @@ describe('OperatorCommandService', () => {
         items: [expect.objectContaining({ id: FINDING_ID })],
       }),
     );
+    expect(result.diagnostics.artifacts).toEqual({
+      availability: 'available',
+      total: 1,
+      items: [expect.objectContaining({ name: 'report.json' })],
+    });
+    expect(JSON.stringify(result.diagnostics.artifacts)).not.toContain('not-needed-by-operator');
     expect(JSON.stringify(result)).not.toContain('stack-must-not-enter-operator-context');
     expect(JSON.stringify(result)).not.toContain('raw-must-not-enter-operator-context');
   });
@@ -725,6 +756,7 @@ describe('OperatorCommandService', () => {
     workflows.getRunResult = vi.fn().mockResolvedValue({ status: 'FAILED', result: null });
     trace.summarizeRun.mockRejectedValue(new Error('trace store unavailable'));
     findings.listFindings.mockRejectedValue(new Error('finding index unavailable'));
+    artifacts.listRunArtifacts.mockRejectedValue(new Error('artifact store unavailable'));
 
     const response = await service.execute({
       commandName: 'get_run',
@@ -748,6 +780,12 @@ describe('OperatorCommandService', () => {
             total: null,
             items: [],
             error: 'finding index unavailable',
+          },
+          artifacts: {
+            availability: 'unavailable',
+            total: null,
+            items: [],
+            error: 'artifact store unavailable',
           },
         },
       }),

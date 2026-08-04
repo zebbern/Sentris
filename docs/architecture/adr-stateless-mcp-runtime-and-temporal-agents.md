@@ -137,6 +137,17 @@ instead keeps one bounded turn durable while it diagnoses a terminal source run,
 smallest valid edit, applies it through the existing Ask/Auto policy, reruns the exact stored
 inputs and scope, and compares the terminal candidate. Candidate waiting uses one observation
 attempt per retrying Activity attempt rather than a long in-Activity polling loop.
+When an ordinary Operator-launched run becomes terminal, its transactional outbox event starts
+one idempotently named follow-up coordinator. The coordinator retries durably while that Operator
+session has another active turn, then creates a fresh turn through the canonical turn service. The
+turn performs one bounded `get_run` inspection and a text-only result summary with product links
+and suggested next actions. Terminal inspection now records separately bounded trace, finding,
+and artifact evidence. The frontend projects that typed evidence into a compact result panel with
+run-scoped finding navigation, direct artifact downloads, and the existing typed run controls;
+older turn histories without recorded artifact evidence use the canonical terminal-run artifact
+query as a compatibility fallback. The original launch turn remains closed, duplicate terminal
+delivery cannot create another summary, and `improve_run` candidates are excluded because that
+journey owns its comparison and completion message.
 Run-derived update proposals persist the reviewed run identity only after organization and
 workflow validation. Applying a valid proposal carries that lineage onto a staged immutable
 version without changing the workflow's `current_version_id`. The improvement journey selects

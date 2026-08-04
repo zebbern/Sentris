@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   ConflictException,
   ForbiddenException,
@@ -169,86 +170,8 @@ export class OperatorService {
     input: OperatorCreateTurn,
   ): Promise<OperatorTurnAccepted> {
     const user = this.requireUserAuth(auth);
-    let session = await this.requireOwnedSession(sessionId, user);
-
-    const { turn, created } = await this.repository.createTurn({
-      id: input.clientTurnId,
-      session,
-      message: input.message,
-      context: input.context,
-      directCommand: input.directCommand,
-      journey: input.journey,
-      auth: user,
-    });
-    const persistedPayload = readOperatorTurnPayload(turn.context);
-
-    if (created && session.title === DEFAULT_SESSION_TITLE) {
-      const title = input.message.replace(/\s+/g, ' ').trim().slice(0, 72);
-      const renamed = await this.repository.updateSession({
-        sessionId: session.id,
-        owner: { organizationId: user.organizationId, userId: user.userId },
-        values: { title },
-        auth: user,
-      });
-      session = renamed ?? session;
-    }
-
-    if (turn.temporalWorkflowId) {
-      return { turnId: turn.id, status: turn.status };
-    }
-
-    const temporalWorkflowId = `operator-turn:${session.id}:${turn.id}`;
-    try {
-      const temporal = await this.temporalService.startWorkflow({
-        workflowType: OPERATOR_WORKFLOW_TYPE,
-        workflowId: temporalWorkflowId,
-        args: [
-          {
-            sessionId: session.id,
-            turnId: turn.id,
-            organizationId: session.organizationId,
-            ...(persistedPayload.directCommand
-              ? {
-                  directCommand: {
-                    toolCallId: `${turn.id}:direct`,
-                    commandName: persistedPayload.directCommand.commandName,
-                    arguments: persistedPayload.directCommand.arguments,
-                  },
-                }
-              : {}),
-            ...(persistedPayload.journey ? { journey: persistedPayload.journey } : {}),
-          },
-        ],
-        workflowExecutionTimeout: '24 hours',
-      });
-      await this.repository.attachTemporal({
-        turnId: turn.id,
-        sessionId: session.id,
-        workflowId: temporal.workflowId,
-        runId: temporal.runId,
-      });
-    } catch (error: unknown) {
-      if (!this.isAlreadyStarted(error)) {
-        await this.repository.failTurn({
-          turn,
-          session,
-          error: this.errorMessage(error),
-          auth: user,
-        });
-        throw error;
-      }
-      const recovered = await this.temporalService.describeWorkflow({
-        workflowId: temporalWorkflowId,
-      });
-      await this.repository.attachTemporal({
-        turnId: turn.id,
-        sessionId: session.id,
-        workflowId: temporalWorkflowId,
-        runId: recovered.runId,
-      });
-    }
-
-    return { turnId: turn.id, status: turn.status };
+    const session = await this.requireOwnedSession(sessionId, user);
+    return this.createTurnForSession(session, input, user, true);
   }
 
   async decideAction(
@@ -383,6 +306,61 @@ export class OperatorService {
     });
     this.decisionReconciliationChecks.delete(reconciliationKey);
     return true;
+  }
+
+  async createInternalRunFollowUp(input: {
+    organizationId: string;
+    sourceActionId: string;
+    sourceSessionId: string;
+    sourceTurnId: string;
+    runId: string;
+    workflowId: string;
+  }): Promise<{ disposition: 'started' | 'ignored'; turnId?: string }> {
+    const source = await this.repository.getActionWithTurnSession(input.sourceActionId);
+    if (
+      !source ||
+      source.session.organizationId !== input.organizationId ||
+      source.session.id !== input.sourceSessionId ||
+      source.turn.id !== input.sourceTurnId ||
+      source.session.status !== 'active' ||
+      (source.action.commandName !== 'run_workflow' && source.action.commandName !== 'retry_run') ||
+      readOperatorTurnPayload(source.turn.context).journey?.kind === 'improve_run'
+    ) {
+      return { disposition: 'ignored' };
+    }
+    if (source.action.status === 'failed' || source.action.status === 'rejected') {
+      return { disposition: 'ignored' };
+    }
+    if (source.action.status !== 'succeeded') {
+      throw new ConflictException('Operator run action has not finished recording its result');
+    }
+    if (source.action.runId !== input.runId) {
+      return { disposition: 'ignored' };
+    }
+
+    const actor = this.authForTurn(source.session, source.turn);
+    const run = await this.workflowsService.getRun(input.runId, actor);
+    if (run.workflowId !== input.workflowId) {
+      return { disposition: 'ignored' };
+    }
+
+    const turnId = operatorRunFollowUpTurnId(source.action.id);
+    await this.createTurnForSession(
+      source.session,
+      {
+        clientTurnId: turnId,
+        message: `Automatic follow-up for workflow run ${input.runId}: inspect the terminal outcome, trace, and findings, then summarize what happened and suggest the most useful next actions.`,
+        context: {
+          path: `/workflows/${input.workflowId}/runs/${input.runId}`,
+          workflowId: input.workflowId,
+          runId: input.runId,
+        },
+        journey: { kind: 'run_follow_up', runId: input.runId },
+      },
+      actor,
+      false,
+    );
+    return { disposition: 'started', turnId };
   }
 
   async getInternalContext(turnId: string, organizationId: string): Promise<OperatorModelContext> {
@@ -663,6 +641,93 @@ export class OperatorService {
     });
   }
 
+  private async createTurnForSession(
+    initialSession: OperatorSessionRecord,
+    input: OperatorCreateTurn,
+    actor: AuthContext,
+    renameDefaultSession: boolean,
+  ): Promise<OperatorTurnAccepted> {
+    let session = initialSession;
+    const { turn, created } = await this.repository.createTurn({
+      id: input.clientTurnId,
+      session,
+      message: input.message,
+      context: input.context,
+      directCommand: input.directCommand,
+      journey: input.journey,
+      auth: actor,
+    });
+    const persistedPayload = readOperatorTurnPayload(turn.context);
+
+    if (renameDefaultSession && created && session.title === DEFAULT_SESSION_TITLE) {
+      const title = input.message.replace(/\s+/g, ' ').trim().slice(0, 72);
+      const renamed = await this.repository.updateSession({
+        sessionId: session.id,
+        owner: { organizationId: session.organizationId, userId: session.userId },
+        values: { title },
+        auth: actor,
+      });
+      session = renamed ?? session;
+    }
+
+    if (turn.temporalWorkflowId) {
+      return { turnId: turn.id, status: turn.status };
+    }
+
+    const temporalWorkflowId = `operator-turn:${session.id}:${turn.id}`;
+    try {
+      const temporal = await this.temporalService.startWorkflow({
+        workflowType: OPERATOR_WORKFLOW_TYPE,
+        workflowId: temporalWorkflowId,
+        args: [
+          {
+            sessionId: session.id,
+            turnId: turn.id,
+            organizationId: session.organizationId,
+            ...(persistedPayload.directCommand
+              ? {
+                  directCommand: {
+                    toolCallId: `${turn.id}:direct`,
+                    commandName: persistedPayload.directCommand.commandName,
+                    arguments: persistedPayload.directCommand.arguments,
+                  },
+                }
+              : {}),
+            ...(persistedPayload.journey ? { journey: persistedPayload.journey } : {}),
+          },
+        ],
+        workflowExecutionTimeout: '24 hours',
+      });
+      await this.repository.attachTemporal({
+        turnId: turn.id,
+        sessionId: session.id,
+        workflowId: temporal.workflowId,
+        runId: temporal.runId,
+      });
+    } catch (error: unknown) {
+      if (!this.isAlreadyStarted(error)) {
+        await this.repository.failTurn({
+          turn,
+          session,
+          error: this.errorMessage(error),
+          auth: actor,
+        });
+        throw error;
+      }
+      const recovered = await this.temporalService.describeWorkflow({
+        workflowId: temporalWorkflowId,
+      });
+      await this.repository.attachTemporal({
+        turnId: turn.id,
+        sessionId: session.id,
+        workflowId: temporalWorkflowId,
+        runId: recovered.runId,
+      });
+    }
+
+    return { turnId: turn.id, status: turn.status };
+  }
+
   private async requireOwnedSession(
     sessionId: string,
     auth: AuthContext & { organizationId: string; userId: string },
@@ -799,4 +864,16 @@ function formatOperatorArgumentValidationError(
     .map((issue) => `${issue.path.map(String).join('.') || 'arguments'}: ${issue.message}`)
     .join('; ');
   return `Invalid arguments for ${commandName}: ${details}`.slice(0, 1_000);
+}
+
+function operatorRunFollowUpTurnId(actionId: string): string {
+  const hex = createHash('sha256')
+    .update(`sentris:operator-run-follow-up:v1:${actionId}`)
+    .digest('hex')
+    .slice(0, 32)
+    .split('');
+  hex[12] = '8';
+  hex[16] = ((Number.parseInt(hex[16]!, 16) & 0x3) | 0x8).toString(16);
+  const value = hex.join('');
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
 }

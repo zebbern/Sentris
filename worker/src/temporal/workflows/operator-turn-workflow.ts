@@ -12,10 +12,12 @@ import {
 
 import {
   OperatorRunComparisonResultSchema,
+  OperatorRunInputProposalResultSchema,
   OperatorPlanProposalResultSchema,
   resolveOperatorPlanStepArguments,
   OperatorWorkflowApplyResultSchema,
   OperatorWorkflowDraftResultSchema,
+  OperatorWorkflowPromotionResultSchema,
   type OperatorCommandName,
   type OperatorJourney,
   type OperatorRunObservation,
@@ -47,6 +49,89 @@ const MAX_PLAN_FAILURE_DETAIL_LENGTH = 400;
 const MAX_PLAN_RESULT_LINKS = 4;
 const MAX_PLAN_COMPLETION_LENGTH = 2_400;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function getStructuredActionCompletionMessage(result: unknown): string | undefined {
+  const kind =
+    typeof result === 'object' && result !== null && 'kind' in result ? result.kind : undefined;
+
+  switch (kind) {
+    case 'operator-plan':
+      return OperatorPlanProposalResultSchema.safeParse(result).success
+        ? 'Plan ready for review. Select Run plan or Revise.'
+        : undefined;
+    case 'workflow-draft': {
+      const draft = OperatorWorkflowDraftResultSchema.safeParse(result);
+      if (!draft.success) return undefined;
+      return draft.data.validation.valid
+        ? 'Workflow draft ready for review. Select Save version when it is ready.'
+        : 'Workflow draft needs revision. Review the validation errors shown in the card.';
+    }
+    case 'run-input-proposal':
+      return OperatorRunInputProposalResultSchema.safeParse(result).success
+        ? 'Input changes ready for review. Select Run with changes or ask for a revision.'
+        : undefined;
+    case 'run-comparison': {
+      const comparison = OperatorRunComparisonResultSchema.safeParse(result);
+      if (!comparison.success) return undefined;
+      return comparison.data.source.workflowVersionId && comparison.data.candidate.workflowVersionId
+        ? 'Comparison ready for review. Select Keep candidate or Revise again.'
+        : 'Comparison ready for review. Select Revise again if another improvement is needed.';
+    }
+    default:
+      return undefined;
+  }
+}
+
+function getControlActionCompletionMessage(input: {
+  commandName: OperatorCommandName;
+  result: unknown;
+  launchedRunId?: string;
+}): string | undefined {
+  const applied = OperatorWorkflowApplyResultSchema.safeParse(input.result);
+  if (input.commandName === 'apply_workflow_draft' && applied.success) {
+    if (applied.data.staged) {
+      return 'Candidate workflow version saved. Run it when ready.';
+    }
+    return applied.data.created
+      ? 'Workflow saved. Open it in Builder when ready.'
+      : 'Workflow version saved.';
+  }
+
+  const promoted = OperatorWorkflowPromotionResultSchema.safeParse(input.result);
+  if (input.commandName === 'promote_workflow_version' && promoted.success) {
+    return promoted.data.alreadyCurrent
+      ? 'Candidate workflow version was already active.'
+      : 'Candidate workflow version is now active.';
+  }
+
+  const resultRecord =
+    typeof input.result === 'object' && input.result !== null
+      ? (input.result as Record<string, unknown>)
+      : undefined;
+  const runId =
+    input.launchedRunId ??
+    (typeof resultRecord?.runId === 'string' ? resultRecord.runId : undefined);
+  if (input.commandName === 'run_workflow' && runId) {
+    return 'Workflow run started. Follow progress in the run card.';
+  }
+  if (input.commandName === 'retry_run' && runId) {
+    return 'Retry started as a new workflow run. Follow progress in the run card.';
+  }
+  if (input.commandName === 'cancel_run') {
+    if (resultRecord?.alreadyTerminal === true) {
+      const status = typeof resultRecord.status === 'string' ? resultRecord.status : 'terminal';
+      return `The run was already ${status}; no cancellation was needed.`;
+    }
+    return resultRecord?.cancelled === true
+      ? 'Cancellation requested. Follow the run card for its terminal status.'
+      : undefined;
+  }
+  if (input.commandName === 'update_finding_triage') {
+    return 'Finding triage updated.';
+  }
+
+  return undefined;
+}
 
 export interface OperatorTurnWorkflowInput {
   sessionId: string;
@@ -636,9 +721,46 @@ async function runOperatorPlanJourney(input: {
   await shortActivities.operatorCompleteTurnActivity({ ...input.base, message });
 }
 
+async function runRunFollowUpJourney(input: {
+  base: OperatorActivityInput;
+  journey: Extract<OperatorJourney, { kind: 'run_follow_up' }>;
+  decisions: OperatorDecisionMap;
+  interpretActionStatus: boolean;
+}): Promise<void> {
+  const inspection = await prepareAndExecuteOperatorAction({
+    base: input.base,
+    decisions: input.decisions,
+    interpretActionStatus: input.interpretActionStatus,
+    userConfirmed: true,
+    toolCall: {
+      toolCallId: `${input.base.turnId}:journey:inspect-run`,
+      commandName: 'get_run',
+      arguments: { runId: input.journey.runId },
+    },
+  });
+  if (inspection.disposition !== 'executed') {
+    throw new Error('The run follow-up could not inspect its terminal run');
+  }
+
+  const summary = await operatorModelStepActivity({
+    ...input.base,
+    step: 1,
+    mode: 'run_follow_up_summary',
+    sourceRunId: input.journey.runId,
+  });
+  await shortActivities.operatorCompleteTurnActivity({
+    ...input.base,
+    message:
+      summary.text.trim() ||
+      `Workflow run ${input.journey.runId} is terminal. Its durable inspection is recorded above.`,
+  });
+}
+
 export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Promise<void> {
   const detachedRunFollowing = patched('operator-detached-run-following-v1');
   const actionStatusOutcomes = patched('operator-action-status-outcome-v1');
+  const compactStructuredCompletions = patched('operator-compact-structured-completions-v1');
+  const compactControlCompletions = patched('operator-compact-control-completions-v1');
   const decisions = new Map<string, OperatorActionDecisionUpdate>();
 
   // Updates can arrive before the workflow reaches its approval wait. Retain the latest
@@ -685,6 +807,17 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
       return;
     }
 
+    if (input.journey?.kind === 'run_follow_up') {
+      await runRunFollowUpJourney({
+        base,
+        journey: input.journey,
+        decisions,
+        interpretActionStatus: actionStatusOutcomes,
+      });
+      await condition(allHandlersFinished);
+      return;
+    }
+
     for (let step = 0; step < MAX_OPERATOR_STEPS; step += 1) {
       const directToolCall = step === 0 ? input.directCommand : undefined;
       const modelStep = directToolCall
@@ -713,6 +846,8 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
 
       let executedAction = false;
       let reusedCompletedAction = false;
+      let structuredCompletionMessage: string | undefined;
+      let controlCompletionMessage: string | undefined;
       for (const toolCall of modelStep.toolCalls) {
         const outcome = await prepareAndExecuteOperatorAction({
           base,
@@ -723,12 +858,23 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
         });
         if (outcome.disposition === 'already_completed') {
           reusedCompletedAction = true;
+          structuredCompletionMessage ??= getStructuredActionCompletionMessage(outcome.result);
+          controlCompletionMessage ??= getControlActionCompletionMessage({
+            commandName: toolCall.commandName,
+            result: outcome.result,
+          });
           continue;
         }
         if (outcome.disposition === 'rejected') continue;
 
         const executed = outcome.executed;
         executedAction = true;
+        structuredCompletionMessage ??= getStructuredActionCompletionMessage(executed.result);
+        controlCompletionMessage ??= getControlActionCompletionMessage({
+          commandName: toolCall.commandName,
+          result: executed.result,
+          ...(executed.launchedRunId ? { launchedRunId: executed.launchedRunId } : {}),
+        });
         if (executed.mcpOperationRequest) {
           const result = await executeDurableMcpOperation(
             executed.mcpOperationRequest,
@@ -755,6 +901,18 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
             );
           }
         }
+      }
+
+      const compactCompletionMessage =
+        (compactStructuredCompletions ? structuredCompletionMessage : undefined) ??
+        (compactControlCompletions ? controlCompletionMessage : undefined);
+      if (compactCompletionMessage) {
+        await shortActivities.operatorCompleteTurnActivity({
+          ...base,
+          message: compactCompletionMessage,
+        });
+        await condition(allHandlersFinished);
+        return;
       }
 
       if (reusedCompletedAction && !executedAction) {

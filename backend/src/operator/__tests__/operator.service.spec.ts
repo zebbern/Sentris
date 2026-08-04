@@ -110,11 +110,13 @@ describe('OperatorService', () => {
         .fn()
         .mockImplementation(
           async (input: {
+            id: string;
             context?: OperatorRouteContext;
             directCommand?: OperatorDirectCommand;
             journey?: OperatorJourney;
           }) => ({
             turn: turnRecord({
+              id: input.id,
               status: 'queued',
               temporalWorkflowId: null,
               temporalRunId: null,
@@ -421,6 +423,91 @@ describe('OperatorService', () => {
         ],
       }),
     );
+  });
+
+  it('starts one fresh bounded turn for a completed Operator run', async () => {
+    repository.getActionWithTurnSession.mockResolvedValue({
+      action: {
+        ...actionRecord('ask', 'succeeded'),
+        commandName: 'run_workflow',
+        effect: 'execute',
+        approvalRequired: false,
+        runId: 'sentris-run-finished',
+      },
+      turn: turnRecord({ status: 'completed', completedAt: new Date('2026-08-02T10:03:00Z') }),
+      session: sessionRecord(),
+    });
+    workflows.getRun.mockResolvedValue({
+      id: 'sentris-run-finished',
+      workflowId: SECRET_ID,
+    });
+
+    const result = await service.createInternalRunFollowUp({
+      organizationId: 'operator-org',
+      sourceActionId: ACTION_ID,
+      sourceSessionId: SESSION_ID,
+      sourceTurnId: TURN_ID,
+      runId: 'sentris-run-finished',
+      workflowId: SECRET_ID,
+    });
+
+    expect(result.disposition).toBe('started');
+    expect(result.turnId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(repository.createTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: result.turnId,
+        journey: { kind: 'run_follow_up', runId: 'sentris-run-finished' },
+        context: {
+          path: `/workflows/${SECRET_ID}/runs/sentris-run-finished`,
+          workflowId: SECRET_ID,
+          runId: 'sentris-run-finished',
+        },
+        auth: expect.objectContaining({ provider: 'operator', roles: ['MEMBER'] }),
+      }),
+    );
+    expect(temporal.startWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowType: 'operatorTurnWorkflow',
+        args: [
+          expect.objectContaining({
+            journey: { kind: 'run_follow_up', runId: 'sentris-run-finished' },
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('does not create a second follow-up for an improve-run journey', async () => {
+    repository.getActionWithTurnSession.mockResolvedValue({
+      action: {
+        ...actionRecord('ask', 'succeeded'),
+        commandName: 'run_workflow',
+        effect: 'execute',
+        approvalRequired: false,
+        runId: 'sentris-run-candidate',
+      },
+      turn: turnRecord({
+        context: {
+          version: 2,
+          routeContext: null,
+          directCommand: null,
+          journey: { kind: 'improve_run', sourceRunId: 'sentris-run-source' },
+        },
+      }),
+      session: sessionRecord(),
+    });
+
+    await expect(
+      service.createInternalRunFollowUp({
+        organizationId: 'operator-org',
+        sourceActionId: ACTION_ID,
+        sourceSessionId: SESSION_ID,
+        sourceTurnId: TURN_ID,
+        runId: 'sentris-run-candidate',
+        workflowId: SECRET_ID,
+      }),
+    ).resolves.toEqual({ disposition: 'ignored' });
+    expect(repository.createTurn).not.toHaveBeenCalled();
   });
 
   it('starts Temporal from the persisted direct command instead of retry request data', async () => {
