@@ -318,6 +318,7 @@ describe('workflow Agent activities', () => {
             uri: 'fixture://report',
             name: 'Latest report',
             description: 'Current investigation report',
+            meta: { 'com.sentris/source-name': 'Fixture MCP' },
           },
         ],
         resourceTemplates: [
@@ -325,6 +326,7 @@ describe('workflow Agent activities', () => {
             sourceId,
             uriTemplate: 'fixture://reports/{id}',
             name: 'Report by ID',
+            meta: { 'com.sentris/source-name': 'Fixture MCP' },
           },
         ],
         prompts: [
@@ -333,6 +335,7 @@ describe('workflow Agent activities', () => {
             name: 'summarize_report',
             description: 'Prepare a report summary',
             arguments: [{ name: 'reportId', required: true }],
+            meta: { 'com.sentris/source-name': 'Fixture MCP' },
           },
         ],
         createdAt: '2026-08-04T10:00:00.000Z',
@@ -447,11 +450,23 @@ describe('workflow Agent activities', () => {
         sourceId,
         authorizationTarget: 'fixture://report',
         operation: { kind: 'resource-read', uri: 'fixture://report' },
+        capability: {
+          kind: 'resource',
+          displayName: 'Latest report',
+          sourceId,
+          sourceName: 'Fixture MCP',
+          target: 'fixture://report',
+        },
       }),
       expect.objectContaining({
         sourceId,
         authorizationTarget: 'fixture://reports/{id}',
         operation: { kind: 'resource-read', uri: 'fixture://reports/42' },
+        capability: expect.objectContaining({
+          kind: 'resource',
+          displayName: 'Report by ID',
+          sourceName: 'Fixture MCP',
+        }),
       }),
       expect.objectContaining({
         sourceId,
@@ -461,7 +476,22 @@ describe('workflow Agent activities', () => {
           name: 'summarize_report',
           arguments: { reportId: '42' },
         },
+        capability: expect.objectContaining({
+          kind: 'prompt',
+          displayName: 'summarize_report',
+          sourceName: 'Fixture MCP',
+        }),
       }),
+    ]);
+    expect(
+      agentTracePublisher.publish.mock.calls
+        .map(([event]) => event.part)
+        .filter((part) => part.type === 'tool-input-available')
+        .map((part) => part.capability),
+    ).toEqual([
+      expect.objectContaining({ kind: 'resource', displayName: 'Latest report' }),
+      expect.objectContaining({ kind: 'resource', displayName: 'Report by ID' }),
+      expect.objectContaining({ kind: 'prompt', displayName: 'summarize_report' }),
     ]);
   });
 

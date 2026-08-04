@@ -10,8 +10,11 @@ const EMPTY_TRANSCRIPT: AgentTranscriptState = {
   steps: [],
 };
 
-export function useAgentTranscript(agentRunId: string | null): AgentTranscriptState {
-  const transcriptQuery = useAgentTranscriptQuery(agentRunId);
+export function useAgentTranscript(
+  agentRunId: string | null,
+  follow = false,
+): AgentTranscriptState {
+  const transcriptQuery = useAgentTranscriptQuery(agentRunId, follow);
 
   if (!agentRunId) {
     return EMPTY_TRANSCRIPT;

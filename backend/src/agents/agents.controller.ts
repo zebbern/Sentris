@@ -14,6 +14,7 @@ import { ApiOkResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import type { Response, Request } from 'express';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { createUIMessageStream, pipeUIMessageStreamToResponse, type UIMessageChunk } from 'ai';
+import { AgentCapabilityTraceSchema, type AgentCapabilityTrace } from '@sentris/shared';
 import { AgentStreamQuerySchema } from './dto/agent-stream-query.dto';
 import type { AgentStreamQueryDto } from './dto/agent-stream-query.dto';
 import { AgentChatRequestSchema } from './dto/agent-chat-request.dto';
@@ -60,7 +61,7 @@ export class AgentsController {
       cursor: lastSequence ?? 0,
       parts: events
         .map((event) => ({ event, chunk: convertAgentTraceToUiChunk(event) }))
-        .filter((entry): entry is { event: AgentTracePartEntry; chunk: UIMessageChunk } =>
+        .filter((entry): entry is { event: AgentTracePartEntry; chunk: AgentUiMessageChunk } =>
           Boolean(entry.chunk),
         )
         .map(({ event, chunk }) => ({
@@ -138,7 +139,9 @@ export class AgentsController {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function convertAgentTraceToUiChunk(event: AgentTracePartEntry): UIMessageChunk | null {
+type AgentUiMessageChunk = UIMessageChunk & { capability?: AgentCapabilityTrace };
+
+function convertAgentTraceToUiChunk(event: AgentTracePartEntry): AgentUiMessageChunk | null {
   const payload = (event.part ?? {}) as Record<string, unknown>;
   const type = typeof payload.type === 'string' ? payload.type : undefined;
   if (!type) {
@@ -216,6 +219,7 @@ function convertAgentTraceToUiChunk(event: AgentTracePartEntry): UIMessageChunk 
   }
 
   if (type === 'tool-input-available') {
+    const capability = parseAgentCapabilityTrace(payload.capability);
     return {
       type: 'tool-input-available',
       toolCallId: ensureString(payload.toolCallId) ?? `${event.sequence}`,
@@ -223,16 +227,19 @@ function convertAgentTraceToUiChunk(event: AgentTracePartEntry): UIMessageChunk 
       input: payload.input ?? null,
       providerExecuted:
         typeof payload.providerExecuted === 'boolean' ? payload.providerExecuted : undefined,
+      ...(capability ? { capability } : {}),
     };
   }
 
   if (type === 'tool-output-available') {
+    const capability = parseAgentCapabilityTrace(payload.capability);
     return {
       type: 'tool-output-available',
       toolCallId: ensureString(payload.toolCallId) ?? `${event.sequence}`,
       output: payload.output ?? null,
       providerExecuted:
         typeof payload.providerExecuted === 'boolean' ? payload.providerExecuted : undefined,
+      ...(capability ? { capability } : {}),
     };
   }
 
@@ -270,4 +277,9 @@ function ensureString(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseAgentCapabilityTrace(value: unknown) {
+  const result = AgentCapabilityTraceSchema.safeParse(value);
+  return result.success ? result.data : undefined;
 }

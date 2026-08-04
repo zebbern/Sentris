@@ -44,10 +44,11 @@ export async function loadAgentTranscript(agentRunId: string): Promise<AgentTran
   };
 }
 
-export function useAgentTranscriptQuery(agentRunId: string | null) {
+export function useAgentTranscriptQuery(agentRunId: string | null, follow = false) {
   return useQuery({
     queryKey: queryKeys.agents.transcript(agentRunId ?? '__no-agent-run__'),
     queryFn: agentRunId ? () => loadAgentTranscript(agentRunId) : skipToken,
     staleTime: 10_000,
+    refetchInterval: agentRunId && follow ? 1_000 : false,
   });
 }

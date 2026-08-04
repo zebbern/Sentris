@@ -13,6 +13,7 @@ import {
 } from '@sentris/component-sdk';
 import { LLMProviderSchema, type LlmProviderConfig } from '@sentris/contracts';
 import {
+  AgentCapabilityTraceSchema,
   CapabilityGrantSchema,
   DurableMcpCapabilityCatalogSnapshotSchema,
   DurableMcpOperationInvocationManifestSchema,
@@ -25,9 +26,11 @@ import {
   PromptDescriptorSchema,
   ResourceDescriptorSchema,
   ResourceTemplateDescriptorSchema,
+  SENTRIS_MCP_SOURCE_NAME_META_KEY,
   SecretEncryption,
   ToolDescriptorSchema,
   parseMasterKey,
+  type AgentCapabilityTrace,
   type ExecutionScope,
   type JsonObject,
   type McpOperation,
@@ -160,6 +163,7 @@ const storedToolCallSchema = z
     arguments: JsonObjectSchema,
     authorizationTarget: z.string().min(1).optional(),
     operation: McpOperationSchema.optional(),
+    capability: AgentCapabilityTraceSchema.optional(),
   })
   .strict();
 
@@ -524,6 +528,7 @@ async function runWorkflowAgentModelStep(
       arguments: argumentsResult.data,
       authorizationTarget: descriptor.authorizationTarget,
       operation: descriptor.toOperation(argumentsResult.data),
+      capability: descriptor.capability,
     };
   });
   await Promise.all(
@@ -533,6 +538,7 @@ async function runWorkflowAgentModelStep(
         toolCallId: call.modelToolCallId,
         toolName: call.toolName,
         input: call.arguments,
+        ...(call.capability ? { capability: call.capability } : {}),
       }),
     ),
   );
@@ -1010,6 +1016,7 @@ interface WorkflowAgentModelOperation {
   inputSchema: Record<string, unknown>;
   sourceId: string;
   authorizationTarget: string;
+  capability: AgentCapabilityTrace;
   toOperation: (input: JsonObject) => McpOperation;
 }
 
@@ -1020,6 +1027,13 @@ function buildModelOperations(root: StoredRootState): WorkflowAgentModelOperatio
     inputSchema: descriptor.inputSchema,
     sourceId: descriptor.source.sourceId,
     authorizationTarget: descriptor.canonicalName,
+    capability: capabilityTrace(
+      'tool',
+      descriptor.title ?? descriptor.displayName,
+      descriptor.source.sourceId,
+      descriptor.meta,
+      descriptor.canonicalName,
+    ),
     toOperation: (input) => ({
       kind: 'tool-call',
       name: descriptor.canonicalName,
@@ -1041,6 +1055,13 @@ function buildModelOperations(root: StoredRootState): WorkflowAgentModelOperatio
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         sourceId: descriptor.sourceId,
         authorizationTarget: descriptor.uri,
+        capability: capabilityTrace(
+          'resource',
+          descriptor.title ?? descriptor.name,
+          descriptor.sourceId,
+          descriptor.meta,
+          descriptor.uri,
+        ),
         toOperation: () => ({ kind: 'resource-read', uri: descriptor.uri }),
       }),
     );
@@ -1068,6 +1089,13 @@ function buildModelOperations(root: StoredRootState): WorkflowAgentModelOperatio
         },
         sourceId: descriptor.sourceId,
         authorizationTarget: descriptor.uriTemplate,
+        capability: capabilityTrace(
+          'resource',
+          descriptor.title ?? descriptor.name,
+          descriptor.sourceId,
+          descriptor.meta,
+          descriptor.uriTemplate,
+        ),
         toOperation: (input) => {
           const uri = input.uri;
           if (typeof uri !== 'string' || uri.trim().length === 0) {
@@ -1107,6 +1135,13 @@ function buildModelOperations(root: StoredRootState): WorkflowAgentModelOperatio
         },
         sourceId: descriptor.sourceId,
         authorizationTarget: descriptor.name,
+        capability: capabilityTrace(
+          'prompt',
+          descriptor.title ?? descriptor.name,
+          descriptor.sourceId,
+          descriptor.meta,
+          descriptor.name,
+        ),
         toOperation: (input) => {
           const args = Object.fromEntries(
             Object.entries(input).map(([name, value]) => {
@@ -1124,6 +1159,23 @@ function buildModelOperations(root: StoredRootState): WorkflowAgentModelOperatio
     );
   }
   return operations;
+}
+
+function capabilityTrace(
+  kind: AgentCapabilityTrace['kind'],
+  displayName: string,
+  sourceId: string,
+  meta: Record<string, unknown> | undefined,
+  target: string,
+): AgentCapabilityTrace {
+  const sourceName = meta?.[SENTRIS_MCP_SOURCE_NAME_META_KEY];
+  return {
+    kind,
+    displayName,
+    sourceId,
+    ...(typeof sourceName === 'string' && sourceName.length > 0 ? { sourceName } : {}),
+    target,
+  };
 }
 
 function claimModelOperation(
@@ -1342,6 +1394,7 @@ async function publishToolResult(
       toolCallId: call.modelToolCallId,
       toolName: call.toolName,
       output: result.output,
+      ...(call.capability ? { capability: call.capability } : {}),
     });
   } else {
     await publishAgentPart(input, sequence, {
@@ -1350,6 +1403,7 @@ async function publishToolResult(
         toolCallId: call.modelToolCallId,
         toolName: call.toolName,
         error: result.message,
+        ...(call.capability ? { capability: call.capability } : {}),
       },
     });
   }

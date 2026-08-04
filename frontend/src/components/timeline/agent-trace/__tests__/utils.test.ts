@@ -14,6 +14,13 @@ describe('deriveAgentSteps', () => {
           toolCallId: 'call-fetch',
           toolName: 'Fetch_Reference__fetch',
           input: { url: 'https://example.com' },
+          capability: {
+            kind: 'resource',
+            displayName: 'Latest report',
+            sourceId: 'mcp-node',
+            sourceName: 'Fixture MCP',
+            target: 'fixture://report',
+          },
         } as any,
       },
       {
@@ -21,9 +28,18 @@ describe('deriveAgentSteps', () => {
         timestamp: '2026-01-01T00:00:02.000Z',
         chunk: {
           type: 'data-tool-error',
-          toolCallId: 'call-fetch',
-          toolName: 'Fetch_Reference__fetch',
-          error: 'Connection failed: Failed to parse JSON',
+          data: {
+            toolCallId: 'call-fetch',
+            toolName: 'Fetch_Reference__fetch',
+            error: 'Connection failed: Failed to parse JSON',
+            capability: {
+              kind: 'resource',
+              displayName: 'Latest report',
+              sourceId: 'mcp-node',
+              sourceName: 'Fixture MCP',
+              target: 'fixture://report',
+            },
+          },
         } as any,
       },
     ];
@@ -38,6 +54,11 @@ describe('deriveAgentSteps', () => {
         finishReason: 'error',
         isComplete: true,
         durationMs: 2000,
+        capability: expect.objectContaining({
+          kind: 'resource',
+          displayName: 'Latest report',
+          sourceName: 'Fixture MCP',
+        }),
       }),
     ]);
   });

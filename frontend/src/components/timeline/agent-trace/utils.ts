@@ -5,13 +5,14 @@ import {
   type UIMessage,
   type UIMessageChunk,
 } from 'ai';
+import { AgentCapabilityTraceSchema, type AgentCapabilityTrace } from '@sentris/shared';
 import type { AgentReasoningAction, AgentReasoningObservation } from '@/types/agent';
 import type { AgentNodeOutput } from '@/types/agent';
 import type { AgentTraceChunk, AgentDerivedStep } from './types';
 
 export function summarizeUnknown(value: unknown): string {
   if (typeof value === 'string') {
-    return value;
+    return value.length > 200 ? `${value.slice(0, 200)}…` : value;
   }
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
@@ -106,6 +107,11 @@ export function ensureString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+function parseCapability(value: unknown): AgentCapabilityTrace | undefined {
+  const result = AgentCapabilityTraceSchema.safeParse(value);
+  return result.success ? result.data : undefined;
+}
+
 export function headersInitToRecord(headers?: HeadersInit): Record<string, string> {
   if (!headers) {
     return {};
@@ -197,12 +203,14 @@ export function deriveAgentSteps(parts: AgentTraceChunk[]): AgentDerivedStep[] {
     toolCallId,
     toolName,
     input,
+    capability,
     timestamp,
     sequence,
   }: {
     toolCallId?: string;
     toolName?: string;
     input?: unknown;
+    capability?: AgentCapabilityTrace;
     timestamp: string;
     sequence: number;
   }): Snapshot => {
@@ -213,6 +221,7 @@ export function deriveAgentSteps(parts: AgentTraceChunk[]): AgentDerivedStep[] {
       toolCallId,
       toolName,
       toolInput: input ?? null,
+      capability,
       toolOutput: undefined,
       timestamp,
       sequence,
@@ -244,6 +253,7 @@ export function deriveAgentSteps(parts: AgentTraceChunk[]): AgentDerivedStep[] {
         toolCallId: ensureString(chunk.toolCallId),
         toolName: ensureString(chunk.toolName),
         input: chunk.input ?? null,
+        capability: parseCapability(chunk.capability),
         timestamp: entry.timestamp,
         sequence: entry.sequence,
       });
@@ -267,6 +277,7 @@ export function deriveAgentSteps(parts: AgentTraceChunk[]): AgentDerivedStep[] {
       if (chunk.toolName && !snapshot.step.toolName) {
         snapshot.step.toolName = ensureString(chunk.toolName);
       }
+      snapshot.step.capability ??= parseCapability(chunk.capability);
       snapshot.step.toolOutput = chunk.output ?? null;
       snapshot.step.finishedAt = entry.timestamp;
       const startedAtMs = ensureDateMs(snapshot.step.startedAt);
@@ -278,7 +289,11 @@ export function deriveAgentSteps(parts: AgentTraceChunk[]): AgentDerivedStep[] {
     }
 
     if (chunk?.type === 'data-tool-error') {
-      const toolCallId = ensureString(chunk.toolCallId);
+      const errorData =
+        chunk.data && typeof chunk.data === 'object' && !Array.isArray(chunk.data)
+          ? (chunk.data as Record<string, unknown>)
+          : undefined;
+      const toolCallId = ensureString(chunk.toolCallId) ?? ensureString(errorData?.toolCallId);
       let snapshot = toolCallId ? snapshotById.get(toolCallId) : undefined;
       if (!snapshot) {
         snapshot = findFallbackSnapshot();
@@ -286,20 +301,19 @@ export function deriveAgentSteps(parts: AgentTraceChunk[]): AgentDerivedStep[] {
       if (!snapshot) {
         snapshot = createSnapshotStep({
           toolCallId,
-          toolName: ensureString(chunk.toolName),
-          input: chunk.input ?? null,
+          toolName: ensureString(chunk.toolName) ?? ensureString(errorData?.toolName),
+          input: chunk.input ?? errorData?.input ?? null,
+          capability: parseCapability(chunk.capability) ?? parseCapability(errorData?.capability),
           timestamp: entry.timestamp,
           sequence: entry.sequence,
         });
       }
-      if (chunk.toolName && !snapshot.step.toolName) {
-        snapshot.step.toolName = ensureString(chunk.toolName);
+      if (!snapshot.step.toolName) {
+        snapshot.step.toolName = ensureString(chunk.toolName) ?? ensureString(errorData?.toolName);
       }
-      snapshot.step.toolError =
-        chunk.error ??
-        chunk.message ??
-        (chunk.data as Record<string, unknown> | undefined)?.error ??
-        null;
+      snapshot.step.capability ??=
+        parseCapability(chunk.capability) ?? parseCapability(errorData?.capability);
+      snapshot.step.toolError = chunk.error ?? chunk.message ?? errorData?.error ?? null;
       snapshot.step.finishReason = 'error';
       snapshot.step.finishedAt = entry.timestamp;
       const startedAtMs = ensureDateMs(snapshot.step.startedAt);

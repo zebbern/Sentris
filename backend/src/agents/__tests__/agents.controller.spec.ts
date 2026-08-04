@@ -319,6 +319,13 @@ describe('AgentsController', () => {
         toolName: 'readFile',
         input: { path: '/tmp/x' },
         providerExecuted: true,
+        capability: {
+          kind: 'resource',
+          displayName: 'instructions.md',
+          sourceId: 'source-1',
+          sourceName: 'Local MCP acceptance',
+          target: 'demo://resource/static/document/instructions.md',
+        },
       });
       expect(chunk).toEqual({
         type: 'tool-input-available',
@@ -326,6 +333,13 @@ describe('AgentsController', () => {
         toolName: 'readFile',
         input: { path: '/tmp/x' },
         providerExecuted: true,
+        capability: {
+          kind: 'resource',
+          displayName: 'instructions.md',
+          sourceId: 'source-1',
+          sourceName: 'Local MCP acceptance',
+          target: 'demo://resource/static/document/instructions.md',
+        },
       });
     });
 
@@ -335,12 +349,40 @@ describe('AgentsController', () => {
         toolCallId: 'tc-2',
         output: { content: 'file contents' },
         providerExecuted: false,
+        capability: {
+          kind: 'tool',
+          displayName: 'Read file',
+          sourceId: 'source-1',
+        },
       });
       expect(chunk).toEqual({
         type: 'tool-output-available',
         toolCallId: 'tc-2',
         output: { content: 'file contents' },
         providerExecuted: false,
+        capability: {
+          kind: 'tool',
+          displayName: 'Read file',
+          sourceId: 'source-1',
+        },
+      });
+    });
+
+    it('drops malformed capability trace metadata', async () => {
+      const chunk = await getChunk({
+        type: 'tool-input-available',
+        toolCallId: 'tc-invalid',
+        toolName: 'readFile',
+        input: {},
+        capability: { kind: 'resource', displayName: '' },
+      });
+
+      expect(chunk).toEqual({
+        type: 'tool-input-available',
+        toolCallId: 'tc-invalid',
+        toolName: 'readFile',
+        input: {},
+        providerExecuted: undefined,
       });
     });
 

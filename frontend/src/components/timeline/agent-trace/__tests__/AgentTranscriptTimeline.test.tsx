@@ -15,6 +15,7 @@ mock.module('../utils', () => ({
     return `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
   },
   formatDuration: (ms: number) => `${ms}ms`,
+  formatStructured: (val: unknown) => JSON.stringify(val, null, 2),
   summarizeUnknown: (val: unknown) => {
     if (typeof val === 'string') return val;
     return JSON.stringify(val).slice(0, 60);
@@ -85,22 +86,22 @@ describe('AgentTranscriptTimeline', () => {
     const steps = [makeStep({ key: 's1', stepNumber: 1 }), makeStep({ key: 's2', stepNumber: 2 })];
     render(<AgentTranscriptTimeline steps={steps} />);
 
-    expect(screen.getByText('Step 1')).toBeTruthy();
-    expect(screen.getByText('Step 2')).toBeTruthy();
+    expect(screen.getByText('Tool call · Step 1')).toBeTruthy();
+    expect(screen.getByText('Tool call · Step 2')).toBeTruthy();
   });
 
-  it('shows "complete" badge on finished steps', () => {
+  it('shows "Completed" badge on finished steps', () => {
     const steps = [makeStep({ isComplete: true, finishReason: 'complete' })];
     render(<AgentTranscriptTimeline steps={steps} />);
 
-    expect(screen.getByText('complete')).toBeTruthy();
+    expect(screen.getByText('Completed')).toBeTruthy();
   });
 
-  it('shows "working" badge on incomplete steps', () => {
+  it('shows "Running" badge on incomplete steps', () => {
     const steps = [makeStep({ isComplete: false })];
     render(<AgentTranscriptTimeline steps={steps} />);
 
-    expect(screen.getByText('working')).toBeTruthy();
+    expect(screen.getByText('Running')).toBeTruthy();
   });
 
   it('shows "Waiting for tool output…" on incomplete steps', () => {
@@ -123,6 +124,32 @@ describe('AgentTranscriptTimeline', () => {
 
     expect(screen.getByText('file_search')).toBeTruthy();
     expect(screen.getByText('Call ID: call-abc')).toBeTruthy();
+    expect(screen.getByText('View full input/output')).toBeTruthy();
+  });
+
+  it('renders readable MCP resource activity and source labels', () => {
+    const steps = [
+      makeStep({
+        toolName: 'sentris_mcp_read_resource_Latest_report_aabbcc',
+        toolCallId: 'resource-call',
+        toolInput: {},
+        toolOutput: { contents: [{ text: 'report' }] },
+        capability: {
+          kind: 'resource',
+          displayName: 'Latest report',
+          sourceId: 'mcp-node',
+          sourceName: 'Fixture MCP',
+          target: 'fixture://report',
+        },
+      }),
+    ];
+
+    render(<AgentTranscriptTimeline steps={steps} />);
+
+    expect(screen.getByText('Resource read · Step 1')).toBeTruthy();
+    expect(screen.getByText('Latest report')).toBeTruthy();
+    expect(screen.getByText('via Fixture MCP')).toBeTruthy();
+    expect(screen.queryByText('sentris_mcp_read_resource_Latest_report_aabbcc')).toBeNull();
   });
 
   it('renders failed tool invocation errors', () => {
@@ -214,7 +241,7 @@ describe('AgentTranscriptTimeline', () => {
     );
 
     expect(screen.getByText('Agent Prompt')).toBeTruthy();
-    expect(screen.getByText('Step 1')).toBeTruthy();
+    expect(screen.getByText('Tool call · Step 1')).toBeTruthy();
     expect(screen.getByText('Final Answer')).toBeTruthy();
   });
 });

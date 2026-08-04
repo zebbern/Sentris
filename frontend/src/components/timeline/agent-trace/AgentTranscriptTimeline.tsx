@@ -1,5 +1,7 @@
+import { useState } from 'react';
+import type { AgentCapabilityTrace } from '@sentris/shared';
 import type { AgentDerivedStep } from './types';
-import { formatClock, formatDuration, summarizeUnknown } from './utils';
+import { formatClock, formatDuration, formatStructured, summarizeUnknown } from './utils';
 import { ExpandableText } from './ExpandableText';
 import { MarkdownView } from '@/components/ui/markdown';
 
@@ -13,14 +15,23 @@ function AgentPromptCard({ prompt }: { prompt: string }) {
 }
 
 function AgentStepCard({ step }: { step: AgentDerivedStep }) {
-  const label = step.stepNumber ? `Step ${step.stepNumber}` : 'Step';
-  const badge = step.isComplete ? (step.finishReason ?? 'complete') : 'working';
+  const [showFullIo, setShowFullIo] = useState(false);
+  const capability = step.capability;
+  const activityLabel = capability ? capabilityActivityLabel(capability.kind) : 'Tool call';
+  const label = step.stepNumber ? `${activityLabel} · Step ${step.stepNumber}` : activityLabel;
+  const failed = step.finishReason === 'error' || step.toolError !== undefined;
+  const badge = failed ? 'Failed' : step.isComplete ? 'Completed' : 'Running';
+  const badgeClass = failed
+    ? 'bg-destructive/10 text-destructive'
+    : step.isComplete
+      ? 'bg-emerald-500/10 text-emerald-600'
+      : 'bg-amber-500/10 text-amber-600';
   const showActions = step.actions && step.actions.length > 1;
   const additionalObservations =
     step.observations && step.observations.length > (step.toolOutput ? 1 : 0);
   const startedAt = step.startedAt ? formatClock(step.startedAt) : null;
   const finishedAt = step.finishedAt ? formatClock(step.finishedAt) : null;
-  const duration = step.durationMs && step.durationMs > 0 ? formatDuration(step.durationMs) : null;
+  const duration = step.durationMs !== undefined ? formatDuration(step.durationMs) : null;
   const toolInputSummary =
     step.toolInput !== null && step.toolInput !== undefined
       ? summarizeUnknown(step.toolInput)
@@ -41,7 +52,7 @@ function AgentStepCard({ step }: { step: AgentDerivedStep }) {
           {label}
         </span>
         {badge && (
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeClass}`}>
             {badge}
           </span>
         )}
@@ -54,13 +65,20 @@ function AgentStepCard({ step }: { step: AgentDerivedStep }) {
         </div>
       )}
       {!step.isComplete && (
-        <p className="text-[11px] font-semibold text-amber-600">Waiting for tool output…</p>
+        <p className="text-[11px] font-semibold text-amber-600">
+          {capabilityRunningLabel(capability?.kind)}
+        </p>
       )}
       {(step.toolName || step.toolCallId) && (
         <div className="rounded-md border border-muted-foreground/20 bg-muted/20 p-2">
           <p className="text-xs font-semibold text-foreground">
-            {step.toolName ?? 'Tool invocation'}
+            {capability?.displayName ?? step.toolName ?? 'Tool invocation'}
           </p>
+          {capability && (
+            <p className="text-[11px] text-muted-foreground">
+              via {capability.sourceName ?? capability.sourceId}
+            </p>
+          )}
           {toolInputSummary && (
             <p className="text-muted-foreground">
               Input: <span className="text-foreground">{toolInputSummary}</span>
@@ -68,7 +86,9 @@ function AgentStepCard({ step }: { step: AgentDerivedStep }) {
           )}
           {toolErrorSummary && (
             <div className="mt-2 rounded border border-destructive/30 bg-destructive/10 p-2">
-              <p className="text-[11px] font-semibold uppercase text-destructive">Tool error</p>
+              <p className="text-[11px] font-semibold uppercase text-destructive">
+                {capabilityErrorLabel(capability?.kind)}
+              </p>
               <p className="mt-1 text-destructive">{toolErrorSummary}</p>
             </div>
           )}
@@ -79,6 +99,32 @@ function AgentStepCard({ step }: { step: AgentDerivedStep }) {
           )}
           {step.toolCallId && (
             <p className="mt-1 text-[10px] text-muted-foreground">Call ID: {step.toolCallId}</p>
+          )}
+          {(step.toolInput !== undefined ||
+            step.toolOutput !== undefined ||
+            step.toolError !== undefined) && (
+            <div className="mt-2 border-t border-muted-foreground/20 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowFullIo((current) => !current)}
+                className="text-[11px] font-semibold text-primary hover:underline"
+              >
+                {showFullIo ? 'Hide full input/output' : 'View full input/output'}
+              </button>
+              {showFullIo && (
+                <div className="mt-2 space-y-2">
+                  {step.toolInput !== undefined && (
+                    <FullIoValue label="Input" value={step.toolInput} />
+                  )}
+                  {step.toolOutput !== undefined && (
+                    <FullIoValue label="Output" value={step.toolOutput} />
+                  )}
+                  {step.toolError !== undefined && (
+                    <FullIoValue label="Error" value={step.toolError} />
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -121,6 +167,64 @@ function AgentStepCard({ step }: { step: AgentDerivedStep }) {
       {step.thought && <ExpandableText text={step.thought} className="text-sm text-foreground" />}
     </div>
   );
+}
+
+function FullIoValue({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</p>
+      <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-background/80 p-2 text-[11px] text-foreground">
+        {formatStructured(value)}
+      </pre>
+    </div>
+  );
+}
+
+function capabilityActivityLabel(kind: AgentCapabilityTrace['kind']): string {
+  switch (kind) {
+    case 'tool':
+      return 'Tool call';
+    case 'resource':
+      return 'Resource read';
+    case 'prompt':
+      return 'Prompt retrieval';
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function capabilityRunningLabel(kind: AgentCapabilityTrace['kind'] | undefined): string {
+  switch (kind) {
+    case 'resource':
+      return 'Reading resource…';
+    case 'prompt':
+      return 'Retrieving prompt…';
+    case 'tool':
+    case undefined:
+      return 'Waiting for tool output…';
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function capabilityErrorLabel(kind: AgentCapabilityTrace['kind'] | undefined): string {
+  switch (kind) {
+    case 'resource':
+      return 'Resource error';
+    case 'prompt':
+      return 'Prompt error';
+    case 'tool':
+    case undefined:
+      return 'Tool error';
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
 }
 
 function AgentFinalResponseCard({ text }: { text: string }) {

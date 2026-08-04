@@ -31,7 +31,7 @@ export function AgentRunCard({
     messages: initialMessages,
     parts,
     steps,
-  } = useAgentTranscript(agentRunId);
+  } = useAgentTranscript(agentRunId, follow ?? live);
   const transport = useAgentChatTransport(agentRunId);
   const queryClient = useQueryClient();
   const { messages, sendMessage, status, setMessages } = useChat({
@@ -167,7 +167,7 @@ export function AgentRunCard({
           id: `${agentRunId}-${step.key}`,
           nodeId,
           label: step.toolName
-            ? `${step.toolName}${step.stepNumber ? ` • Step ${step.stepNumber}` : ''}`
+            ? `${step.capability?.displayName ?? step.toolName}${step.stepNumber ? ` • Step ${step.stepNumber}` : ''}`
             : step.stepNumber
               ? `Step ${step.stepNumber}`
               : 'Agent step',

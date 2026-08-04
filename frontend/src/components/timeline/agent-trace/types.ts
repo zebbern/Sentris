@@ -1,4 +1,5 @@
 import type { UIMessage, UIMessageChunk } from 'ai';
+import type { AgentCapabilityTrace } from '@sentris/shared';
 import type {
   AgentNodeOutput,
   AgentReasoningAction,
@@ -32,6 +33,7 @@ export interface AgentDerivedStep {
   toolInput?: unknown;
   toolOutput?: unknown;
   toolError?: unknown;
+  capability?: AgentCapabilityTrace;
   timestamp?: string;
   sequence: number;
   startedAt?: string;

@@ -2,6 +2,18 @@ import { z } from 'zod';
 
 export const MCP_LEGACY_CAPABILITY_CONTRACT_VERSION = '1' as const;
 export const MCP_CAPABILITY_CONTRACT_VERSION = '2' as const;
+export const SENTRIS_MCP_SOURCE_NAME_META_KEY = 'com.sentris/source-name' as const;
+
+export const AgentCapabilityTraceSchema = z
+  .object({
+    kind: z.enum(['tool', 'resource', 'prompt']),
+    displayName: z.string().min(1),
+    sourceId: z.string().min(1),
+    sourceName: z.string().min(1).optional(),
+    target: z.string().min(1).optional(),
+  })
+  .strict();
+export type AgentCapabilityTrace = z.infer<typeof AgentCapabilityTraceSchema>;
 
 const Sha256HexSchema = z.string().regex(/^[a-f0-9]{64}$/);
 

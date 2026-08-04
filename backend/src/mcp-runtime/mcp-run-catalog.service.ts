@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { componentRegistry } from '@sentris/component-sdk';
-import type {
-  McpCatalog,
-  McpRuntimeKey,
-  McpSnapshotRuntimeBinding,
-  McpToolRegistrationDescriptor,
-  PromptDescriptor,
-  ResourceDescriptor,
-  ResourceTemplateDescriptor,
-  ToolDescriptor,
+import {
+  SENTRIS_MCP_SOURCE_NAME_META_KEY,
+  type McpCatalog,
+  type McpRuntimeKey,
+  type McpSnapshotRuntimeBinding,
+  type McpToolRegistrationDescriptor,
+  type PromptDescriptor,
+  type ResourceDescriptor,
+  type ResourceTemplateDescriptor,
+  type ToolDescriptor,
 } from '@sentris/shared';
 
 import type { AuthContext } from '../auth/types';
@@ -115,18 +116,21 @@ export class McpRunCatalogService {
           ...discovered.catalog.resources.map((descriptor) => ({
             ...descriptor,
             sourceId: source.nodeId,
+            meta: capabilitySourceMeta(descriptor.meta, source),
           })),
         );
         resourceTemplates.push(
           ...discovered.catalog.resourceTemplates.map((descriptor) => ({
             ...descriptor,
             sourceId: source.nodeId,
+            meta: capabilitySourceMeta(descriptor.meta, source),
           })),
         );
         prompts.push(
           ...discovered.catalog.prompts.map((descriptor) => ({
             ...descriptor,
             sourceId: source.nodeId,
+            meta: capabilitySourceMeta(descriptor.meta, source),
           })),
         );
       }
@@ -314,7 +318,7 @@ function externalToolDescriptor(
     ...(upstream.outputSchema !== undefined && { outputSchema: upstream.outputSchema }),
     ...(upstream.icons !== undefined && { icons: upstream.icons }),
     ...(upstream.annotations !== undefined && { annotations: upstream.annotations }),
-    ...(upstream._meta !== undefined && { meta: upstream._meta }),
+    meta: capabilitySourceMeta(upstream._meta, source),
     source: {
       kind: 'mcp',
       sourceId: source.nodeId,
@@ -326,6 +330,16 @@ function externalToolDescriptor(
     effects: readOnly ? 'read-only' : 'unknown',
     effectsSource: readOnly || idempotent ? 'mcp-annotation' : 'unknown',
     retryPolicy: readOnly || idempotent ? 'reviewed-idempotent' : 'pre-dispatch-only',
+  };
+}
+
+function capabilitySourceMeta(
+  upstream: Record<string, unknown> | undefined,
+  source: RegisteredTool,
+): Record<string, unknown> {
+  return {
+    ...upstream,
+    [SENTRIS_MCP_SOURCE_NAME_META_KEY]: source.toolName,
   };
 }
 

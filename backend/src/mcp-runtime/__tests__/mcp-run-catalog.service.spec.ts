@@ -9,7 +9,12 @@ import {
   port,
   type ComponentDefinition,
 } from '@sentris/component-sdk';
-import type { McpCatalog, McpRuntimeKey, McpToolRegistrationDescriptor } from '@sentris/shared';
+import {
+  SENTRIS_MCP_SOURCE_NAME_META_KEY,
+  type McpCatalog,
+  type McpRuntimeKey,
+  type McpToolRegistrationDescriptor,
+} from '@sentris/shared';
 
 import { computeMcpBindingFingerprint } from '../mcp-binding-fingerprint';
 import { McpRunCatalogService } from '../mcp-run-catalog.service';
@@ -259,7 +264,10 @@ describe('McpRunCatalogService', () => {
         outputSchema: EXTERNAL_TOOLS[0].outputSchema,
         icons: EXTERNAL_TOOLS[0].icons,
         annotations: EXTERNAL_TOOLS[0].annotations,
-        meta: EXTERNAL_TOOLS[0]._meta,
+        meta: {
+          ...EXTERNAL_TOOLS[0]._meta,
+          [SENTRIS_MCP_SOURCE_NAME_META_KEY]: 'External Server',
+        },
         source: {
           kind: 'mcp',
           sourceId: 'parent/child',
@@ -304,11 +312,28 @@ describe('McpRunCatalogService', () => {
       'Local__live-search',
       'Saved__lookup_events',
     ]);
-    expect(catalog.resources).toEqual([{ ...SAVED_CATALOG.resources[0], sourceId: 'saved-node' }]);
-    expect(catalog.resourceTemplates).toEqual([
-      { ...SAVED_CATALOG.resourceTemplates[0], sourceId: 'saved-node' },
+    const sourceMeta = { [SENTRIS_MCP_SOURCE_NAME_META_KEY]: 'Saved' };
+    expect(catalog.resources).toEqual([
+      {
+        ...SAVED_CATALOG.resources[0],
+        sourceId: 'saved-node',
+        meta: { ...SAVED_CATALOG.resources[0]!.meta, ...sourceMeta },
+      },
     ]);
-    expect(catalog.prompts).toEqual([{ ...SAVED_CATALOG.prompts[0], sourceId: 'saved-node' }]);
+    expect(catalog.resourceTemplates).toEqual([
+      {
+        ...SAVED_CATALOG.resourceTemplates[0],
+        sourceId: 'saved-node',
+        meta: { ...SAVED_CATALOG.resourceTemplates[0]!.meta, ...sourceMeta },
+      },
+    ]);
+    expect(catalog.prompts).toEqual([
+      {
+        ...SAVED_CATALOG.prompts[0],
+        sourceId: 'saved-node',
+        meta: { ...SAVED_CATALOG.prompts[0]!.meta, ...sourceMeta },
+      },
+    ]);
     expect(buildRuntimeKey).toHaveBeenCalledWith(
       {
         userId: 'run:run-1',
