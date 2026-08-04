@@ -143,6 +143,40 @@
         ]
       }
     },
+    "/api/v1/agents/{agentRunId}/follow-ups": {
+      "post": {
+        "operationId": "AgentFollowUpsController_followUp",
+        "parameters": [
+          {
+            "name": "agentRunId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentFollowUpRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The follow-up turn was accepted"
+          }
+        },
+        "summary": "Start a durable follow-up turn for a completed workflow Agent",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/api/v1/workflows/runs": {
       "get": {
         "operationId": "WorkflowRunsController_listRuns",
@@ -9987,6 +10021,26 @@
   ],
   "components": {
     "schemas": {
+      "AgentFollowUpRequestDto": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        },
+        "required": [
+          "requestId",
+          "message"
+        ],
+        "additionalProperties": false
+      },
       "WorkflowRunResultResponseDto": {
         "type": "object",
         "properties": {

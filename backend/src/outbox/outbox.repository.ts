@@ -31,6 +31,8 @@ export interface KafkaMessageIdentity {
   offset: string;
 }
 
+export type KafkaProjectionExecutor = OutboxExecutor & Pick<NodePgDatabase, 'select' | 'update'>;
+
 interface ClaimedOutboxRow {
   id: string;
   event_type: string;
@@ -138,7 +140,7 @@ export class OutboxRepository extends OutboxRepositoryPort {
   async runKafkaMessageOnce(
     identity: KafkaMessageIdentity,
     organizationId: string | null,
-    project: (executor: OutboxExecutor) => Promise<void>,
+    project: (executor: KafkaProjectionExecutor) => Promise<void>,
   ): Promise<boolean> {
     const aggregateId = this.kafkaAggregateId(identity);
     return this.runKafkaReceiptOnce(
@@ -156,7 +158,7 @@ export class OutboxRepository extends OutboxRepositoryPort {
     identity: KafkaMessageIdentity,
     eventId: string,
     organizationId: string | null,
-    project: (executor: OutboxExecutor) => Promise<void>,
+    project: (executor: KafkaProjectionExecutor) => Promise<void>,
   ): Promise<boolean> {
     return this.runKafkaReceiptOnce(
       identity,
@@ -176,7 +178,7 @@ export class OutboxRepository extends OutboxRepositoryPort {
     aggregateId: string,
     dedupeKey: string,
     extraPayload: Record<string, unknown>,
-    project: (executor: OutboxExecutor) => Promise<void>,
+    project: (executor: KafkaProjectionExecutor) => Promise<void>,
   ): Promise<boolean> {
     const now = new Date();
 

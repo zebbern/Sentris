@@ -8,6 +8,9 @@ const EMPTY_TRANSCRIPT: AgentTranscriptState = {
   messages: null,
   parts: [],
   steps: [],
+  active: false,
+  canFollowUp: false,
+  turns: [],
 };
 
 export function useAgentTranscript(

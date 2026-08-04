@@ -34,6 +34,7 @@ import { handleToolModeRegistration } from './tool-mode-handler.js';
 import { handleHumanInput } from './human-input-handler.js';
 import { durableAiAgentWorkflow } from './durable-ai-agent-workflow.js';
 export { durableAiAgentWorkflow } from './durable-ai-agent-workflow.js';
+export { workflowAgentFollowUpWorkflow } from './workflow-agent-follow-up-workflow.js';
 import type { PendingHumanInputOutput } from './human-input-handler.js';
 import {
   registerToolInvocationUpdateHandlers,

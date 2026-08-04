@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { AgentCapabilityTraceSchema, type AgentCapabilityTrace } from '@sentris/shared';
 
 import { AgentTraceRepository } from './agent-trace.repository';
+import { AgentConversationRepository } from './agent-conversation.repository';
+
+const AGENT_CONVERSATION_SEQUENCE_STRIDE = 100_000_000;
 
 export interface AgentTracePartEntry {
   agentRunId: string;
@@ -10,6 +13,30 @@ export interface AgentTracePartEntry {
   sequence: number;
   timestamp: string;
   part: Record<string, unknown>;
+}
+
+export interface AgentConversationTurnEntry {
+  agentRunId: string;
+  turnIndex: number;
+  prompt: string | null;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  responseText: string | null;
+  error: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  sequenceStart: number;
+  sequenceEnd: number;
+}
+
+export interface AgentConversationTranscript {
+  conversationId: string;
+  workflowRunId: string;
+  nodeRef: string;
+  active: boolean;
+  canFollowUp: boolean;
+  cursor: number;
+  turns: AgentConversationTurnEntry[];
+  events: AgentTracePartEntry[];
 }
 
 export interface AgentRunCapabilityOperation {
@@ -49,7 +76,10 @@ interface MutableAgentRunSummary {
 
 @Injectable()
 export class AgentTraceService {
-  constructor(private readonly repository: AgentTraceRepository) {}
+  constructor(
+    private readonly repository: AgentTraceRepository,
+    private readonly conversations: AgentConversationRepository,
+  ) {}
 
   async append(event: Parameters<AgentTraceRepository['append']>[0]): Promise<void> {
     await this.repository.append(event);
@@ -59,6 +89,120 @@ export class AgentTraceService {
     agentRunId: string,
   ): Promise<{ workflowRunId: string; nodeRef: string } | null> {
     return this.repository.getRunMetadata(agentRunId);
+  }
+
+  async resolveConversationId(agentRunId: string): Promise<string> {
+    const turn = await this.conversations.findByAgentRunId(agentRunId);
+    return turn?.conversationId ?? agentRunId;
+  }
+
+  async getConversation(
+    agentRunId: string,
+    afterSequence?: number,
+  ): Promise<AgentConversationTranscript | null> {
+    const conversationId = await this.resolveConversationId(agentRunId);
+    const metadata = await this.repository.getRunMetadata(conversationId);
+    if (!metadata) return null;
+
+    const storedTurns = await this.conversations.listTurns(conversationId);
+    const agentRunIds = [conversationId, ...storedTurns.map((turn) => turn.agentRunId)];
+    const rows = await this.repository.listMany(agentRunIds);
+    const turnIndexByAgentRunId = new Map<string, number>([[conversationId, 0]]);
+    storedTurns.forEach((turn) => turnIndexByAgentRunId.set(turn.agentRunId, turn.turnIndex));
+    const allEvents = rows
+      .map((row) => {
+        const turnIndex = turnIndexByAgentRunId.get(row.agentRunId);
+        if (turnIndex === undefined) return null;
+        return {
+          agentRunId: row.agentRunId,
+          workflowRunId: row.workflowRunId,
+          nodeRef: row.nodeRef,
+          sequence: turnIndex * AGENT_CONVERSATION_SEQUENCE_STRIDE + row.sequence,
+          timestamp:
+            row.timestamp instanceof Date
+              ? row.timestamp.toISOString()
+              : new Date(row.timestamp).toISOString(),
+          part: (row.payload ?? {}) as Record<string, unknown>,
+        } satisfies AgentTracePartEntry;
+      })
+      .filter((event): event is AgentTracePartEntry => event !== null)
+      .sort((left, right) => left.sequence - right.sequence);
+
+    const events = allEvents.filter(
+      (event) => afterSequence === undefined || event.sequence > afterSequence,
+    );
+    const rootFinish = latestFinish(rows.filter((row) => row.agentRunId === conversationId));
+    const rootPayload = isRecord(rootFinish?.payload) ? rootFinish.payload : {};
+    const rootFailed = rootPayload.finishReason === 'error';
+    const turns: AgentConversationTurnEntry[] = [
+      {
+        agentRunId: conversationId,
+        turnIndex: 0,
+        prompt: null,
+        status: rootFinish ? (rootFailed ? 'failed' : 'completed') : 'running',
+        responseText: readString(rootPayload.responseText) ?? null,
+        error: rootFailed ? (readString(rootPayload.responseText) ?? 'Agent turn failed') : null,
+        startedAt: firstTimestamp(rows, conversationId),
+        completedAt: rootFinish ? toIsoTimestamp(rootFinish.timestamp) : null,
+        sequenceStart: 0,
+        sequenceEnd: AGENT_CONVERSATION_SEQUENCE_STRIDE - 1,
+      },
+      ...storedTurns.map((turn) => ({
+        agentRunId: turn.agentRunId,
+        turnIndex: turn.turnIndex,
+        prompt: turn.prompt,
+        status: turn.status,
+        responseText: turn.responseText,
+        error: turn.error,
+        startedAt: turn.startedAt?.toISOString() ?? turn.createdAt.toISOString(),
+        completedAt: turn.completedAt?.toISOString() ?? null,
+        sequenceStart: turn.turnIndex * AGENT_CONVERSATION_SEQUENCE_STRIDE,
+        sequenceEnd: (turn.turnIndex + 1) * AGENT_CONVERSATION_SEQUENCE_STRIDE - 1,
+      })),
+    ];
+    const latestTurn = turns[turns.length - 1]!;
+    const active = latestTurn.status === 'queued' || latestTurn.status === 'running';
+    const canFollowUp =
+      !active &&
+      [...turns].reverse().some((turn) => {
+        if (turn.status !== 'completed') return false;
+        const finish = latestFinish(rows.filter((row) => row.agentRunId === turn.agentRunId));
+        const payload = isRecord(finish?.payload) ? finish.payload : {};
+        return isStateRef(payload.continuationState);
+      });
+
+    return {
+      conversationId,
+      workflowRunId: metadata.workflowRunId,
+      nodeRef: metadata.nodeRef,
+      active,
+      canFollowUp,
+      cursor: allEvents.length > 0 ? (allEvents[allEvents.length - 1]?.sequence ?? 0) : 0,
+      turns,
+      events,
+    };
+  }
+
+  async getLatestContinuation(agentRunId: string): Promise<{
+    conversationId: string;
+    sourceAgentRunId: string;
+    state: { fileId: string; rootFileId: string };
+  } | null> {
+    const conversation = await this.getConversation(agentRunId);
+    if (!conversation || conversation.active || !conversation.canFollowUp) return null;
+    for (const turn of [...conversation.turns].reverse()) {
+      if (turn.status !== 'completed') continue;
+      const finish = await this.repository.getLatestFinish(turn.agentRunId);
+      const payload = isRecord(finish?.payload) ? finish.payload : {};
+      if (isStateRef(payload.continuationState)) {
+        return {
+          conversationId: conversation.conversationId,
+          sourceAgentRunId: turn.agentRunId,
+          state: payload.continuationState,
+        };
+      }
+    }
+    return null;
   }
 
   async list(agentRunId: string, afterSequence?: number): Promise<AgentTracePartEntry[]> {
@@ -207,4 +351,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toIsoTimestamp(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function latestFinish(rows: Awaited<ReturnType<AgentTraceRepository['listMany']>>) {
+  return [...rows].reverse().find((row) => row.partType === 'finish') ?? null;
+}
+
+function firstTimestamp(
+  rows: Awaited<ReturnType<AgentTraceRepository['listMany']>>,
+  agentRunId: string,
+): string | null {
+  const row = rows.find((candidate) => candidate.agentRunId === agentRunId);
+  return row ? toIsoTimestamp(row.timestamp) : null;
+}
+
+function isStateRef(value: unknown): value is { fileId: string; rootFileId: string } {
+  return (
+    isRecord(value) &&
+    typeof value.fileId === 'string' &&
+    value.fileId.length > 0 &&
+    typeof value.rootFileId === 'string' &&
+    value.rootFileId.length > 0
+  );
 }

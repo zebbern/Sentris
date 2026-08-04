@@ -18,10 +18,23 @@ export interface WorkflowAgentStateRef {
 export interface WorkflowAgentTurnInput {
   component: RunComponentActivityInput;
   agentRunId: string;
+  /** Follow-up turns belong to the Agent conversation, not to another graph-node execution. */
+  recordNodeLifecycle?: boolean;
 }
 
 export interface WorkflowAgentSetupInput extends WorkflowAgentTurnInput {
   initialStateFileId: string;
+}
+
+export interface WorkflowAgentFollowUpSetupInput extends WorkflowAgentSetupInput {
+  sourceAgentRunId: string;
+  sourceState: WorkflowAgentStateRef;
+  userInput: string;
+}
+
+export interface WorkflowAgentFollowUpWorkflowInput extends WorkflowAgentFollowUpSetupInput {
+  turnId: string;
+  conversationId: string;
 }
 
 export interface WorkflowAgentAuthorityRef {
@@ -129,6 +142,9 @@ export interface WorkflowAgentFailureInput extends WorkflowAgentTurnInput {
 
 export interface WorkflowAgentActivities {
   workflowAgentSetupActivity(input: WorkflowAgentSetupInput): Promise<WorkflowAgentSetupOutput>;
+  workflowAgentFollowUpSetupActivity(
+    input: WorkflowAgentFollowUpSetupInput,
+  ): Promise<WorkflowAgentSetupOutput>;
   workflowAgentModelStepActivity(
     input: WorkflowAgentModelStepInput,
   ): Promise<WorkflowAgentModelStepOutput>;

@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { UIMessage } from 'ai';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,7 @@ import { extractAssistantText, chunksToMessages } from './utils';
 import { useAgentTranscript } from './hooks/useAgentTranscript';
 import { useAgentChatTransport } from './hooks/useAgentChatTransport';
 import { AgentTranscriptTimeline } from './AgentTranscriptTimeline';
+import { useAgentFollowUpMutation } from '@/hooks/queries/useAgentQueries';
 
 export function AgentRunCard({
   nodeId,
@@ -31,6 +33,9 @@ export function AgentRunCard({
     messages: initialMessages,
     parts,
     steps,
+    active,
+    canFollowUp,
+    turns,
   } = useAgentTranscript(agentRunId, follow ?? live);
   const transport = useAgentChatTransport(agentRunId);
   const queryClient = useQueryClient();
@@ -40,13 +45,17 @@ export function AgentRunCard({
     messages: [],
   });
   const [visibleMessages, setVisibleMessages] = useState<UIMessage[]>(messages);
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  const [followUpMessage, setFollowUpMessage] = useState('');
+  const followUpMutation = useAgentFollowUpMutation(agentRunId);
   const hydratedRef = useRef(false);
   const startedRef = useRef(false);
   const lastReplaySequenceRef = useRef<number | null>(null);
   const previousLiveStateRef = useRef({ agentRunId, live });
-  const transcriptFinished = parts.some((entry) => entry.chunk.type === 'finish');
-  const agentIsLive = live && !transcriptFinished;
-  const shouldFollow = (follow ?? live) && !transcriptFinished;
+  const transcriptFinished =
+    !active && parts.length > 0 && parts[parts.length - 1]?.chunk.type === 'finish';
+  const agentIsLive = active || (live && !transcriptFinished);
+  const shouldFollow = active || ((follow ?? live) && !transcriptFinished);
   const playbackMode = useExecutionTimelineStore((state) => state.playbackMode);
   const timelineStartTime = useExecutionTimelineStore((state) => state.timelineStartTime);
   const timelineCurrentTime = useExecutionTimelineStore((state) => state.currentTime);
@@ -81,6 +90,17 @@ export function AgentRunCard({
     }
     return extractAssistantText(visibleMessages);
   }, [responseText, visibleMessages]);
+  const latestTurn = turns[turns.length - 1];
+  const latestTurnHasText = latestTurn
+    ? parts.some(
+        (entry) =>
+          entry.sequence >= latestTurn.sequenceStart &&
+          entry.sequence <= latestTurn.sequenceEnd &&
+          entry.chunk.type === 'text-delta' &&
+          entry.chunk.delta.length > 0,
+      )
+    : true;
+  const visibleFinalAssistantText = active && !latestTurnHasText ? null : finalAssistantText;
 
   const visibleSteps = useMemo(() => {
     if (!sequenceBoundary) {
@@ -106,6 +126,10 @@ export function AgentRunCard({
       body: cursor > 0 ? { cursor } : undefined,
     });
   }, [shouldFollow, cursor, sendMessage, transport]);
+
+  useEffect(() => {
+    if (!shouldFollow) startedRef.current = false;
+  }, [shouldFollow]);
 
   useEffect(() => {
     const previous = previousLiveStateRef.current;
@@ -219,14 +243,70 @@ export function AgentRunCard({
             prompt={prompt}
             steps={visibleSteps}
             finalText={
-              finalAssistantText && sequenceBoundary >= finalSequence ? finalAssistantText : null
+              visibleFinalAssistantText && sequenceBoundary >= finalSequence
+                ? visibleFinalAssistantText
+                : null
             }
+            turns={turns}
           />
         )}
         {agentIsLive ? (
           <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
             Status: {status}
           </p>
+        ) : null}
+        {!agentIsLive && canFollowUp ? (
+          showFollowUp ? (
+            <form
+              className="space-y-2 border-t pt-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const message = followUpMessage.trim();
+                if (!message || followUpMutation.isPending) return;
+                followUpMutation.mutate(message, {
+                  onSuccess: () => {
+                    setFollowUpMessage('');
+                    setShowFollowUp(false);
+                  },
+                });
+              }}
+            >
+              <label htmlFor={`agent-follow-up-${agentRunId}`} className="text-xs font-medium">
+                Continue this investigation
+              </label>
+              <Textarea
+                id={`agent-follow-up-${agentRunId}`}
+                value={followUpMessage}
+                onChange={(event) => setFollowUpMessage(event.target.value)}
+                placeholder="Ask the Agent to investigate further…"
+                className="min-h-20 resize-y"
+                maxLength={32_000}
+                autoFocus
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowFollowUp(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={!followUpMessage.trim()}>
+                  {followUpMutation.isPending ? 'Starting…' : 'Send'}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="border-t pt-3">
+              <Button size="sm" variant="outline" onClick={() => setShowFollowUp(true)}>
+                Continue with Agent
+              </Button>
+            </div>
+          )
+        ) : null}
+        {followUpMutation.error ? (
+          <p className="text-xs text-destructive">{followUpMutation.error.message}</p>
         ) : null}
       </div>
     </div>

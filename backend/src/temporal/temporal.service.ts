@@ -168,6 +168,7 @@ export class TemporalService implements OnModuleDestroy {
       case 'webhookParsingWorkflow':
       case 'operatorTurnWorkflow':
       case 'operatorRunFollowUpWorkflow':
+      case 'workflowAgentFollowUpWorkflow':
         return workflowType;
       default:
         throw new Error(`Unknown workflow type: ${workflowType}`);

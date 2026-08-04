@@ -105,6 +105,7 @@ import {
   workflowAgentDispatchToolActivity,
   workflowAgentFailActivity,
   workflowAgentFinalizeActivity,
+  workflowAgentFollowUpSetupActivity,
   workflowAgentModelStepActivity,
   workflowAgentPrepareToolActivity,
   workflowAgentReconcileToolActivity,
@@ -307,6 +308,7 @@ async function main() {
       workflowAgentReconcileToolActivity,
       workflowAgentCheckpointActivity,
       workflowAgentFinalizeActivity,
+      workflowAgentFollowUpSetupActivity,
       workflowAgentFailActivity,
     };
 

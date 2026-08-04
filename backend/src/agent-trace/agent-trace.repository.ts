@@ -72,6 +72,30 @@ export class AgentTraceRepository {
       .orderBy(asc(agentTraceEventsTable.sequence));
   }
 
+  async listMany(agentRunIds: readonly string[]): Promise<AgentTraceEventRecord[]> {
+    if (agentRunIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(agentTraceEventsTable)
+      .where(inArray(agentTraceEventsTable.agentRunId, [...agentRunIds]))
+      .orderBy(asc(agentTraceEventsTable.timestamp), asc(agentTraceEventsTable.id));
+  }
+
+  async getLatestFinish(agentRunId: string): Promise<AgentTraceEventRecord | null> {
+    const [event] = await this.db
+      .select()
+      .from(agentTraceEventsTable)
+      .where(
+        and(
+          eq(agentTraceEventsTable.agentRunId, agentRunId),
+          eq(agentTraceEventsTable.partType, 'finish'),
+        ),
+      )
+      .orderBy(desc(agentTraceEventsTable.sequence), desc(agentTraceEventsTable.id))
+      .limit(1);
+    return event ?? null;
+  }
+
   async listRunActivityEvents(
     workflowRunId: string,
     limit: number,

@@ -403,6 +403,11 @@ operations are separate durable activities; native AI SDK continuation messages,
 arguments, and tool results are checkpointed in organization-scoped object storage.
 The immutable run snapshot exposes tools, exact resources, resource templates, and prompts
 to the model as bounded operations that retain their canonical typed identity through dispatch.
+Completed graph Agents continue through a new idempotently named coordinator and durable child,
+not a Signal to the closed child. Postgres links the turns under one public conversation while
+organization-scoped state refs carry bounded model context. Each follow-up receives fresh
+authority from the source run's immutable graph and must not reopen or overwrite the completed
+node lifecycle; only one follow-up may be queued or running per conversation.
 Top-level and For Each nodes share this execution boundary; pre-patch histories retain
 the legacy single-activity loop. Provider-declared model finish errors are classified at one
 worker-local boundary before either durable or legacy Agent paths can record success; Operator's

@@ -508,6 +508,9 @@ Inline provider keys are sealed before object storage; the child receives saniti
 while native provider messages and tool results remain behind compact organization-scoped
 refs. Its immutable snapshot exposes tools, exact resources, resource templates, and prompts
 as bounded model operations that dispatch through the same canonical durable invocation path.
+After a graph Agent completes, the same public conversation can start another idempotent
+coordinator and durable child from server-owned state refs. The new turn refreshes authority from
+the source run's immutable graph and leaves the completed node lifecycle unchanged.
 
 Studio remains on its v1 sessionful controller, `mcp_affinity` routing, and Redis session
 registry while its facade migration is pending. The gateway's outbound proxy remains an

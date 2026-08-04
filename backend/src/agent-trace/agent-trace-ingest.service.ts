@@ -10,6 +10,7 @@ import { recordEmptyRequiredKafkaPayload } from '../common/empty-kafka-payload';
 import { REQUIRED_KAFKA_CONSUMER_TIMING } from '../common/kafka-consumer-timing';
 
 import { AgentTraceRepository, type AgentTraceEventInput } from './agent-trace.repository';
+import { AgentConversationRepository } from './agent-conversation.repository';
 import { areIngestServicesEnabled, type IngestConfig, type KafkaConfig } from '../config';
 import { OutboxRepository, type KafkaMessageIdentity } from '../outbox/outbox.repository';
 
@@ -36,6 +37,7 @@ export class AgentTraceIngestService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly repository: AgentTraceRepository,
+    private readonly conversations: AgentConversationRepository,
     private readonly configService: ConfigService,
     private readonly outboxRepository: OutboxRepository,
     @Optional() healthRegistry?: KafkaIngestHealthRegistry,
@@ -153,7 +155,23 @@ export class AgentTraceIngestService implements OnModuleInit, OnModuleDestroy {
       identity,
       payload.eventId,
       payload.organizationId ?? null,
-      (executor) => this.repository.appendWithExecutor(executor, payload),
+      async (executor) => {
+        await this.repository.appendWithExecutor(executor, payload);
+        if (payload.part.type === 'finish') {
+          const failed = payload.part.finishReason === 'error';
+          await this.conversations.markTerminalWithExecutor(executor, {
+            agentRunId: payload.agentRunId,
+            status: failed ? 'failed' : 'completed',
+            responseText:
+              typeof payload.part.responseText === 'string' ? payload.part.responseText : undefined,
+            error:
+              failed && typeof payload.part.responseText === 'string'
+                ? payload.part.responseText
+                : undefined,
+            completedAt: new Date(payload.timestamp),
+          });
+        }
+      },
     );
   }
 }

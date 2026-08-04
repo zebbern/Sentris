@@ -49,6 +49,22 @@ export interface AgentTranscriptState {
   messages: UIMessage[] | null;
   parts: AgentTraceChunk[];
   steps: AgentDerivedStep[];
+  active: boolean;
+  canFollowUp: boolean;
+  turns: AgentConversationTurn[];
+}
+
+export interface AgentConversationTurn {
+  agentRunId: string;
+  turnIndex: number;
+  prompt: string | null;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  responseText: string | null;
+  error: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  sequenceStart: number;
+  sequenceEnd: number;
 }
 
 export interface AgentTracePanelProps {

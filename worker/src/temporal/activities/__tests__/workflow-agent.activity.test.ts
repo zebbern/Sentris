@@ -22,6 +22,7 @@ const MODEL_ID = '22222222-2222-4222-8222-222222222222';
 const TOOL_STATE_ID = '33333333-3333-4333-8333-333333333333';
 const RESULT_ID = '44444444-4444-4444-8444-444444444444';
 const OUTPUT_ID = '55555555-5555-4555-8555-555555555555';
+const FOLLOW_UP_ROOT_ID = '77777777-7777-4777-8777-777777777777';
 
 const input = {
   agentRunId: 'run-1:agent-1:turn-1',
@@ -267,7 +268,50 @@ describe('workflow Agent activities', () => {
     expect(agentTracePublisher.publish).toHaveBeenCalledWith(
       expect.objectContaining({
         eventId: `${input.agentRunId}:90000000`,
-        part: expect.objectContaining({ type: 'finish' }),
+        part: expect.objectContaining({
+          type: 'finish',
+          continuationState: checkpoint,
+        }),
+      }),
+    );
+  });
+
+  test('starts a follow-up from bounded durable state without reopening node lifecycle', async () => {
+    const setup = await agentActivities.workflowAgentSetupActivity({
+      ...input,
+      initialStateFileId: ROOT_ID,
+    });
+    vi.clearAllMocks();
+
+    const followUpAgentRunId = `${input.agentRunId}:follow-up:1`;
+    const followUp = await agentActivities.workflowAgentFollowUpSetupActivity({
+      component: input.component,
+      agentRunId: followUpAgentRunId,
+      recordNodeLifecycle: false,
+      sourceAgentRunId: input.agentRunId,
+      sourceState: setup.state,
+      userInput: 'Now inspect its transitive dependencies.',
+      initialStateFileId: FOLLOW_UP_ROOT_ID,
+    });
+
+    expect(followUp.state).toEqual({
+      fileId: FOLLOW_UP_ROOT_ID,
+      rootFileId: FOLLOW_UP_ROOT_ID,
+    });
+    const root = parseStored(storage, FOLLOW_UP_ROOT_ID);
+    expect(root.agentRunId).toBe(followUpAgentRunId);
+    expect(root.sessionId).toBe(parseStored(storage, ROOT_ID).sessionId);
+    expect(root.credential).toEqual({ kind: 'secret', secretId: 'provider-secret-id' });
+    expect(root.messages).toEqual([
+      { role: 'user', content: 'Investigate the package' },
+      { role: 'user', content: 'Now inspect its transitive dependencies.' },
+    ]);
+    expect(nodeIO.recordStart).not.toHaveBeenCalled();
+    expect(trace.record).not.toHaveBeenCalled();
+    expect(agentTracePublisher.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentRunId: followUpAgentRunId,
+        part: expect.objectContaining({ type: 'message-start' }),
       }),
     );
   });

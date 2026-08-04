@@ -126,6 +126,13 @@
       "sqlSha256": "f82f26a156216a8bb5117e414871dcfa201a7596ad62d4c1d6d91fe5d40a97ed",
       "snapshotSha256": "deadee6b8a5bf2e4fbb53398711bc2a4f921bbe26f8aa69166f3c7ae1519a55b",
       "contractSha256": "4cecab885e0a3b295ff84d84c489efbbb3d7cfb762ddf7deb0d931dc8ddb1f97"
+    },
+    {
+      "idx": 18,
+      "tag": "0018_agent_conversation_follow_up_turns",
+      "sqlSha256": "52aa1968d751a223677a2b017146fdb0b9afe272e9d94335d7b21576920ca3de",
+      "snapshotSha256": "197a55e2a9d66106a3baffe8ad24e0648e6a817d032398d4d6af35d608a1bee4",
+      "contractSha256": "7195c3750239cd9e29bf3c72e4e622602fd085ed68dc34b9fb40f1022a7153d9"
     }
   ]
 }

@@ -12,6 +12,10 @@ let mockMessages: any[] | null = null;
 let mockParts: any[] = [];
 let mockSteps: any[] = [];
 let mockTransport: object | null = null;
+let mockActive = false;
+let mockCanFollowUp = false;
+let mockTurns: any[] = [];
+let mockTranscriptTimelineProps: any = null;
 
 mock.module('@/components/timeline/agent-trace/hooks/useAgentTranscript', () => ({
   useAgentTranscript: () => ({
@@ -21,6 +25,9 @@ mock.module('@/components/timeline/agent-trace/hooks/useAgentTranscript', () => 
     messages: mockMessages,
     parts: mockParts,
     steps: mockSteps,
+    active: mockActive,
+    canFollowUp: mockCanFollowUp,
+    turns: mockTurns,
   }),
 }));
 
@@ -31,6 +38,15 @@ mock.module('@/components/timeline/agent-trace/hooks/useAgentChatTransport', () 
 const mockSendMessage = mock(async () => {});
 const mockSetMessages = mock(() => {});
 const mockInvalidateQueries = mock(async () => {});
+const mockFollowUpMutate = mock(() => {});
+
+mock.module('@/hooks/queries/useAgentQueries', () => ({
+  useAgentFollowUpMutation: () => ({
+    mutate: mockFollowUpMutate,
+    isPending: false,
+    error: null,
+  }),
+}));
 
 mock.module('@tanstack/react-query', () => ({
   useQueryClient: () => ({
@@ -85,9 +101,10 @@ mock.module('@/components/timeline/agent-trace/utils', () => ({
 }));
 
 mock.module('@/components/timeline/agent-trace/AgentTranscriptTimeline', () => ({
-  AgentTranscriptTimeline: (props: any) => (
-    <div data-testid="agent-transcript">{props.prompt ?? ''}</div>
-  ),
+  AgentTranscriptTimeline: (props: any) => {
+    mockTranscriptTimelineProps = props;
+    return <div data-testid="agent-transcript">{props.prompt ?? ''}</div>;
+  },
 }));
 
 import { AgentRunCard } from '../AgentRunCard';
@@ -118,9 +135,14 @@ function resetMocks() {
   mockParts = [];
   mockSteps = [];
   mockTransport = null;
+  mockActive = false;
+  mockCanFollowUp = false;
+  mockTurns = [];
+  mockTranscriptTimelineProps = null;
   mockSendMessage.mockClear();
   mockSetMessages.mockClear();
   mockInvalidateQueries.mockClear();
+  mockFollowUpMutate.mockClear();
   mockTimelineState = {
     playbackMode: 'replay',
     timelineStartTime: null,
@@ -245,6 +267,47 @@ describe('AgentRunCard', () => {
     expect(screen.queryByText('Live')).toBeNull();
     expect(screen.queryByText(/Status:/)).toBeNull();
     expect(mockSendMessage).toHaveBeenCalledWith(undefined, { body: { cursor: 7 } });
+  });
+
+  it('does not show the previous answer while a follow-up is waiting for new text', () => {
+    mockActive = true;
+    mockParts = [
+      {
+        sequence: 90_000_000,
+        timestamp: '2026-08-04T10:00:00.000Z',
+        chunk: { type: 'finish' },
+      },
+    ];
+    mockTurns = [
+      {
+        agentRunId: 'root-agent',
+        turnIndex: 0,
+        prompt: null,
+        status: 'completed',
+        responseText: 'Previous answer',
+        error: null,
+        startedAt: null,
+        completedAt: null,
+        sequenceStart: 0,
+        sequenceEnd: 99_999_999,
+      },
+      {
+        agentRunId: 'follow-up-agent',
+        turnIndex: 1,
+        prompt: 'Continue',
+        status: 'running',
+        responseText: null,
+        error: null,
+        startedAt: null,
+        completedAt: null,
+        sequenceStart: 100_000_000,
+        sequenceEnd: 199_999_999,
+      },
+    ];
+
+    render(<AgentRunCard {...makeProps({ responseText: 'Previous answer' })} />);
+
+    expect(mockTranscriptTimelineProps.finalText).toBeNull();
   });
 
   it('shows "Focused" button text when selected', () => {

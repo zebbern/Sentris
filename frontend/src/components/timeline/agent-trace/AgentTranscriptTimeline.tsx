@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AgentCapabilityTrace } from '@sentris/shared';
-import type { AgentDerivedStep } from './types';
+import type { AgentConversationTurn, AgentDerivedStep } from './types';
 import { formatClock, formatDuration, formatStructured, summarizeUnknown } from './utils';
 import { ExpandableText } from './ExpandableText';
 import { MarkdownView } from '@/components/ui/markdown';
@@ -243,13 +243,51 @@ interface AgentTranscriptTimelineProps {
   prompt?: string | null;
   steps: AgentDerivedStep[];
   finalText?: string | null;
+  turns?: AgentConversationTurn[];
 }
 
 export function AgentTranscriptTimeline({
   prompt,
   steps,
   finalText,
+  turns = [],
 }: AgentTranscriptTimelineProps) {
+  if (turns.length > 0) {
+    return (
+      <div className="space-y-4">
+        {turns.map((turn, index) => {
+          const turnPrompt = index === 0 ? prompt : turn.prompt;
+          const turnSteps = steps.filter(
+            (step) => step.sequence >= turn.sequenceStart && step.sequence <= turn.sequenceEnd,
+          );
+          const turnFinalText =
+            turn.responseText ?? (index === turns.length - 1 ? finalText : null);
+          return (
+            <section key={turn.agentRunId} className="space-y-3">
+              {turns.length > 1 ? (
+                <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <span>Turn {turn.turnIndex + 1}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{turn.status}</span>
+                </div>
+              ) : null}
+              {turnPrompt?.trim() ? <AgentPromptCard prompt={turnPrompt.trim()} /> : null}
+              {turnSteps.map((step) => (
+                <AgentStepCard key={step.key} step={step} />
+              ))}
+              {turnFinalText?.trim() ? (
+                <AgentFinalResponseCard text={turnFinalText.trim()} />
+              ) : turn.error ? (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  {turn.error}
+                </div>
+              ) : null}
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
   const hasPrompt = Boolean(prompt && prompt.trim().length > 0);
   const hasFinal = Boolean(finalText && finalText.trim().length > 0);
   const hasSteps = steps.length > 0;

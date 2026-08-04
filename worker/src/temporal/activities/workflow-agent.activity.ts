@@ -78,6 +78,7 @@ import { recordNodeIoWithoutChangingExecution } from '../utils/node-io-delivery'
 import type {
   WorkflowAgentCheckpointInput,
   WorkflowAgentFailureInput,
+  WorkflowAgentFollowUpSetupInput,
   WorkflowAgentFinalizeInput,
   WorkflowAgentModelStepInput,
   WorkflowAgentModelStepOutput,
@@ -200,6 +201,7 @@ const storedRootStateSchema = z
     toolStatus: toolStatusSchema,
     authority: authorityRefSchema.optional(),
     startDeliveryCompleted: z.boolean(),
+    toolAvailability: z.enum(['required', 'best-effort']).default('best-effort'),
   })
   .strict();
 
@@ -369,6 +371,7 @@ async function setupWorkflowAgent(
     resourceTemplates: capability.resourceTemplates,
     prompts: capability.prompts,
     toolStatus: capability.toolStatus,
+    toolAvailability: parsedParams.toolAvailability,
     ...(capability.authority ? { authority: capability.authority } : {}),
     startDeliveryCompleted: false,
   });
@@ -380,39 +383,97 @@ async function setupWorkflowAgent(
   return setupOutput(completed);
 }
 
+export async function workflowAgentFollowUpSetupActivity(
+  input: WorkflowAgentFollowUpSetupInput,
+): Promise<WorkflowAgentSetupOutput> {
+  const heartbeatTimer = startPeriodicHeartbeat('workflow-agent:follow-up-setup');
+  try {
+    const scopedStorage = requireStorage(input.component.organizationId ?? null);
+    const existing = await readOptionalJson(
+      scopedStorage,
+      input.initialStateFileId,
+      storedRootStateSchema,
+    );
+    if (existing) {
+      assertStoredOwnership(existing, input);
+      if (existing.startDeliveryCompleted) return setupOutput(existing);
+      await recordAgentStarted(input, requireAgentComponent());
+      const completed = { ...existing, startDeliveryCompleted: true };
+      await writeJson(scopedStorage, completed.stateId, 'workflow-agent-root.json', completed);
+      return setupOutput(completed);
+    }
+
+    const sourceOwner: WorkflowAgentTurnInput = {
+      component: input.component,
+      agentRunId: input.sourceAgentRunId,
+      recordNodeLifecycle: false,
+    };
+    const source = await loadConversation(scopedStorage, input.sourceState, sourceOwner);
+    const capability = await prepareCapabilityAccess(input, source.root.toolAvailability);
+    const messages = trimModelMessages(
+      [...source.messages, { role: 'user', content: input.userInput.trim() }],
+      source.root.memorySize,
+    );
+    const root = storedRootStateSchema.parse({
+      ...source.root,
+      stateId: input.initialStateFileId,
+      agentRunId: input.agentRunId,
+      systemPrompt: `${stripToolAvailabilityPrompt(source.root.systemPrompt)}${getToolAvailabilityPrompt(capability.toolStatus)}`,
+      messages,
+      tools: capability.tools,
+      resources: capability.resources,
+      resourceTemplates: capability.resourceTemplates,
+      prompts: capability.prompts,
+      toolStatus: capability.toolStatus,
+      ...(capability.authority ? { authority: capability.authority } : { authority: undefined }),
+      startDeliveryCompleted: false,
+    });
+    throwIfActivityCancelled();
+    await writeJson(scopedStorage, root.stateId, 'workflow-agent-root.json', root);
+    await recordAgentStarted(input, requireAgentComponent());
+    const completed = { ...root, startDeliveryCompleted: true };
+    await writeJson(scopedStorage, completed.stateId, 'workflow-agent-root.json', completed);
+    return setupOutput(completed);
+  } finally {
+    clearInterval(heartbeatTimer);
+  }
+}
+
 async function recordAgentStarted(
   input: WorkflowAgentSetupInput,
   component: ReturnType<typeof requireAgentComponent>,
 ): Promise<void> {
   throwIfActivityCancelled();
-  await recordNodeIoWithoutChangingExecution(() =>
-    getComponentActivityServices().nodeIO?.recordStart({
-      runId: input.component.runId,
-      nodeRef: input.component.action.ref,
-      workflowId: input.component.workflowId,
-      organizationId: input.component.organizationId ?? null,
-      componentId: input.component.action.componentId,
-      inputs: maskSecretInputs(component, {
-        ...input.component.inputs,
-        ...input.component.params,
-      }) as Record<string, unknown>,
-    }),
-  );
-  await recordTraceWithoutChangingExecution(input, {
-    eventId: `trace:${input.component.runId}:workflow-agent:${input.agentRunId}:started`,
-    type: 'NODE_STARTED',
-    level: 'info',
-  });
-  await recordTraceWithoutChangingExecution(input, {
-    eventId: `trace:${input.component.runId}:workflow-agent:${input.agentRunId}:progress-started`,
-    type: 'NODE_PROGRESS',
-    level: 'info',
-    message: 'AI agent session started',
-    data: {
-      agentRunId: input.agentRunId,
-      agentStatus: 'started',
-    },
-  });
+  if (input.recordNodeLifecycle !== false) {
+    await recordNodeIoWithoutChangingExecution(() =>
+      getComponentActivityServices().nodeIO?.recordStart({
+        runId: input.component.runId,
+        nodeRef: input.component.action.ref,
+        workflowId: input.component.workflowId,
+        organizationId: input.component.organizationId ?? null,
+        componentId: input.component.action.componentId,
+        inputs: maskSecretInputs(component, {
+          ...input.component.inputs,
+          ...input.component.params,
+        }) as Record<string, unknown>,
+      }),
+    );
+    await recordTraceWithoutChangingExecution(input, {
+      eventId: `trace:${input.component.runId}:workflow-agent:${input.agentRunId}:started`,
+      type: 'NODE_STARTED',
+      level: 'info',
+    });
+    await recordTraceWithoutChangingExecution(input, {
+      eventId: `trace:${input.component.runId}:workflow-agent:${input.agentRunId}:progress-started`,
+      type: 'NODE_PROGRESS',
+      level: 'info',
+      message: 'AI agent session started',
+      data: {
+        agentRunId: input.agentRunId,
+        agentStatus: 'started',
+      },
+    });
+  }
   await publishAgentPart(input, 1, {
     type: 'message-start',
     messageId: input.agentRunId,
@@ -786,49 +847,54 @@ export async function workflowAgentFinalizeActivity(
     };
   }
   throwIfActivityCancelled();
-  await recordNodeIoWithoutChangingExecution(() =>
-    getComponentActivityServices().nodeIO?.recordCompletion({
-      runId: input.component.runId,
-      nodeRef: input.component.action.ref,
-      organizationId: input.component.organizationId ?? null,
-      componentId: input.component.action.componentId,
-      outputs: maskSecretOutputs(component, output) as Record<string, unknown>,
-      status: 'completed',
-    }),
-  );
-  await recordTraceWithoutChangingExecution(input, {
-    eventId: `trace:${input.component.runId}:workflow-agent:${input.agentRunId}:completed`,
-    type: 'NODE_COMPLETED',
-    level: 'info',
-    outputSummary: createLightweightSummary(component, output),
-  });
+  if (input.recordNodeLifecycle !== false) {
+    await recordNodeIoWithoutChangingExecution(() =>
+      getComponentActivityServices().nodeIO?.recordCompletion({
+        runId: input.component.runId,
+        nodeRef: input.component.action.ref,
+        organizationId: input.component.organizationId ?? null,
+        componentId: input.component.action.componentId,
+        outputs: maskSecretOutputs(component, output) as Record<string, unknown>,
+        status: 'completed',
+      }),
+    );
+    await recordTraceWithoutChangingExecution(input, {
+      eventId: `trace:${input.component.runId}:workflow-agent:${input.agentRunId}:completed`,
+      type: 'NODE_COMPLETED',
+      level: 'info',
+      outputSummary: createLightweightSummary(component, output),
+    });
+  }
   await publishAgentPart(input, AGENT_TRACE_FINISH_SEQUENCE, {
     type: 'finish',
     finishReason: latestFinishReason,
     responseText: latestResponseText,
+    continuationState: input.state,
   });
   return { output };
 }
 
 export async function workflowAgentFailActivity(input: WorkflowAgentFailureInput): Promise<void> {
   const message = redactCredentialText(input.error).slice(0, TOOL_RESULT_ERROR_LIMIT);
-  await recordNodeIoWithoutChangingExecution(() =>
-    getComponentActivityServices().nodeIO?.recordCompletion({
-      runId: input.component.runId,
-      nodeRef: input.component.action.ref,
-      organizationId: input.component.organizationId ?? null,
-      componentId: input.component.action.componentId,
-      outputs: {},
-      status: 'failed',
-      errorMessage: message,
-    }),
-  );
-  await recordTraceWithoutChangingExecution(input, {
-    eventId: `trace:${input.component.runId}:workflow-agent:${input.agentRunId}:failed`,
-    type: 'NODE_FAILED',
-    level: 'error',
-    error: message,
-  });
+  if (input.recordNodeLifecycle !== false) {
+    await recordNodeIoWithoutChangingExecution(() =>
+      getComponentActivityServices().nodeIO?.recordCompletion({
+        runId: input.component.runId,
+        nodeRef: input.component.action.ref,
+        organizationId: input.component.organizationId ?? null,
+        componentId: input.component.action.componentId,
+        outputs: {},
+        status: 'failed',
+        errorMessage: message,
+      }),
+    );
+    await recordTraceWithoutChangingExecution(input, {
+      eventId: `trace:${input.component.runId}:workflow-agent:${input.agentRunId}:failed`,
+      type: 'NODE_FAILED',
+      level: 'error',
+      error: message,
+    });
+  }
   await publishAgentPart(input, AGENT_TRACE_FINISH_SEQUENCE, {
     type: 'finish',
     finishReason: input.cancelled ? 'other' : 'error',

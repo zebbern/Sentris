@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'bun:test';
 import type { AgentTraceEventRecord } from '../../database/schema';
 import type { AgentTraceRepository } from '../agent-trace.repository';
 import { AgentTraceService } from '../agent-trace.service';
+import type { AgentConversationRepository } from '../agent-conversation.repository';
 
 function event(input: {
   agentRunId: string;
@@ -110,7 +111,7 @@ describe('AgentTraceService capability activity', () => {
     const repository = {
       listRunActivityEvents: vi.fn().mockResolvedValue(rows),
     } as unknown as AgentTraceRepository;
-    const service = new AgentTraceService(repository);
+    const service = new AgentTraceService(repository, {} as AgentConversationRepository);
 
     const summary = await service.summarizeRunCapabilityActivity('sentris-run-1', {
       maxAgentRuns: 8,
@@ -138,5 +139,142 @@ describe('AgentTraceService capability activity', () => {
         error: 'Server unavailable',
       }),
     ]);
+  });
+
+  it('presents linked durable turns as one cursor-safe Agent conversation', async () => {
+    const rootState = {
+      fileId: '11111111-1111-4111-8111-111111111111',
+      rootFileId: '11111111-1111-4111-8111-111111111111',
+    };
+    const followUpState = {
+      fileId: '22222222-2222-4222-8222-222222222222',
+      rootFileId: '22222222-2222-4222-8222-222222222222',
+    };
+    const rows = [
+      event({
+        agentRunId: 'agent-root',
+        nodeRef: 'agent-node',
+        sequence: 1,
+        timestamp: '2026-08-04T10:00:00.000Z',
+        part: { type: 'message-start' },
+      }),
+      event({
+        agentRunId: 'agent-root',
+        nodeRef: 'agent-node',
+        sequence: 90_000_000,
+        timestamp: '2026-08-04T10:00:01.000Z',
+        part: { type: 'finish', finishReason: 'stop', continuationState: rootState },
+      }),
+      event({
+        agentRunId: 'agent-follow-up',
+        nodeRef: 'agent-node',
+        sequence: 1,
+        timestamp: '2026-08-04T10:01:00.000Z',
+        part: { type: 'message-start' },
+      }),
+      event({
+        agentRunId: 'agent-follow-up',
+        nodeRef: 'agent-node',
+        sequence: 90_000_000,
+        timestamp: '2026-08-04T10:01:01.000Z',
+        part: {
+          type: 'finish',
+          finishReason: 'stop',
+          responseText: 'Follow-up complete',
+          continuationState: followUpState,
+        },
+      }),
+      event({
+        agentRunId: 'agent-failed-follow-up',
+        nodeRef: 'agent-node',
+        sequence: 1,
+        timestamp: '2026-08-04T10:02:00.000Z',
+        part: { type: 'message-start' },
+      }),
+      event({
+        agentRunId: 'agent-failed-follow-up',
+        nodeRef: 'agent-node',
+        sequence: 90_000_000,
+        timestamp: '2026-08-04T10:02:01.000Z',
+        part: { type: 'finish', finishReason: 'error', responseText: 'Provider unavailable' },
+      }),
+    ];
+    const completedFollowUpFinish = rows.find(
+      (row) => row.agentRunId === 'agent-follow-up' && row.partType === 'finish',
+    )!;
+    const repository = {
+      getRunMetadata: vi.fn().mockResolvedValue({
+        workflowRunId: 'sentris-run-1',
+        nodeRef: 'agent-node',
+      }),
+      listMany: vi.fn().mockResolvedValue(rows),
+      getLatestFinish: vi.fn().mockResolvedValue(completedFollowUpFinish),
+    } as unknown as AgentTraceRepository;
+    const conversations = {
+      findByAgentRunId: vi.fn().mockResolvedValue(null),
+      listTurns: vi.fn().mockResolvedValue([
+        {
+          id: '33333333-3333-4333-8333-333333333333',
+          conversationId: 'agent-root',
+          agentRunId: 'agent-follow-up',
+          sourceAgentRunId: 'agent-root',
+          turnIndex: 1,
+          organizationId: 'org-1',
+          workflowRunId: 'sentris-run-1',
+          nodeRef: 'agent-node',
+          prompt: 'Inspect dependencies',
+          sourceStateFileId: rootState.fileId,
+          sourceStateRootFileId: rootState.rootFileId,
+          temporalWorkflowId: 'sentris-agent-follow-up:1',
+          temporalRunId: 'temporal-run-1',
+          status: 'completed',
+          responseText: 'Follow-up complete',
+          error: null,
+          createdAt: new Date('2026-08-04T10:01:00.000Z'),
+          startedAt: new Date('2026-08-04T10:01:00.000Z'),
+          completedAt: new Date('2026-08-04T10:01:01.000Z'),
+        },
+        {
+          id: '44444444-4444-4444-8444-444444444444',
+          conversationId: 'agent-root',
+          agentRunId: 'agent-failed-follow-up',
+          sourceAgentRunId: 'agent-follow-up',
+          turnIndex: 2,
+          organizationId: 'org-1',
+          workflowRunId: 'sentris-run-1',
+          nodeRef: 'agent-node',
+          prompt: 'Try another provider',
+          sourceStateFileId: followUpState.fileId,
+          sourceStateRootFileId: followUpState.rootFileId,
+          temporalWorkflowId: 'sentris-agent-follow-up:2',
+          temporalRunId: 'temporal-run-2',
+          status: 'failed',
+          responseText: null,
+          error: 'Provider unavailable',
+          createdAt: new Date('2026-08-04T10:02:00.000Z'),
+          startedAt: new Date('2026-08-04T10:02:00.000Z'),
+          completedAt: new Date('2026-08-04T10:02:01.000Z'),
+        },
+      ]),
+    } as unknown as AgentConversationRepository;
+    const service = new AgentTraceService(repository, conversations);
+
+    const conversation = await service.getConversation('agent-root', 90_000_000);
+
+    expect(conversation).toMatchObject({
+      conversationId: 'agent-root',
+      active: false,
+      canFollowUp: true,
+      cursor: 290_000_000,
+    });
+    expect(conversation?.turns).toHaveLength(3);
+    expect(conversation?.events.map((entry) => entry.sequence)).toEqual([
+      100_000_001, 190_000_000, 200_000_001, 290_000_000,
+    ]);
+    await expect(service.getLatestContinuation('agent-root')).resolves.toEqual({
+      conversationId: 'agent-root',
+      sourceAgentRunId: 'agent-follow-up',
+      state: followUpState,
+    });
   });
 });

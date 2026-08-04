@@ -1,4 +1,4 @@
-import { useQuery, skipToken } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, skipToken } from '@tanstack/react-query';
 import type { UIMessageChunk } from 'ai';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
@@ -41,6 +41,9 @@ export async function loadAgentTranscript(agentRunId: string): Promise<AgentTran
     messages,
     parts,
     steps,
+    active: data?.active === true,
+    canFollowUp: data?.canFollowUp === true,
+    turns: Array.isArray(data?.turns) ? data.turns : [],
   };
 }
 
@@ -49,6 +52,20 @@ export function useAgentTranscriptQuery(agentRunId: string | null, follow = fals
     queryKey: queryKeys.agents.transcript(agentRunId ?? '__no-agent-run__'),
     queryFn: agentRunId ? () => loadAgentTranscript(agentRunId) : skipToken,
     staleTime: 10_000,
-    refetchInterval: agentRunId && follow ? 1_000 : false,
+    refetchInterval: (query) =>
+      agentRunId && (follow || query.state.data?.active === true) ? 1_000 : false,
+  });
+}
+
+export function useAgentFollowUpMutation(agentRunId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (message: string) =>
+      api.agents.followUp(agentRunId, { requestId: crypto.randomUUID(), message }),
+    onSettled: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.agents.transcript(agentRunId),
+      });
+    },
   });
 }

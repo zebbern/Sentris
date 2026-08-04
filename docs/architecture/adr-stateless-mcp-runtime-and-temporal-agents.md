@@ -238,9 +238,15 @@ child turns over this contract. Its setup snapshot exposes tools plus exact reso
 resource templates, and prompts as bounded model operations; every selected operation is
 recorded and dispatched with its canonical typed identity through the same durable invocation
 path. A true follow-up turn for a completed workflow Agent remains
-separate work: it needs a new child turn, server-owned continuation state, and fresh run
-authority rather than a Signal to the closed child. Remaining work is MCP Tasks, the Task 8
-unbound-source migration, and the separately bounded Studio v1 sessionful migration.
+available without reopening the completed graph node. Each accepted request creates an
+idempotently named coordinator and a new durable Agent child linked to the public conversation
+in Postgres. The worker clones the bounded conversation from organization-scoped state refs,
+adds the new user message, and materializes fresh authority from the source run's immutable graph.
+It does not Signal the closed child or emit another node lifecycle. The trace API projects the
+linked turns as one cursor-safe conversation, while each child retains a distinct internal Agent
+run identity. Only one follow-up may be queued or running per conversation. Remaining work is MCP
+Tasks, the Task 8 unbound-source migration, and the separately bounded Studio v1 sessionful
+migration.
 
 ### Protocol boundary
 

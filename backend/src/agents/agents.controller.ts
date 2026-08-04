@@ -43,22 +43,27 @@ export class AgentsController {
     @Query(new ZodValidationPipe(AgentStreamQuerySchema)) query: AgentStreamQueryDto,
     @CurrentAuth() auth: AuthContext | null,
   ) {
-    const metadata = await this.agentTraceService.getRunMetadata(agentRunId);
-    if (!metadata) {
-      throw new NotFoundException(`Agent run ${agentRunId} not found`);
-    }
-    await this.workflowsService.ensureRunAccess(metadata.workflowRunId, auth);
     const cursor = Number.parseInt(query.cursor ?? '0', 10);
     const effectiveCursor = Number.isNaN(cursor) ? undefined : cursor;
-    const events = await this.agentTraceService.list(agentRunId, effectiveCursor);
+    const conversation = await this.agentTraceService.getConversation(agentRunId, effectiveCursor);
+    if (!conversation) {
+      throw new NotFoundException(`Agent run ${agentRunId} not found`);
+    }
+    await this.workflowsService.ensureRunAccess(conversation.workflowRunId, auth);
+    const events = conversation.events;
     const lastSequence =
-      events.length > 0 ? events[events.length - 1]?.sequence : (effectiveCursor ?? 0);
+      events.length > 0
+        ? events[events.length - 1]?.sequence
+        : Math.max(effectiveCursor ?? 0, conversation.cursor);
 
     return {
-      agentRunId,
-      workflowRunId: metadata.workflowRunId,
-      nodeRef: metadata.nodeRef,
+      agentRunId: conversation.conversationId,
+      workflowRunId: conversation.workflowRunId,
+      nodeRef: conversation.nodeRef,
       cursor: lastSequence ?? 0,
+      active: conversation.active,
+      canFollowUp: conversation.canFollowUp,
+      turns: conversation.turns,
       parts: events
         .map((event) => ({ event, chunk: convertAgentTraceToUiChunk(event) }))
         .filter((entry): entry is { event: AgentTracePartEntry; chunk: AgentUiMessageChunk } =>
@@ -82,11 +87,11 @@ export class AgentsController {
     @Res() res: Response,
     @Req() req: Request,
   ): Promise<void> {
-    const metadata = await this.agentTraceService.getRunMetadata(agentRunId);
-    if (!metadata) {
+    const initialConversation = await this.agentTraceService.getConversation(agentRunId);
+    if (!initialConversation) {
       throw new NotFoundException(`Agent run ${agentRunId} not found`);
     }
-    await this.workflowsService.ensureRunAccess(metadata.workflowRunId, auth);
+    await this.workflowsService.ensureRunAccess(initialConversation.workflowRunId, auth);
 
     let lastSequence = typeof body?.cursor === 'number' ? body.cursor : 0;
     let seenFinish = false;
@@ -104,13 +109,18 @@ export class AgentsController {
     const stream = createUIMessageStream({
       execute: async ({ writer }) => {
         while (!seenFinish && !aborted) {
-          const events = await this.agentTraceService.list(agentRunId, lastSequence);
+          const conversation = await this.agentTraceService.getConversation(
+            agentRunId,
+            lastSequence,
+          );
+          if (!conversation) break;
+          const events = conversation.events;
           if (events.length > 0) {
             events.forEach((event) => {
               const chunk = convertAgentTraceToUiChunk(event);
               if (chunk) {
                 writer.write(chunk);
-                if (chunk.type === 'finish') {
+                if (chunk.type === 'finish' && !conversation.active) {
                   seenFinish = true;
                 }
               }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 
 import { AgentTraceIngestService } from '../agent-trace-ingest.service';
 import type { AgentTraceRepository } from '../agent-trace.repository';
+import type { AgentConversationRepository } from '../agent-conversation.repository';
 import type { ConfigService } from '@nestjs/config';
 import type { KafkaConfig } from '../../config';
 import type { OutboxRepository } from '../../outbox/outbox.repository';
@@ -38,6 +39,10 @@ function restoreEnv(): void {
   process.env = { ...ORIGINAL_ENV };
 }
 
+const conversations = {
+  markTerminalWithExecutor: mock(async () => undefined),
+} as unknown as AgentConversationRepository;
+
 describe('AgentTraceIngestService', () => {
   function createOutboxRepository() {
     return {
@@ -72,6 +77,7 @@ describe('AgentTraceIngestService', () => {
     const repository = { append: async () => undefined } as unknown as AgentTraceRepository;
     const service = new AgentTraceIngestService(
       repository,
+      conversations,
       createMockConfigService(),
       createOutboxRepository() as unknown as OutboxRepository,
     ) as unknown as {
@@ -88,6 +94,7 @@ describe('AgentTraceIngestService', () => {
     const repository = { append: async () => undefined } as unknown as AgentTraceRepository;
     const service = new AgentTraceIngestService(
       repository,
+      conversations,
       createMockConfigService(),
       createOutboxRepository() as unknown as OutboxRepository,
     ) as unknown as {
@@ -106,6 +113,7 @@ describe('AgentTraceIngestService', () => {
     const repository = { append: async () => undefined } as unknown as AgentTraceRepository;
     const service = new AgentTraceIngestService(
       repository,
+      conversations,
       createMockConfigService(),
       createOutboxRepository() as unknown as OutboxRepository,
     ) as unknown as {
@@ -126,6 +134,7 @@ describe('AgentTraceIngestService', () => {
     const outbox = createOutboxRepository();
     const service = new AgentTraceIngestService(
       repository,
+      conversations,
       createMockConfigService(),
       outbox as unknown as OutboxRepository,
     );
@@ -154,6 +163,7 @@ describe('AgentTraceIngestService', () => {
     const outbox = createOutboxRepository();
     const service = new AgentTraceIngestService(
       {} as AgentTraceRepository,
+      conversations,
       createMockConfigService(),
       outbox as unknown as OutboxRepository,
     );
@@ -180,6 +190,7 @@ describe('AgentTraceIngestService', () => {
     const outbox = createOutboxRepository();
     const service = new AgentTraceIngestService(
       repository,
+      conversations,
       createMockConfigService(),
       outbox as unknown as OutboxRepository,
     );
@@ -217,6 +228,7 @@ describe('AgentTraceIngestService', () => {
     const outbox = createOutboxRepository();
     const service = new AgentTraceIngestService(
       repository,
+      conversations,
       createMockConfigService(),
       outbox as unknown as OutboxRepository,
     );

@@ -41,10 +41,28 @@ function makeEvent(overrides: Partial<AgentTracePartEntry> = {}): AgentTracePart
 // ---------------------------------------------------------------------------
 
 function makeAgentTraceService() {
-  return {
+  const service = {
     getRunMetadata: jest.fn().mockResolvedValue(METADATA),
     list: jest.fn().mockResolvedValue([]),
     append: jest.fn().mockResolvedValue(undefined),
+  };
+  return {
+    ...service,
+    getConversation: jest.fn(async (_agentRunId: string, cursor?: number) => {
+      const metadata = await service.getRunMetadata();
+      if (!metadata) return null;
+      const events = await service.list(AGENT_RUN_ID, cursor);
+      return {
+        conversationId: AGENT_RUN_ID,
+        workflowRunId: metadata.workflowRunId,
+        nodeRef: metadata.nodeRef,
+        active: false,
+        canFollowUp: false,
+        cursor: events.length > 0 ? events[events.length - 1].sequence : (cursor ?? 0),
+        turns: [],
+        events,
+      };
+    }),
   } as unknown as AgentTraceService;
 }
 
@@ -182,6 +200,9 @@ describe('AgentsController', () => {
         workflowRunId: WORKFLOW_RUN_ID,
         nodeRef: NODE_REF,
         cursor: 3,
+        active: false,
+        canFollowUp: false,
+        turns: [],
         parts: [
           {
             sequence: 3,

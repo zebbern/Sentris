@@ -121,6 +121,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/agents/{agentRunId}/follow-ups': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start a durable follow-up turn for a completed workflow Agent */
+    post: operations['AgentFollowUpsController_followUp'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/workflows/runs': {
     parameters: {
       query?: never;
@@ -3333,6 +3350,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AgentFollowUpRequestDto: {
+      /** Format: uuid */
+      requestId: string;
+      message: string;
+    };
     WorkflowRunResultResponseDto: {
       runId: string;
       result:
@@ -6501,6 +6523,30 @@ export interface operations {
     responses: {
       /** @description AI SDK-compatible SSE for agent run */
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AgentFollowUpsController_followUp: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agentRunId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AgentFollowUpRequestDto'];
+      };
+    };
+    responses: {
+      /** @description The follow-up turn was accepted */
+      202: {
         headers: {
           [name: string]: unknown;
         };
