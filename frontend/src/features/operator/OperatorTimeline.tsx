@@ -8,12 +8,14 @@ import {
   OperatorWorkflowPromotionResultSchema,
   OperatorRunComparisonResultSchema,
   OperatorRunInputProposalResultSchema,
+  OperatorPlanProposalResultSchema,
   OperatorRunWorkflowInputSchema,
   type OperatorActionStatus,
   type OperatorActionView,
   type OperatorCommandName,
   type FindingTriageStatus,
   type OperatorMessageView,
+  type OperatorTurnView,
   type OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
 import {
@@ -35,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { OperatorRunActivity, type OperatorRunCommandRequest } from './OperatorRunActivity';
 import { OperatorRunComparisonCard } from './OperatorRunComparisonCard';
 import { OperatorRunInputProposalCard } from './OperatorRunInputProposalCard';
+import { OperatorPlanCard } from './OperatorPlanCard';
 import { OperatorWorkflowDraftCard } from './OperatorWorkflowDraftCard';
 
 const ACTION_STATUS_LABELS: Record<OperatorActionStatus, string> = {
@@ -70,6 +73,7 @@ const COMMAND_LABELS: Record<OperatorCommandName, string> = {
   get_run: 'Inspect run',
   compare_runs: 'Compare runs',
   propose_run_input_changes: 'Propose run input changes',
+  propose_operator_plan: 'Propose action plan',
   run_workflow: 'Run workflow',
   cancel_run: 'Cancel run',
   retry_run: 'Retry run',
@@ -271,6 +275,7 @@ function InvestigationFollowUps({
 
 interface ActionEventProps {
   action: OperatorActionView;
+  actions: OperatorActionView[];
   pendingDecision: boolean;
   runCommandDisabled: boolean;
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
@@ -278,10 +283,14 @@ interface ActionEventProps {
   workflowDrafts: OperatorWorkflowDraftDetail[];
   appliedDraftIds: ReadonlySet<string>;
   keptVersionIds: ReadonlySet<string>;
+  turns?: OperatorTurnView[];
+  pendingCancelTurnId?: string;
+  onCancelTurn: (turnId: string) => void;
 }
 
 function ActionEvent({
   action,
+  actions,
   pendingDecision,
   runCommandDisabled,
   onDecision,
@@ -289,12 +298,16 @@ function ActionEvent({
   workflowDrafts,
   appliedDraftIds,
   keptVersionIds,
+  turns = [],
+  pendingCancelTurnId,
+  onCancelTurn,
 }: ActionEventProps) {
   const argumentsPreview = formatPreview(action.arguments);
   const draftResult = OperatorWorkflowDraftResultSchema.safeParse(action.result);
   const applyResult = OperatorWorkflowApplyResultSchema.safeParse(action.result);
   const runComparison = OperatorRunComparisonResultSchema.safeParse(action.result);
   const runInputProposal = OperatorRunInputProposalResultSchema.safeParse(action.result);
+  const planProposal = OperatorPlanProposalResultSchema.safeParse(action.result);
   const runWorkflowInput =
     action.commandName === 'run_workflow'
       ? OperatorRunWorkflowInputSchema.safeParse(action.arguments)
@@ -313,7 +326,9 @@ function ActionEvent({
           ? null
           : runInputProposal.success
             ? null
-            : formatPreview(action.result);
+            : planProposal.success
+              ? null
+              : formatPreview(action.result);
   const isActive = action.status === 'executing' || action.status === 'approved';
   const workflowDraft = draftResult.success
     ? workflowDrafts.find(
@@ -428,6 +443,18 @@ function ActionEvent({
           />
         ) : null}
 
+        {planProposal.success ? (
+          <OperatorPlanCard
+            plan={planProposal.data}
+            turns={turns}
+            actions={actions}
+            disabled={runCommandDisabled}
+            pendingCancelTurnId={pendingCancelTurnId}
+            onCommand={onRunCommand}
+            onCancelTurn={onCancelTurn}
+          />
+        ) : null}
+
         {action.runId ? (
           <OperatorRunActivity
             runId={action.runId}
@@ -475,23 +502,29 @@ function ActionEvent({
 interface OperatorTimelineProps {
   messages: OperatorMessageView[];
   actions: OperatorActionView[];
+  turns?: OperatorTurnView[];
   isActive: boolean;
   pendingDecisionActionId?: string;
   runCommandDisabled?: boolean;
   workflowDrafts?: OperatorWorkflowDraftDetail[];
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
   onRunCommand?: (request: OperatorRunCommandRequest) => void;
+  pendingCancelTurnId?: string;
+  onCancelTurn?: (turnId: string) => void;
 }
 
 export function OperatorTimeline({
   messages,
   actions,
+  turns = [],
   isActive,
   pendingDecisionActionId,
   runCommandDisabled = false,
   workflowDrafts = [],
   onDecision,
   onRunCommand = () => {},
+  pendingCancelTurnId,
+  onCancelTurn = () => {},
 }: OperatorTimelineProps) {
   const events = toTimelineEvents(messages, actions);
   const latestInvestigationAction = [...actions]
@@ -531,6 +564,7 @@ export function OperatorTimeline({
           <ActionEvent
             key={`action-${event.value.id}`}
             action={event.value}
+            actions={actions}
             pendingDecision={pendingDecisionActionId === event.value.id}
             runCommandDisabled={runCommandDisabled}
             onDecision={onDecision}
@@ -538,6 +572,9 @@ export function OperatorTimeline({
             workflowDrafts={workflowDrafts}
             appliedDraftIds={appliedDraftIds}
             keptVersionIds={keptVersionIds}
+            turns={turns}
+            pendingCancelTurnId={pendingCancelTurnId}
+            onCancelTurn={onCancelTurn}
           />
         ),
       )}

@@ -42,6 +42,7 @@ import {
   operatorSessionHasActiveTurn,
   useCreateOperatorSession,
   useCreateOperatorTurn,
+  useCancelOperatorTurn,
   useDecideOperatorAction,
   useOperatorSessionStream,
   useOperatorSessions,
@@ -323,6 +324,7 @@ function ActiveSession({
   const navigate = useNavigate();
   const { toast } = useToast();
   const createTurn = useCreateOperatorTurn();
+  const cancelTurn = useCancelOperatorTurn();
   const decideAction = useDecideOperatorAction();
   const [message, setMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -423,6 +425,18 @@ function ActiveSession({
     }
   };
 
+  const cancel = async (turnId: string) => {
+    try {
+      await cancelTurn.mutateAsync({ sessionId: session.id, turnId });
+    } catch (error) {
+      toast({
+        title: 'Could not stop Operator plan',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <SessionModelSettings key={session.id} session={session} />
@@ -433,6 +447,7 @@ function ActiveSession({
           <OperatorTimeline
             messages={session.messages}
             actions={session.actions}
+            turns={session.turns}
             workflowDrafts={workflowDraftsQuery.data ?? []}
             isActive={isActive}
             pendingDecisionActionId={decideAction.variables?.actionId}
@@ -441,6 +456,8 @@ function ActiveSession({
             onRunCommand={(request) =>
               void sendTurn(request.message, request.directCommand, request.journey)
             }
+            pendingCancelTurnId={cancelTurn.variables?.turnId}
+            onCancelTurn={(turnId) => void cancel(turnId)}
           />
           {latestTurnError ? <ErrorBanner message={latestTurnError} className="ml-9 mt-3" /> : null}
         </div>

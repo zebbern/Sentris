@@ -15,6 +15,7 @@ import type {
   OperatorActionView,
   McpOperationInvocationRequest,
   OperatorModelContext,
+  OperatorPlanProposalResult,
   OperatorPreparedAction,
   OperatorRunObservation,
   OperatorTurnView,
@@ -26,12 +27,16 @@ import type { AuthContext } from '../auth/types';
 import {
   InternalCompleteOperatorTurnDto,
   InternalCompleteOperatorTurnSchema,
+  InternalCancelOperatorTurnDto,
+  InternalCancelOperatorTurnSchema,
   InternalFailOperatorTurnDto,
   InternalFailOperatorTurnSchema,
   InternalOperatorObservationQueryDto,
   InternalOperatorObservationQuerySchema,
   InternalOperatorOrganizationDto,
   InternalOperatorOrganizationSchema,
+  InternalOperatorPlanParamDto,
+  InternalOperatorPlanParamSchema,
   InternalOperatorStatusDto,
   InternalOperatorStatusSchema,
   InternalSettleOperatorMcpActionDto,
@@ -60,6 +65,20 @@ export class InternalOperatorController {
     @Param(new ZodValidationPipe(OperatorTurnIdParamSchema)) params: OperatorTurnIdParamDto,
   ): Promise<OperatorModelContext> {
     return this.operatorService.getInternalContext(params.turnId, this.requireInternalOrg(auth));
+  }
+
+  @Get('turns/:turnId/plans/:planActionId')
+  @ApiOperation({ summary: 'Load one immutable Operator plan for its execution journey' })
+  getPlan(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param(new ZodValidationPipe(InternalOperatorPlanParamSchema))
+    params: InternalOperatorPlanParamDto,
+  ): Promise<OperatorPlanProposalResult> {
+    return this.operatorService.getInternalPlan(
+      params.turnId,
+      params.planActionId,
+      this.requireInternalOrg(auth),
+    );
   }
 
   @Post('turns/:turnId/status')
@@ -164,6 +183,22 @@ export class InternalOperatorController {
       error: body.error,
     });
     return { failed: true };
+  }
+
+  @Post('turns/:turnId/cancel')
+  async cancelTurn(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param(new ZodValidationPipe(OperatorTurnIdParamSchema)) params: OperatorTurnIdParamDto,
+    @Body(new ZodValidationPipe(InternalCancelOperatorTurnSchema))
+    body: InternalCancelOperatorTurnDto,
+  ): Promise<{ cancelled: true }> {
+    const organizationId = this.requireInternalOrg(auth, body.organizationId);
+    await this.operatorService.cancelInternalTurn({
+      turnId: params.turnId,
+      organizationId,
+      message: body.message,
+    });
+    return { cancelled: true };
   }
 
   private requireInternalOrg(auth: AuthContext | null, requested?: string): string {

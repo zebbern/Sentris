@@ -97,6 +97,17 @@ replaying older histories. Explicit run-card inspect, cancel, and retry controls
 turn path as user-confirmed structured commands. Retry starts one new run from the original
 stored version, inputs, and scope using the Operator action identity for idempotency; it does
 not mutate or reset a completed Agent child.
+For bounded multi-action requests, `propose_operator_plan` persists an immutable preview of
+three to eight exact typed commands. Running that proposal starts a separate patch-gated
+`execute_plan` journey by proposal-action identity. Temporal schedules the existing Operator
+action boundary sequentially with stable per-step tool-call IDs, so retries and worker restarts
+reuse the same action rows and the normal Ask/Auto policy still decides consequential steps.
+The action ledger is the progress record rendered by the browser; there is no second plan
+executor or plan-state store. Stop requests cancel the exact Operator Temporal run and record
+the turn as cancelled while retaining completed actions. Revision creates a new immutable
+proposal. Initial plans intentionally exclude turn-scoped MCP snapshots and cross-step output
+bindings; those require a future authority-aware dataflow contract rather than string
+substitution.
 The selected session is projected to the browser through a versioned SSE stream of complete
 Postgres-backed snapshots. TanStack Query remains the frontend cache, with periodic REST
 reads only as a connection fallback; the stream is not a second event store and does not

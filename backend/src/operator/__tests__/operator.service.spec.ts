@@ -146,6 +146,7 @@ describe('OperatorService', () => {
       completeAction: vi.fn(),
       failAction: vi.fn(),
       failTurn: vi.fn(),
+      cancelTurn: vi.fn(),
       settleMcpAction: vi.fn(),
     };
     commands = { execute: vi.fn() };
@@ -157,6 +158,7 @@ describe('OperatorService', () => {
         workflowId: `operator-turn:${SESSION_ID}:${TURN_ID}`,
         runId: 'temporal-operator-run',
       }),
+      cancelWorkflow: vi.fn().mockResolvedValue(undefined),
     };
     workflows = {
       getRun: vi.fn(),
@@ -172,6 +174,62 @@ describe('OperatorService', () => {
       temporal as unknown as TemporalService,
       workflowAuthoring as unknown as OperatorWorkflowAuthoringService,
     );
+  });
+
+  it('loads a succeeded immutable plan only from the executing session', async () => {
+    const plan = {
+      kind: 'operator-plan' as const,
+      planId: ACTION_ID,
+      title: 'Review and triage',
+      steps: [
+        {
+          id: 'inspect-run',
+          label: 'Inspect run',
+          commandName: 'get_run' as const,
+          arguments: { runId: 'sentris-run-source' },
+          effect: 'read' as const,
+        },
+        {
+          id: 'inspect-finding',
+          label: 'Inspect finding',
+          commandName: 'get_finding' as const,
+          arguments: { findingId: 'finding-1' },
+          effect: 'read' as const,
+        },
+        {
+          id: 'triage-finding',
+          label: 'Triage finding',
+          commandName: 'update_finding_triage' as const,
+          arguments: { findingId: 'finding-1', status: 'triaged' },
+          effect: 'execute' as const,
+        },
+      ],
+    };
+    repository.getActionWithTurnSession.mockResolvedValue({
+      action: {
+        ...actionRecord('ask', 'succeeded'),
+        commandName: 'propose_operator_plan',
+        effect: 'execute',
+        approvalRequired: false,
+        result: plan,
+      },
+      turn: turnRecord(),
+      session: sessionRecord(),
+    });
+
+    await expect(service.getInternalPlan(TURN_ID, ACTION_ID, 'operator-org')).resolves.toEqual(
+      plan,
+    );
+  });
+
+  it('requests cancellation of the exact owned durable turn', async () => {
+    await service.cancelTurn(auth, TURN_ID);
+
+    expect(temporal.cancelWorkflow).toHaveBeenCalledWith({
+      workflowId: 'operator-turn:session:turn',
+      runId: 'temporal-run',
+    });
+    expect(repository.cancelTurn).not.toHaveBeenCalled();
   });
 
   it('returns the latest user-owned Operator improvement reference for a source run', async () => {

@@ -6,6 +6,7 @@ import {
   JsonValueSchema,
   OperatorRunComparisonResultSchema,
   OperatorRunInputProposalResultSchema,
+  OperatorPlanProposalResultSchema,
   OperatorWorkflowPromotionResultSchema,
   MCP_CAPABILITY_CONTRACT_VERSION,
   McpOperationSchema,
@@ -354,6 +355,11 @@ export class OperatorCommandService {
           OPERATOR_COMMAND_DEFINITIONS.propose_run_input_changes.inputSchema.parse(input.arguments),
           input.auth,
         );
+      case 'propose_operator_plan':
+        return this.proposeOperatorPlan(
+          OPERATOR_COMMAND_DEFINITIONS.propose_operator_plan.inputSchema.parse(input.arguments),
+          input.actionId,
+        );
       case 'run_workflow':
         return this.runWorkflow(
           OPERATOR_COMMAND_DEFINITIONS.run_workflow.inputSchema.parse(input.arguments),
@@ -486,6 +492,24 @@ export class OperatorCommandService {
               : null,
         })),
       },
+    };
+  }
+
+  private proposeOperatorPlan(
+    input: OperatorCommandInputMap['propose_operator_plan'],
+    actionId: string,
+  ): { result: unknown } {
+    return {
+      result: OperatorPlanProposalResultSchema.parse({
+        kind: 'operator-plan',
+        planId: actionId,
+        title: input.title,
+        ...(input.summary ? { summary: input.summary } : {}),
+        steps: input.steps.map((step) => ({
+          ...step,
+          effect: OPERATOR_COMMAND_DEFINITIONS[step.commandName].effect,
+        })),
+      }),
     };
   }
 

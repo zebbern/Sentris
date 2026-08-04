@@ -931,4 +931,71 @@ export class OperatorRepository {
       });
     });
   }
+
+  async cancelTurn(input: {
+    turn: OperatorTurnRecord;
+    session: OperatorSessionRecord;
+    message: string;
+    auth: AuthContext;
+  }): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx
+        .insert(operatorMessagesTable)
+        .values({
+          sessionId: input.session.id,
+          turnId: input.turn.id,
+          role: 'assistant',
+          content: input.message,
+        })
+        .onConflictDoNothing({
+          target: [operatorMessagesTable.turnId, operatorMessagesTable.role],
+        });
+      await tx
+        .update(operatorTurnsTable)
+        .set({ status: 'cancelled', error: null, completedAt: new Date() })
+        .where(
+          and(
+            eq(operatorTurnsTable.id, input.turn.id),
+            inArray(operatorTurnsTable.status, [...ACTIVE_OPERATOR_TURN_STATUSES]),
+          ),
+        );
+      await tx
+        .update(operatorActionsTable)
+        .set({
+          status: 'rejected',
+          error: 'Operator turn stopped by the user',
+          completedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(operatorActionsTable.turnId, input.turn.id),
+            inArray(operatorActionsTable.status, ['proposed', 'pending_approval', 'approved']),
+          ),
+        );
+      await tx
+        .update(operatorActionsTable)
+        .set({
+          status: 'failed',
+          error: 'Operator turn stopped by the user',
+          completedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(operatorActionsTable.turnId, input.turn.id),
+            eq(operatorActionsTable.status, 'executing'),
+          ),
+        );
+      await tx
+        .update(operatorSessionsTable)
+        .set({ updatedAt: new Date() })
+        .where(eq(operatorSessionsTable.id, input.session.id));
+      await this.auditLogService.recordDurableWithExecutor(tx, input.auth, {
+        action: 'operator.turn.cancel',
+        resourceType: 'operator_session',
+        resourceId: input.session.id,
+        resourceName: input.session.title,
+        metadata: { turnId: input.turn.id },
+      });
+    });
+  }
 }

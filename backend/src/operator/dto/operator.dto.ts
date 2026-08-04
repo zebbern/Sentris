@@ -32,6 +32,11 @@ export class OperatorIdParamDto extends createZodDto(OperatorIdParamSchema) {}
 export const OperatorTurnIdParamSchema = z.object({ turnId: z.string().uuid() }).strict();
 export class OperatorTurnIdParamDto extends createZodDto(OperatorTurnIdParamSchema) {}
 
+export const InternalOperatorPlanParamSchema = z
+  .object({ turnId: z.string().uuid(), planActionId: z.string().uuid() })
+  .strict();
+export class InternalOperatorPlanParamDto extends createZodDto(InternalOperatorPlanParamSchema) {}
+
 export const OperatorActionIdParamSchema = z.object({ actionId: z.string().uuid() }).strict();
 export class OperatorActionIdParamDto extends createZodDto(OperatorActionIdParamSchema) {}
 
@@ -95,6 +100,14 @@ export const InternalFailOperatorTurnSchema = z
   })
   .strict();
 export class InternalFailOperatorTurnDto extends createZodDto(InternalFailOperatorTurnSchema) {}
+
+export const InternalCancelOperatorTurnSchema = z
+  .object({
+    organizationId: OrganizationIdSchema,
+    message: z.string().trim().min(1).max(20_000),
+  })
+  .strict();
+export class InternalCancelOperatorTurnDto extends createZodDto(InternalCancelOperatorTurnSchema) {}
 
 export const InternalOperatorObservationQuerySchema = z
   .object({ turnId: z.string().uuid() })

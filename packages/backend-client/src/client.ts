@@ -3283,6 +3283,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/operator/turns/{turnId}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Request cancellation of an active Operator turn */
+    post: operations['OperatorController_cancelTurn'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6198,11 +6215,18 @@ export interface components {
               comment?: string;
             };
           };
-      journey?: {
-        /** @enum {string} */
-        kind: 'improve_run';
-        sourceRunId: string;
-      };
+      journey?:
+        | {
+            /** @enum {string} */
+            kind: 'improve_run';
+            sourceRunId: string;
+          }
+        | {
+            /** @enum {string} */
+            kind: 'execute_plan';
+            /** Format: uuid */
+            planActionId: string;
+          };
     };
     OperatorActionDecisionDto: {
       /** @enum {string} */
@@ -12230,6 +12254,25 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_cancelTurn: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        turnId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      202: {
         headers: {
           [name: string]: unknown;
         };

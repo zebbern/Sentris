@@ -12,6 +12,7 @@ import {
 
 import {
   OperatorRunComparisonResultSchema,
+  OperatorPlanProposalResultSchema,
   OperatorWorkflowApplyResultSchema,
   OperatorWorkflowDraftResultSchema,
   type OperatorCommandName,
@@ -26,6 +27,7 @@ import type {
   OperatorModelStepInput,
   OperatorModelStepOutput,
   OperatorModelToolCall,
+  OperatorLoadPlanInput,
   OperatorObserveRunInput,
   OperatorPrepareActionInput,
   OperatorPreparedActionOutput,
@@ -80,6 +82,10 @@ const shortActivities = proxyActivities<{
   operatorSettleMcpActionActivity(input: OperatorSettleMcpActionInput): Promise<void>;
   operatorCompleteTurnActivity(input: OperatorActivityInput & { message: string }): Promise<void>;
   operatorFailTurnActivity(input: OperatorActivityInput & { error: string }): Promise<void>;
+  operatorCancelTurnActivity(input: OperatorActivityInput & { message: string }): Promise<void>;
+  operatorLoadPlanActivity(
+    input: OperatorLoadPlanInput,
+  ): Promise<ReturnType<typeof OperatorPlanProposalResultSchema.parse>>;
 }>({
   startToCloseTimeout: '2 minutes',
   heartbeatTimeout: '20 seconds',
@@ -398,6 +404,42 @@ async function runImproveRunJourney(input: {
   });
 }
 
+async function runOperatorPlanJourney(input: {
+  base: OperatorActivityInput;
+  journey: Extract<OperatorJourney, { kind: 'execute_plan' }>;
+  decisions: OperatorDecisionMap;
+}): Promise<void> {
+  const plan = await shortActivities.operatorLoadPlanActivity({
+    ...input.base,
+    planActionId: input.journey.planActionId,
+  });
+  for (const [index, step] of plan.steps.entries()) {
+    const outcome = await prepareAndExecuteOperatorAction({
+      base: input.base,
+      decisions: input.decisions,
+      toolCall: {
+        toolCallId: `${input.base.turnId}:plan:${plan.planId}:${step.id}`,
+        commandName: step.commandName,
+        arguments: step.arguments,
+      },
+    });
+    if (outcome.disposition === 'rejected') {
+      await shortActivities.operatorCompleteTurnActivity({
+        ...input.base,
+        message: `Plan "${plan.title}" stopped at step ${index + 1} of ${plan.steps.length} because "${step.label}" was rejected. Completed actions remain recorded.`,
+      });
+      return;
+    }
+    if (outcome.disposition === 'executed' && outcome.executed.mcpOperationRequest) {
+      throw new Error('Operator plans cannot execute turn-scoped MCP operations');
+    }
+  }
+  await shortActivities.operatorCompleteTurnActivity({
+    ...input.base,
+    message: `Completed all ${plan.steps.length} steps in plan "${plan.title}".`,
+  });
+}
+
 export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Promise<void> {
   const detachedRunFollowing = patched('operator-detached-run-following-v1');
   const decisions = new Map<string, OperatorActionDecisionUpdate>();
@@ -426,6 +468,12 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
 
     if (input.journey?.kind === 'improve_run' && patched('operator-improve-run-journey-v1')) {
       await runImproveRunJourney({ base, journey: input.journey, decisions });
+      await condition(allHandlersFinished);
+      return;
+    }
+
+    if (input.journey?.kind === 'execute_plan' && patched('operator-execute-plan-journey-v1')) {
+      await runOperatorPlanJourney({ base, journey: input.journey, decisions });
       await condition(allHandlersFinished);
       return;
     }
@@ -524,14 +572,18 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
     await condition(allHandlersFinished);
   } catch (error: unknown) {
     await CancellationScope.nonCancellable(async () => {
-      await shortActivities.operatorFailTurnActivity({
-        ...base,
-        error: isCancellation(error)
-          ? 'Operator turn cancelled; any launched workflow continues independently.'
-          : error instanceof Error
-            ? error.message
-            : String(error),
-      });
+      if (isCancellation(error)) {
+        await shortActivities.operatorCancelTurnActivity({
+          ...base,
+          message:
+            'Operator turn stopped. Completed actions remain recorded, and any launched workflow continues independently.',
+        });
+      } else {
+        await shortActivities.operatorFailTurnActivity({
+          ...base,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       await condition(allHandlersFinished);
     });
     throw error;

@@ -468,6 +468,22 @@ export function useCreateOperatorTurn() {
   });
 }
 
+export function useCancelOperatorTurn() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sessionId: _sessionId, turnId }: { sessionId: string; turnId: string }) =>
+      api.operator.cancelTurn(turnId),
+    meta: { suppressGlobalError: true },
+    onSuccess: (_turn, variables) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.operator.sessions() });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.operator.session(variables.sessionId),
+      });
+    },
+  });
+}
+
 export function useDecideOperatorAction() {
   const queryClient = useQueryClient();
 

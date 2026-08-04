@@ -14,6 +14,7 @@ import {
   OperatorListFindingsInputSchema,
   OperatorPersistedTurnPayloadSchema,
   OperatorPersistedTurnPayloadV1Schema,
+  OperatorProposePlanInputSchema,
   OperatorReadMcpResourceInputSchema,
   OperatorSessionStreamErrorSchema,
   OperatorSessionStreamReadySchema,
@@ -625,6 +626,77 @@ describe('Operator finding commands', () => {
     expect(OPERATOR_COMMAND_DEFINITIONS.list_findings.effect).toBe('read');
     expect(OPERATOR_COMMAND_DEFINITIONS.get_finding.effect).toBe('read');
     expect(OPERATOR_COMMAND_DEFINITIONS.update_finding_triage.effect).toBe('execute');
+  });
+});
+
+describe('Operator durable plans', () => {
+  const validSteps = [
+    {
+      id: 'inspect-run',
+      label: 'Inspect the source run',
+      commandName: 'get_run',
+      arguments: { runId: 'sentris-run-source' },
+    },
+    {
+      id: 'inspect-finding',
+      label: 'Inspect the finding',
+      commandName: 'get_finding',
+      arguments: { findingId: 'finding-1' },
+    },
+    {
+      id: 'triage-finding',
+      label: 'Mark the finding triaged',
+      commandName: 'update_finding_triage',
+      arguments: { findingId: 'finding-1', status: 'triaged' },
+    },
+  ] as const;
+
+  it('accepts a bounded exact-command plan and its execution journey reference', () => {
+    expect(
+      OperatorProposePlanInputSchema.parse({ title: 'Review and triage', steps: validSteps }).steps,
+    ).toHaveLength(3);
+    expect(
+      OperatorCreateTurnSchema.parse({
+        clientTurnId: SESSION_ID,
+        message: 'Run the reviewed plan',
+        journey: {
+          kind: 'execute_plan',
+          planActionId: '22222222-2222-4222-8222-222222222222',
+        },
+      }).journey,
+    ).toEqual({
+      kind: 'execute_plan',
+      planActionId: '22222222-2222-4222-8222-222222222222',
+    });
+  });
+
+  it('rejects duplicate steps, invalid typed arguments, and turn-scoped MCP operations', () => {
+    expect(
+      OperatorProposePlanInputSchema.safeParse({
+        title: 'Duplicate plan',
+        steps: [...validSteps.slice(0, 2), { ...validSteps[0] }],
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposePlanInputSchema.safeParse({
+        title: 'Invalid arguments',
+        steps: [...validSteps.slice(0, 2), { ...validSteps[2], arguments: {} }],
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposePlanInputSchema.safeParse({
+        title: 'MCP plan',
+        steps: [
+          ...validSteps.slice(0, 2),
+          {
+            id: 'invoke-mcp',
+            label: 'Invoke MCP',
+            commandName: 'invoke_mcp_tool',
+            arguments: {},
+          },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });
 

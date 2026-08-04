@@ -337,7 +337,14 @@ result. Explicit run-card inspect, cancel, and retry controls are structured,
 user-confirmed Operator turns. Retry creates one new run from the original stored version,
 inputs, and scope with action-ID idempotency; it never mutates a completed Agent child. Its
 tool, resource, and prompt calls dispatch through the same canonical runtime and durable
-invocation path. Workflow authoring also uses typed durable actions: component discovery is
+invocation path. Bounded multi-action requests may produce an immutable three-to-eight-step
+`propose_operator_plan` preview. Run starts a separate patch-gated `execute_plan` journey by
+proposal-action ID; it schedules the existing typed action boundary sequentially with stable
+step identities, keeps Ask/Auto approval semantics, projects progress from the action ledger,
+and supports exact-turn cancellation. Revise creates a new proposal. Initial plan steps have
+fully resolved arguments and exclude turn-scoped MCP snapshots and cross-step output bindings;
+do not add string substitution or a second plan executor to bypass that boundary. Workflow
+authoring also uses typed durable actions: component discovery is
 registry-backed, new-workflow proposals use credential-safe bounded graphs, and existing-workflow
 proposals use bounded operations keyed by stable node and edge IDs. The backend materializes
 those operations against the exact immutable base; both paths share compile validation and a

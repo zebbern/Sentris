@@ -699,6 +699,125 @@ export const OperatorUpdateFindingTriageInputSchema = z
     },
   );
 
+export const OPERATOR_PLAN_COMMAND_NAMES = [
+  'list_workflows',
+  'get_workflow',
+  'list_components',
+  'get_component',
+  'propose_workflow_draft',
+  'propose_workflow_edits',
+  'apply_workflow_draft',
+  'promote_workflow_version',
+  'list_runs',
+  'get_run',
+  'compare_runs',
+  'propose_run_input_changes',
+  'run_workflow',
+  'cancel_run',
+  'retry_run',
+  'list_findings',
+  'get_finding',
+  'update_finding_triage',
+] as const;
+export const OperatorPlanCommandNameSchema = z.enum(OPERATOR_PLAN_COMMAND_NAMES);
+export type OperatorPlanCommandName = z.infer<typeof OperatorPlanCommandNameSchema>;
+
+const OPERATOR_PLAN_COMMAND_SCHEMAS = {
+  list_workflows: OperatorListWorkflowsInputSchema,
+  get_workflow: OperatorGetWorkflowInputSchema,
+  list_components: OperatorListComponentsInputSchema,
+  get_component: OperatorGetComponentInputSchema,
+  propose_workflow_draft: OperatorProposeWorkflowDraftInputSchema,
+  propose_workflow_edits: OperatorProposeWorkflowEditsInputSchema,
+  apply_workflow_draft: OperatorApplyWorkflowDraftInputSchema,
+  promote_workflow_version: OperatorPromoteWorkflowVersionInputSchema,
+  list_runs: OperatorListRunsInputSchema,
+  get_run: OperatorGetRunInputSchema,
+  compare_runs: OperatorCompareRunsInputSchema,
+  propose_run_input_changes: OperatorProposeRunInputChangesInputSchema,
+  run_workflow: OperatorRunWorkflowInputSchema,
+  cancel_run: OperatorCancelRunInputSchema,
+  retry_run: OperatorRetryRunInputSchema,
+  list_findings: OperatorListFindingsInputSchema,
+  get_finding: OperatorGetFindingInputSchema,
+  update_finding_triage: OperatorUpdateFindingTriageInputSchema,
+} as const satisfies Record<OperatorPlanCommandName, z.ZodType>;
+
+const OperatorPlanStepBaseSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9_-]{0,63}$/),
+    label: z.string().trim().min(1).max(191),
+    commandName: OperatorPlanCommandNameSchema,
+    arguments: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+function validateOperatorPlanStep(
+  value: z.infer<typeof OperatorPlanStepBaseSchema>,
+  context: z.RefinementCtx,
+): void {
+  const parsed = OPERATOR_PLAN_COMMAND_SCHEMAS[value.commandName].safeParse(value.arguments);
+  if (parsed.success) return;
+  for (const issue of parsed.error.issues.slice(0, 5)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['arguments', ...issue.path],
+      message: issue.message,
+    });
+  }
+}
+
+export const OperatorPlanStepSchema =
+  OperatorPlanStepBaseSchema.superRefine(validateOperatorPlanStep);
+export type OperatorPlanStep = z.infer<typeof OperatorPlanStepSchema>;
+
+export const OperatorProposePlanInputSchema = z
+  .object({
+    title: z.string().trim().min(1).max(191),
+    summary: z.string().trim().min(1).max(2_000).optional(),
+    steps: z.array(OperatorPlanStepSchema).min(3).max(8),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+    for (const [index, step] of value.steps.entries()) {
+      if (seen.has(step.id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['steps', index, 'id'],
+          message: `Duplicate plan step id "${step.id}"`,
+        });
+      }
+      seen.add(step.id);
+    }
+    if (new TextEncoder().encode(JSON.stringify(value)).byteLength > 64 * 1024) {
+      context.addIssue({
+        code: 'custom',
+        path: ['steps'],
+        message: 'Operator plan exceeds 65536 bytes',
+      });
+    }
+  });
+
+export const OperatorPlanResultStepSchema = OperatorPlanStepBaseSchema.extend({
+  effect: OperatorCommandEffectSchema,
+}).superRefine(validateOperatorPlanStep);
+export type OperatorPlanResultStep = z.infer<typeof OperatorPlanResultStepSchema>;
+
+export const OperatorPlanProposalResultSchema = z
+  .object({
+    kind: z.literal('operator-plan'),
+    planId: z.string().uuid(),
+    title: z.string().trim().min(1).max(191),
+    summary: z.string().trim().min(1).max(2_000).optional(),
+    steps: z.array(OperatorPlanResultStepSchema).min(3).max(8),
+  })
+  .strict();
+export type OperatorPlanProposalResult = z.infer<typeof OperatorPlanProposalResultSchema>;
+
 const McpCapabilitySnapshotIdSchema = z.string().uuid();
 const McpSourceIdSchema = z.string().trim().min(1).max(512);
 
@@ -812,6 +931,12 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
     effect: 'execute',
     inputSchema: OperatorProposeRunInputChangesInputSchema,
   },
+  propose_operator_plan: {
+    description:
+      'Create an immutable, reviewable plan of 3-8 exact typed Operator commands without executing them. Resolve every command argument before proposing the plan; plan steps cannot reference outputs from earlier steps. MCP snapshot operations are intentionally unavailable because their authority is turn-scoped. The user starts the plan separately with Run plan.',
+    effect: 'execute',
+    inputSchema: OperatorProposePlanInputSchema,
+  },
   run_workflow: {
     description:
       'Run an existing workflow version with runtime inputs keyed by the exact IDs returned from get_workflow. Pass its returned immutable versionId. To run a reviewed input-change proposal, pass its sourceRunId and inputChanges while leaving inputs empty; stored secret inputs and source scope are preserved server-side. Use only when the user explicitly asks to run it.',
@@ -906,6 +1031,7 @@ export type OperatorCommandInputMap = {
   get_run: z.infer<typeof OperatorGetRunInputSchema>;
   compare_runs: z.infer<typeof OperatorCompareRunsInputSchema>;
   propose_run_input_changes: z.infer<typeof OperatorProposeRunInputChangesInputSchema>;
+  propose_operator_plan: z.infer<typeof OperatorProposePlanInputSchema>;
   run_workflow: z.infer<typeof OperatorRunWorkflowInputSchema>;
   cancel_run: z.infer<typeof OperatorCancelRunInputSchema>;
   retry_run: z.infer<typeof OperatorRetryRunInputSchema>;
@@ -992,6 +1118,12 @@ export const OperatorJourneySchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('improve_run'),
       sourceRunId: RunIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('execute_plan'),
+      planActionId: z.string().uuid(),
     })
     .strict(),
 ]);

@@ -7,6 +7,7 @@ import type {
   OperatorSessionDetail,
   OperatorSessionSummary,
   OperatorTurnAccepted,
+  OperatorTurnView,
   OperatorUpdateSession,
   OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
@@ -45,6 +46,9 @@ export const operatorApi = {
 
   createTurn: (sessionId: string, input: OperatorCreateTurn) =>
     httpPost<OperatorTurnAccepted>(`${sessionPath(sessionId)}/turns`, input),
+
+  cancelTurn: (turnId: string) =>
+    httpPost<OperatorTurnView>(`/operator/turns/${encodeURIComponent(turnId)}/cancel`, {}),
 
   decideAction: (actionId: string, input: OperatorActionDecision) =>
     httpPost<OperatorActionView>(

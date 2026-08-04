@@ -12,6 +12,8 @@ const operatorObserveRunActivity = vi.fn();
 const operatorAwaitRunActivity = vi.fn();
 const operatorCompleteTurnActivity = vi.fn();
 const operatorFailTurnActivity = vi.fn();
+const operatorCancelTurnActivity = vi.fn();
+const operatorLoadPlanActivity = vi.fn();
 const prepareMcpOperationActivity = vi.fn();
 const dispatchMcpOperationActivity = vi.fn();
 const reconcileMcpOperationActivity = vi.fn();
@@ -26,6 +28,8 @@ const activityImplementations = {
   operatorAwaitRunActivity,
   operatorCompleteTurnActivity,
   operatorFailTurnActivity,
+  operatorCancelTurnActivity,
+  operatorLoadPlanActivity,
   prepareMcpOperationActivity,
   dispatchMcpOperationActivity,
   reconcileMcpOperationActivity,
@@ -94,6 +98,7 @@ beforeEach(() => {
   });
   operatorCompleteTurnActivity.mockResolvedValue(undefined);
   operatorFailTurnActivity.mockResolvedValue(undefined);
+  operatorCancelTurnActivity.mockResolvedValue(undefined);
   operatorSettleMcpActionActivity.mockResolvedValue(undefined);
   operatorAwaitRunActivity.mockResolvedValue({
     runId: 'sentris-run-candidate',
@@ -104,6 +109,64 @@ beforeEach(() => {
 });
 
 describe('operatorTurnWorkflow', () => {
+  test('executes an immutable plan sequentially through the canonical action boundary', async () => {
+    const planActionId = '44444444-4444-4444-8444-444444444444';
+    operatorLoadPlanActivity.mockResolvedValue({
+      kind: 'operator-plan',
+      planId: planActionId,
+      title: 'Review and triage findings',
+      steps: [
+        {
+          id: 'inspect-run',
+          label: 'Inspect the source run',
+          commandName: 'get_run',
+          arguments: { runId: 'sentris-run-source' },
+          effect: 'read',
+        },
+        {
+          id: 'inspect-finding',
+          label: 'Inspect the finding',
+          commandName: 'get_finding',
+          arguments: { findingId: 'finding-1' },
+          effect: 'read',
+        },
+        {
+          id: 'triage-finding',
+          label: 'Mark the finding triaged',
+          commandName: 'update_finding_triage',
+          arguments: { findingId: 'finding-1', status: 'triaged' },
+          effect: 'execute',
+        },
+      ],
+    });
+    operatorPrepareActionActivity.mockImplementation(async ({ toolCallId }) => ({
+      actionId: toolCallId,
+      actionVersion: 0,
+      disposition: 'execute',
+    }));
+    operatorExecuteActionActivity.mockImplementation(async ({ actionId }) => ({
+      actionId,
+      result: { ok: true },
+    }));
+
+    await operatorTurnWorkflow({
+      ...input,
+      journey: { kind: 'execute_plan', planActionId },
+    });
+
+    expect(operatorModelStepActivity).not.toHaveBeenCalled();
+    expect(operatorPrepareActionActivity.mock.calls.map(([call]) => call.toolCallId)).toEqual([
+      `${input.turnId}:plan:${planActionId}:inspect-run`,
+      `${input.turnId}:plan:${planActionId}:inspect-finding`,
+      `${input.turnId}:plan:${planActionId}:triage-finding`,
+    ]);
+    expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(3);
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message: 'Completed all 3 steps in plan "Review and triage findings".',
+    });
+  });
+
   test('installs the keyed decision Update before starting activities', async () => {
     operatorModelStepActivity.mockResolvedValue({
       text: 'The latest run completed successfully.',

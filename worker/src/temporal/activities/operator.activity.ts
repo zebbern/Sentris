@@ -10,10 +10,12 @@ import {
   McpOperationInvocationRequestSchema,
   McpOperationResultSchema,
   OperatorModelConfigSchema,
+  OperatorPlanProposalResultSchema,
   type McpOperationInvocationRequest,
   type McpOperationResult,
   type OperatorCommandName,
   type OperatorModelContext,
+  type OperatorPlanProposalResult,
   type OperatorRunObservation,
 } from '@sentris/shared';
 import {
@@ -206,6 +208,10 @@ export interface OperatorObserveRunInput extends OperatorActivityInput {
   runId: string;
 }
 
+export interface OperatorLoadPlanInput extends OperatorActivityInput {
+  planActionId: string;
+}
+
 function getServices(): OperatorActivityServices {
   if (!services) throw new Error('Operator activities have not been initialized');
   return services;
@@ -310,6 +316,17 @@ export async function operatorSetTurnStatusActivity(
       organizationId: input.organizationId,
       status: input.status,
     },
+  );
+}
+
+export async function operatorLoadPlanActivity(
+  input: OperatorLoadPlanInput,
+): Promise<OperatorPlanProposalResult> {
+  return callInternalJson(
+    input,
+    `operator/internal/turns/${encodeURIComponent(input.turnId)}/plans/${encodeURIComponent(input.planActionId)}`,
+    'GET',
+    OperatorPlanProposalResultSchema,
   );
 }
 
@@ -545,6 +562,19 @@ export async function operatorFailTurnActivity(
   );
 }
 
+export async function operatorCancelTurnActivity(
+  input: OperatorActivityInput & { message: string },
+): Promise<void> {
+  await callInternalVoid(
+    input,
+    `operator/internal/turns/${encodeURIComponent(input.turnId)}/cancel`,
+    {
+      organizationId: input.organizationId,
+      message: input.message.slice(0, MAX_MODEL_TEXT_LENGTH),
+    },
+  );
+}
+
 function assertContextOwnership(
   input: OperatorActivityInput,
   context: z.infer<typeof operatorModelContextSchema>,
@@ -638,6 +668,7 @@ function buildSystemPrompt(
     'Call retry_run only when the user explicitly asks to retry an existing run. It preserves the original workflow version and stored inputs.',
     'When the user asks to rerun with changed inputs, first inspect the terminal source run with get_run and its exact immutable version with get_workflow. Use only the non-secret values and exact runtime input IDs returned by that evidence, then call propose_run_input_changes with the smallest justified set/unset operations. Never copy or replace the credential placeholder, and never call run_workflow in the proposal turn; the user launches the reviewed proposal explicitly.',
     'Call update_finding_triage only when the user explicitly asks for that finding change.',
+    'When a user request requires 3-8 exact actions, first use normal read commands to resolve every ID and argument, then call propose_operator_plan. A plan is an immutable preview only: never execute its planned commands in the proposal turn. Plan steps cannot reference outputs from earlier steps, and MCP snapshot operations cannot be planned because their authority is turn-scoped. The user starts an accepted plan with Run plan.',
     'For a terminal run, get_run returns bounded failed/recent trace evidence and run-scoped findings. Use that evidence to explain the likely root cause.',
     'Only when the user explicitly asks for a fix or revision, inspect the exact saved workflow and component definitions and call propose_workflow_edits. Propose edits only for an evidence-supported graph or component-configuration defect, and make the smallest justified change.',
     'Treat wrong invocation inputs or input IDs as invocation guidance; do not weaken a valid workflow contract by adding aliases. Never set credential values in workflow edits. Include sourceRunId on an update proposal derived from a run.',

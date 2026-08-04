@@ -7,6 +7,7 @@ import {
 
 import {
   OPERATOR_COMMAND_DEFINITIONS,
+  OperatorPlanProposalResultSchema,
   TERMINAL_STATUSES,
   type McpOperationInvocationRequest,
   type McpOperationResult,
@@ -18,6 +19,7 @@ import {
   type OperatorMessageView,
   type OperatorModelContext,
   type OperatorPreparedAction,
+  type OperatorPlanProposalResult,
   type OperatorRunObservation,
   type OperatorRunImprovementLookup,
   type OperatorSessionDetail,
@@ -296,6 +298,43 @@ export class OperatorService {
     return this.toActionView(action);
   }
 
+  async cancelTurn(auth: AuthContext | null, turnId: string): Promise<OperatorTurnView> {
+    const user = this.requireUserAuth(auth);
+    const context = await this.repository.getTurnWithSession(turnId);
+    if (
+      !context ||
+      context.session.organizationId !== user.organizationId ||
+      context.session.userId !== user.userId
+    ) {
+      throw new NotFoundException('Operator turn not found');
+    }
+    if (['completed', 'failed', 'cancelled'].includes(context.turn.status)) {
+      return this.toTurnView(context.turn);
+    }
+    if (!context.turn.temporalWorkflowId) {
+      await this.repository.cancelTurn({
+        ...context,
+        message: 'Operator turn stopped. Completed actions remain recorded.',
+        auth: user,
+      });
+      return this.toTurnView({ ...context.turn, status: 'cancelled' });
+    }
+
+    try {
+      await this.temporalService.cancelWorkflow({
+        workflowId: context.turn.temporalWorkflowId,
+        ...(context.turn.temporalRunId ? { runId: context.turn.temporalRunId } : {}),
+      });
+    } catch (error: unknown) {
+      const described = await this.temporalService.describeWorkflow({
+        workflowId: context.turn.temporalWorkflowId,
+        runId: context.turn.temporalRunId ?? undefined,
+      });
+      if (described.status === 'RUNNING') throw error;
+    }
+    return this.toTurnView(context.turn);
+  }
+
   private async reconcileStaleApprovedAction(
     session: OperatorSessionRecord,
     turns: OperatorTurnRecord[],
@@ -364,6 +403,28 @@ export class OperatorService {
         .filter((action) => action.turnId === turn.id)
         .map((action) => this.toActionView(action)),
     };
+  }
+
+  async getInternalPlan(
+    turnId: string,
+    planActionId: string,
+    organizationId: string,
+  ): Promise<OperatorPlanProposalResult> {
+    const current = await this.requireInternalTurn(turnId, organizationId);
+    const source = await this.repository.getActionWithTurnSession(planActionId);
+    if (
+      !source ||
+      source.session.id !== current.session.id ||
+      source.action.commandName !== 'propose_operator_plan' ||
+      source.action.status !== 'succeeded'
+    ) {
+      throw new NotFoundException('Operator plan not found');
+    }
+    const plan = OperatorPlanProposalResultSchema.parse(source.action.result);
+    if (plan.planId !== source.action.id) {
+      throw new ConflictException('Operator plan identity does not match its proposal action');
+    }
+    return plan;
   }
 
   async setInternalTurnStatus(
@@ -584,6 +645,20 @@ export class OperatorService {
       turn,
       session,
       error: input.error,
+      auth: this.authForTurn(session, turn),
+    });
+  }
+
+  async cancelInternalTurn(input: {
+    turnId: string;
+    organizationId: string;
+    message: string;
+  }): Promise<void> {
+    const { turn, session } = await this.requireInternalTurn(input.turnId, input.organizationId);
+    await this.repository.cancelTurn({
+      turn,
+      session,
+      message: input.message,
       auth: this.authForTurn(session, turn),
     });
   }

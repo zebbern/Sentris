@@ -23,6 +23,7 @@ import {
   type OperatorSessionDetail,
   type OperatorSessionSummary,
   type OperatorTurnAccepted,
+  type OperatorTurnView,
 } from '@sentris/shared';
 
 import { CurrentAuth } from '../auth/auth-context.decorator';
@@ -38,6 +39,8 @@ import {
   OperatorRunIdParamDto,
   OperatorRunIdParamSchema,
   OperatorRunImprovementLookupDto,
+  OperatorTurnIdParamDto,
+  OperatorTurnIdParamSchema,
   OperatorWorkflowDraftDetailDto,
   UpdateOperatorSessionDto,
 } from './dto/operator.dto';
@@ -136,5 +139,15 @@ export class OperatorController {
     @Body(new ZodValidationPipe(OperatorActionDecisionSchema)) body: OperatorActionDecisionDto,
   ): Promise<OperatorActionView> {
     return this.operatorService.decideAction(auth, params.actionId, body);
+  }
+
+  @Post('turns/:turnId/cancel')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Request cancellation of an active Operator turn' })
+  cancelTurn(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param(new ZodValidationPipe(OperatorTurnIdParamSchema)) params: OperatorTurnIdParamDto,
+  ): Promise<OperatorTurnView> {
+    return this.operatorService.cancelTurn(auth, params.turnId);
   }
 }
