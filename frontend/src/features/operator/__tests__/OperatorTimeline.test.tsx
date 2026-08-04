@@ -79,7 +79,7 @@ describe('OperatorTimeline', () => {
     expect(onDecision).toHaveBeenCalledWith(pendingAction, 'rejected');
   });
 
-  it('opens configure-and-run from a structured saved workflow list', () => {
+  it('opens configure-and-run without repeating a structured saved workflow list', () => {
     const onRunSavedWorkflow = mock(() => {});
     const workflowId = '22222222-2222-4222-8222-222222222222';
     const listAction: OperatorActionView = {
@@ -110,7 +110,18 @@ describe('OperatorTimeline', () => {
 
     renderWithProviders(
       <OperatorTimeline
-        messages={[]}
+        messages={[
+          {
+            id: 'workflow-list-summary',
+            sessionId: 'session-1',
+            turnId: 'turn-1',
+            sequence: 2,
+            role: 'assistant',
+            content:
+              'Here are your existing workflows:\n\n- **npm package investigation** — Investigate one npm package',
+            createdAt: '2026-08-02T10:00:01.000Z',
+          },
+        ]}
         actions={[listAction]}
         isActive={false}
         onDecision={mock(() => {})}
@@ -124,6 +135,11 @@ describe('OperatorTimeline', () => {
       `/workflows/${workflowId}`,
     );
     expect(screen.queryByText('Result')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('1 saved workflow is shown above. Choose Configure & run to continue.'),
+    ).toBeInTheDocument();
+    const summary = screen.getByText('Show Operator summary');
+    expect(summary.closest('details')).not.toHaveAttribute('open');
     fireEvent.click(
       screen.getByRole('button', { name: 'Configure and run npm package investigation' }),
     );

@@ -103,7 +103,13 @@ function formatPreview(value: unknown): string | null {
   return formatted.length > 600 ? `${formatted.slice(0, 600)}…` : formatted;
 }
 
-function MessageEvent({ message }: { message: OperatorMessageView }) {
+function MessageEvent({
+  message,
+  workflowListCount,
+}: {
+  message: OperatorMessageView;
+  workflowListCount?: number;
+}) {
   if (message.role === 'user') {
     return (
       <article
@@ -115,6 +121,13 @@ function MessageEvent({ message }: { message: OperatorMessageView }) {
     );
   }
 
+  const workflowListTransition =
+    workflowListCount === undefined
+      ? null
+      : workflowListCount === 0
+        ? 'No saved workflows matched.'
+        : `${workflowListCount} saved workflow${workflowListCount === 1 ? ' is' : 's are'} shown above. Choose Configure & run to continue.`;
+
   return (
     <article
       data-operator-turn-id={message.turnId}
@@ -124,11 +137,27 @@ function MessageEvent({ message }: { message: OperatorMessageView }) {
         <Bot className="h-4 w-4" />
       </div>
       <div className="min-w-0 rounded-xl rounded-tl-sm border border-border/70 bg-card/70 px-3.5 py-2.5 shadow-sm">
-        <MarkdownView
-          content={message.content}
-          dataTestId={`operator-message-${message.id}`}
-          className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-1 prose-pre:my-2 prose-pre:max-w-full prose-pre:overflow-auto"
-        />
+        {workflowListTransition ? (
+          <>
+            <p className="text-sm text-foreground">{workflowListTransition}</p>
+            <details className="mt-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer select-none font-medium">
+                Show Operator summary
+              </summary>
+              <MarkdownView
+                content={message.content}
+                dataTestId={`operator-message-${message.id}`}
+                className="prose prose-sm mt-2 max-w-none break-words border-t border-border/60 pt-2 text-foreground dark:prose-invert prose-p:my-1 prose-pre:my-2 prose-pre:max-w-full prose-pre:overflow-auto"
+              />
+            </details>
+          </>
+        ) : (
+          <MarkdownView
+            content={message.content}
+            dataTestId={`operator-message-${message.id}`}
+            className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-1 prose-pre:my-2 prose-pre:max-w-full prose-pre:overflow-auto"
+          />
+        )}
       </div>
     </article>
   );
@@ -580,12 +609,24 @@ export function OperatorTimeline({
       return parsed.success ? [parsed.data.versionId] : [];
     }),
   );
+  const workflowListCountsByTurn = new Map<string, number>();
+  const lastActionsByTurn = new Map<string, OperatorActionView>();
+  for (const action of actions) lastActionsByTurn.set(action.turnId, action);
+  for (const [turnId, action] of lastActionsByTurn) {
+    if (action.status !== 'succeeded' || action.commandName !== 'list_workflows') continue;
+    const result = OperatorListWorkflowsResultSchema.safeParse(action.result);
+    if (result.success) workflowListCountsByTurn.set(turnId, result.data.length);
+  }
 
   return (
     <div className="space-y-3">
       {events.map((event) =>
         event.kind === 'message' ? (
-          <MessageEvent key={`message-${event.value.id}`} message={event.value} />
+          <MessageEvent
+            key={`message-${event.value.id}`}
+            message={event.value}
+            workflowListCount={workflowListCountsByTurn.get(event.value.turnId)}
+          />
         ) : (
           <ActionEvent
             key={`action-${event.value.id}`}
