@@ -104,8 +104,14 @@ action boundary sequentially with stable per-step tool-call IDs, so retries and 
 reuse the same action rows and the normal Ask/Auto policy still decides consequential steps.
 The action ledger is the progress record rendered by the browser; there is no second plan
 executor or plan-state store. Stop requests cancel the exact Operator Temporal run and record
-the turn as cancelled while retaining completed actions. Revision creates a new immutable
-proposal. A later step may copy one string from an earlier step's durable action result into one
+the turn as cancelled while retaining completed actions. The backend's authoritative action
+status is preserved through the worker boundary: failed actions stop execution before later
+steps, while user rejections remain distinct. Successful new histories use a patch-gated,
+text-only model activity to summarize the existing durable action ledger, then append bounded
+workflow/run links derived deterministically from exact typed results. Model failure or incomplete
+output falls back to the deterministic completion message and does not turn a completed plan into
+a failed turn. Revision creates a new immutable proposal. A later step may copy one
+string from an earlier step's durable action result into one
 top-level command argument through bounded RFC 6901 source and target pointers. Resolution is a
 deterministic Workflow operation and the completed arguments still pass through the canonical
 backend command schema and action boundary. Forward references, nested targets, literal/bound

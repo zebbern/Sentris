@@ -161,15 +161,37 @@ describe('operatorTurnWorkflow', () => {
     }));
     operatorExecuteActionActivity.mockImplementation(async ({ actionId }) => ({
       actionId,
-      result: actionId.endsWith(':list-workflows') ? [{ id: workflowId }] : { ok: true },
+      actionStatus: 'succeeded',
+      result: actionId.endsWith(':list-workflows')
+        ? [{ id: workflowId }]
+        : actionId.endsWith(':list-runs')
+          ? {
+              runs: [
+                {
+                  id: 'sentris-run-12345678-verified',
+                  workflowId,
+                },
+              ],
+            }
+          : { id: workflowId },
     }));
+    operatorModelStepActivity.mockResolvedValue({
+      text: 'The workflow activity was inspected successfully.',
+      finishReason: 'stop',
+      toolCalls: [],
+    });
 
     await operatorTurnWorkflow({
       ...input,
       journey: { kind: 'execute_plan', planActionId },
     });
 
-    expect(operatorModelStepActivity).not.toHaveBeenCalled();
+    expect(operatorModelStepActivity).toHaveBeenCalledWith({
+      ...input,
+      step: 3,
+      mode: 'plan_summary',
+      planTitle: 'Inspect workflow activity',
+    });
     expect(operatorPrepareActionActivity.mock.calls.map(([call]) => call.toolCallId)).toEqual([
       `${input.turnId}:plan:${planActionId}:list-workflows`,
       `${input.turnId}:plan:${planActionId}:inspect-workflow`,
@@ -183,7 +205,71 @@ describe('operatorTurnWorkflow', () => {
     expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(3);
     expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
       ...input,
-      message: 'Completed all 3 steps in plan "Inspect workflow activity".',
+      message: `The workflow activity was inspected successfully.\n\n[Open workflow](/workflows/${workflowId}) · [Open run 12345678](/workflows/${workflowId}/runs/sentris-run-12345678-verified)`,
+    });
+  });
+
+  test('stops a plan on an authoritative failed action and does not run later steps', async () => {
+    const planActionId = '46464646-4646-4646-8646-464646464646';
+    operatorLoadPlanActivity.mockResolvedValue({
+      kind: 'operator-plan',
+      planId: planActionId,
+      title: 'Inspect and run a workflow',
+      steps: [
+        {
+          id: 'inspect',
+          label: 'Inspect workflow',
+          commandName: 'get_workflow',
+          arguments: { workflowId: '55555555-5555-4555-8555-555555555555' },
+          effect: 'read',
+        },
+        {
+          id: 'run',
+          label: 'Run workflow',
+          commandName: 'run_workflow',
+          arguments: { workflowId: '55555555-5555-4555-8555-555555555555' },
+          effect: 'consequential',
+        },
+        {
+          id: 'list-runs',
+          label: 'List runs',
+          commandName: 'list_runs',
+          arguments: { limit: 5 },
+          effect: 'read',
+        },
+      ],
+    });
+    operatorPrepareActionActivity.mockImplementation(async ({ toolCallId }) => ({
+      actionId: toolCallId,
+      actionVersion: 0,
+      actionStatus: 'approved',
+      disposition: 'execute',
+    }));
+    operatorExecuteActionActivity
+      .mockResolvedValueOnce({
+        actionId: 'inspect-action',
+        actionStatus: 'succeeded',
+        result: { workflowId: '55555555-5555-4555-8555-555555555555' },
+      })
+      .mockResolvedValueOnce({
+        actionId: 'run-action',
+        actionStatus: 'failed',
+        actionError: 'Required runtime input packageSpec was not provided.\nTry again.',
+        result: { error: 'Required runtime input packageSpec was not provided.' },
+      });
+
+    await operatorTurnWorkflow({
+      ...input,
+      journey: { kind: 'execute_plan', planActionId },
+    });
+
+    expect(operatorPrepareActionActivity).toHaveBeenCalledTimes(2);
+    expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(2);
+    expect(operatorModelStepActivity).not.toHaveBeenCalled();
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message:
+        'Plan "Inspect and run a workflow" stopped at step 2 of 3 because "Run workflow" failed. Error: Required runtime input packageSpec was not provided. Try again. Earlier completed actions remain recorded; later steps were not run.',
     });
   });
 
@@ -235,6 +321,7 @@ describe('operatorTurnWorkflow', () => {
     });
     operatorExecuteActionActivity.mockResolvedValue({
       actionId,
+      actionStatus: 'succeeded',
       result: { accepted: true },
       launchedRunId: 'sentris-run-1',
     });
@@ -283,6 +370,7 @@ describe('operatorTurnWorkflow', () => {
     });
     operatorExecuteActionActivity.mockResolvedValue({
       actionId,
+      actionStatus: 'succeeded',
       result: { status: 'RUNNING' },
       launchedRunId: 'sentris-run-legacy',
     });
@@ -342,13 +430,19 @@ describe('operatorTurnWorkflow', () => {
       disposition: 'execute',
     }));
     operatorExecuteActionActivity
-      .mockResolvedValueOnce({ actionId: 'inspect', result: { runId: sourceRunId } })
+      .mockResolvedValueOnce({
+        actionId: 'inspect',
+        actionStatus: 'succeeded',
+        result: { runId: sourceRunId },
+      })
       .mockResolvedValueOnce({
         actionId: 'workflow',
+        actionStatus: 'succeeded',
         result: { workflowId, versionId: baseVersionId },
       })
       .mockResolvedValueOnce({
         actionId: 'proposal',
+        actionStatus: 'succeeded',
         result: {
           kind: 'workflow-draft',
           draftId,
@@ -372,6 +466,7 @@ describe('operatorTurnWorkflow', () => {
       })
       .mockResolvedValueOnce({
         actionId: 'apply',
+        actionStatus: 'succeeded',
         result: {
           kind: 'workflow-applied',
           draftId,
@@ -385,11 +480,13 @@ describe('operatorTurnWorkflow', () => {
       })
       .mockResolvedValueOnce({
         actionId: 'run',
+        actionStatus: 'succeeded',
         result: { status: 'RUNNING' },
         launchedRunId: candidateRunId,
       })
       .mockResolvedValueOnce({
         actionId: 'compare',
+        actionStatus: 'succeeded',
         result: {
           kind: 'run-comparison',
           assessment: 'improved',
@@ -471,6 +568,7 @@ describe('operatorTurnWorkflow', () => {
     });
     operatorExecuteActionActivity.mockResolvedValue({
       actionId,
+      actionStatus: 'succeeded',
       result: { cancelled: true },
     });
     operatorModelStepActivity.mockResolvedValue({
@@ -561,7 +659,11 @@ describe('operatorTurnWorkflow', () => {
         actionVersion: 1,
         disposition: 'execute',
       });
-    operatorExecuteActionActivity.mockResolvedValue({ actionId, result: { cancelled: true } });
+    operatorExecuteActionActivity.mockResolvedValue({
+      actionId,
+      actionStatus: 'succeeded',
+      result: { cancelled: true },
+    });
 
     await operatorTurnWorkflow(input);
 
@@ -638,6 +740,7 @@ describe('operatorTurnWorkflow', () => {
       });
     operatorExecuteActionActivity.mockResolvedValue({
       actionId,
+      actionStatus: 'succeeded',
       result: { status: 'RUNNING' },
       launchedRunId: 'sentris-run-deduped',
     });
@@ -712,6 +815,7 @@ describe('operatorTurnWorkflow', () => {
     });
     operatorExecuteActionActivity.mockResolvedValue({
       actionId,
+      actionStatus: 'executing',
       result: { kind: 'mcp-operation', state: 'ready_for_dispatch' },
       mcpOperationRequest: request,
     });

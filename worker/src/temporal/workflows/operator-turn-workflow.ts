@@ -43,6 +43,10 @@ const MAX_OPERATOR_STEPS = 8;
 const MAX_IMPROVEMENT_PROPOSAL_STEPS = 6;
 const DEFAULT_COMPLETION = 'I could not produce a useful answer for this turn.';
 const APPROVAL_RECONCILE_INTERVAL = '5 seconds';
+const MAX_PLAN_FAILURE_DETAIL_LENGTH = 400;
+const MAX_PLAN_RESULT_LINKS = 4;
+const MAX_PLAN_COMPLETION_LENGTH = 2_400;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface OperatorTurnWorkflowInput {
   sessionId: string;
@@ -193,13 +197,33 @@ type OperatorDecisionMap = Map<string, OperatorActionDecisionUpdate>;
 
 type OperatorActionExecutionOutcome =
   | { disposition: 'executed'; executed: OperatorExecuteActionOutput }
-  | { disposition: 'rejected' }
+  | {
+      disposition: 'rejected';
+      reason: 'user_rejected' | 'action_failed';
+      error?: string;
+    }
   | { disposition: 'already_completed'; result?: unknown };
+
+function rejectedActionOutcome(input: {
+  interpretActionStatus: boolean;
+  actionStatus: OperatorPreparedActionOutput['actionStatus'];
+  actionError?: string;
+}): Extract<OperatorActionExecutionOutcome, { disposition: 'rejected' }> {
+  if (input.interpretActionStatus && input.actionStatus === 'failed') {
+    return {
+      disposition: 'rejected',
+      reason: 'action_failed',
+      ...(input.actionError ? { error: input.actionError } : {}),
+    };
+  }
+  return { disposition: 'rejected', reason: 'user_rejected' };
+}
 
 async function prepareAndExecuteOperatorAction(input: {
   base: OperatorActivityInput;
   toolCall: OperatorModelToolCall;
   decisions: OperatorDecisionMap;
+  interpretActionStatus: boolean;
   userConfirmed?: boolean;
 }): Promise<OperatorActionExecutionOutcome> {
   const prepared = await shortActivities.operatorPrepareActionActivity({
@@ -213,7 +237,13 @@ async function prepareAndExecuteOperatorAction(input: {
       ...(prepared.completedResult !== undefined ? { result: prepared.completedResult } : {}),
     };
   }
-  if (prepared.disposition === 'rejected') return { disposition: 'rejected' };
+  if (prepared.disposition === 'rejected') {
+    return rejectedActionOutcome({
+      interpretActionStatus: input.interpretActionStatus,
+      actionStatus: prepared.actionStatus,
+      ...(prepared.actionError ? { actionError: prepared.actionError } : {}),
+    });
+  }
 
   if (prepared.disposition === 'wait_for_approval') {
     await shortActivities.operatorSetTurnStatusActivity({
@@ -222,6 +252,7 @@ async function prepareAndExecuteOperatorAction(input: {
     });
     let approvalOutcome: 'execute' | 'rejected' | 'already_completed' | undefined;
     let reconciledCompletedResult: unknown;
+    let reconciledAction: OperatorPreparedActionOutput | undefined;
     while (!approvalOutcome) {
       const updateArrived = await condition(() => {
         const decision = input.decisions.get(prepared.actionId);
@@ -244,10 +275,19 @@ async function prepareAndExecuteOperatorAction(input: {
       if (reconciled.disposition !== 'wait_for_approval') {
         approvalOutcome = reconciled.disposition;
         reconciledCompletedResult = reconciled.completedResult;
+        reconciledAction = reconciled;
       }
     }
     await shortActivities.operatorSetTurnStatusActivity({ ...input.base, status: 'running' });
-    if (approvalOutcome === 'rejected') return { disposition: 'rejected' };
+    if (approvalOutcome === 'rejected') {
+      return reconciledAction
+        ? rejectedActionOutcome({
+            interpretActionStatus: input.interpretActionStatus,
+            actionStatus: reconciledAction.actionStatus,
+            ...(reconciledAction.actionError ? { actionError: reconciledAction.actionError } : {}),
+          })
+        : { disposition: 'rejected', reason: 'user_rejected' };
+    }
     if (approvalOutcome === 'already_completed') {
       return {
         disposition: 'already_completed',
@@ -256,19 +296,34 @@ async function prepareAndExecuteOperatorAction(input: {
     }
   }
 
-  return {
-    disposition: 'executed',
-    executed: await operatorExecuteActionActivity({
-      ...input.base,
-      actionId: prepared.actionId,
-    }),
-  };
+  const executed = await operatorExecuteActionActivity({
+    ...input.base,
+    actionId: prepared.actionId,
+  });
+  if (input.interpretActionStatus && executed.actionStatus === 'failed') {
+    return {
+      disposition: 'rejected',
+      reason: 'action_failed',
+      ...(executed.actionError ? { error: executed.actionError } : {}),
+    };
+  }
+  if (
+    input.interpretActionStatus &&
+    executed.actionStatus !== 'succeeded' &&
+    !executed.mcpOperationRequest
+  ) {
+    throw new Error(
+      `Operator action ${executed.actionId} returned unexpected status ${executed.actionStatus}`,
+    );
+  }
+  return { disposition: 'executed', executed };
 }
 
 async function runImproveRunJourney(input: {
   base: OperatorActivityInput;
   journey: Extract<OperatorJourney, { kind: 'improve_run' }>;
   decisions: OperatorDecisionMap;
+  interpretActionStatus: boolean;
 }): Promise<void> {
   const sourceRunId = input.journey.sourceRunId;
   const toolCallHistory: OperatorModelToolCall[] = [];
@@ -277,6 +332,7 @@ async function runImproveRunJourney(input: {
   const sourceInspection = await prepareAndExecuteOperatorAction({
     base: input.base,
     decisions: input.decisions,
+    interpretActionStatus: input.interpretActionStatus,
     userConfirmed: true,
     toolCall: {
       toolCallId: `${input.base.turnId}:journey:inspect-source`,
@@ -306,6 +362,7 @@ async function runImproveRunJourney(input: {
         base: input.base,
         toolCall,
         decisions: input.decisions,
+        interpretActionStatus: input.interpretActionStatus,
       });
       if (outcome.disposition !== 'executed') continue;
 
@@ -335,6 +392,7 @@ async function runImproveRunJourney(input: {
   const appliedOutcome = await prepareAndExecuteOperatorAction({
     base: input.base,
     decisions: input.decisions,
+    interpretActionStatus: input.interpretActionStatus,
     toolCall: {
       toolCallId: `${input.base.turnId}:journey:apply`,
       commandName: 'apply_workflow_draft',
@@ -360,6 +418,7 @@ async function runImproveRunJourney(input: {
   const runOutcome = await prepareAndExecuteOperatorAction({
     base: input.base,
     decisions: input.decisions,
+    interpretActionStatus: input.interpretActionStatus,
     userConfirmed: true,
     toolCall: {
       toolCallId: `${input.base.turnId}:journey:run`,
@@ -385,6 +444,7 @@ async function runImproveRunJourney(input: {
   const comparisonOutcome = await prepareAndExecuteOperatorAction({
     base: input.base,
     decisions: input.decisions,
+    interpretActionStatus: input.interpretActionStatus,
     userConfirmed: true,
     toolCall: {
       toolCallId: `${input.base.turnId}:journey:compare`,
@@ -413,21 +473,118 @@ async function runImproveRunJourney(input: {
   });
 }
 
+interface OperatorPlanResultLink {
+  label: string;
+  href: string;
+}
+
+function addOperatorPlanResultLink(
+  links: Map<string, OperatorPlanResultLink>,
+  link: OperatorPlanResultLink,
+): void {
+  if (links.size < MAX_PLAN_RESULT_LINKS && !links.has(link.href)) {
+    links.set(link.href, link);
+  }
+}
+
+function collectOperatorPlanResultLinks(
+  commandName: OperatorCommandName,
+  result: unknown,
+  links: Map<string, OperatorPlanResultLink>,
+): void {
+  if (links.size >= MAX_PLAN_RESULT_LINKS) return;
+
+  const addWorkflow = (workflowId: unknown): void => {
+    if (typeof workflowId !== 'string' || !UUID_PATTERN.test(workflowId)) return;
+    addOperatorPlanResultLink(links, {
+      label: 'Open workflow',
+      href: `/workflows/${workflowId}`,
+    });
+  };
+
+  if (commandName === 'list_workflows' && Array.isArray(result)) {
+    for (const item of result.slice(0, MAX_PLAN_RESULT_LINKS)) {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        addWorkflow((item as Record<string, unknown>).id);
+      }
+    }
+  } else if (
+    commandName === 'get_workflow' &&
+    result &&
+    typeof result === 'object' &&
+    !Array.isArray(result)
+  ) {
+    addWorkflow((result as Record<string, unknown>).id);
+  }
+
+  let visited = 0;
+  const visit = (value: unknown, depth: number): void => {
+    if (links.size >= MAX_PLAN_RESULT_LINKS || depth > 3 || visited >= 100) return;
+    visited += 1;
+    if (Array.isArray(value)) {
+      for (const item of value.slice(0, 20)) visit(item, depth + 1);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+
+    const record = value as Record<string, unknown>;
+    const workflowId =
+      typeof record.workflowId === 'string' && UUID_PATTERN.test(record.workflowId)
+        ? record.workflowId
+        : undefined;
+    if (workflowId) addWorkflow(workflowId);
+
+    const runIdCandidate = record.runId ?? record.id;
+    if (
+      workflowId &&
+      typeof runIdCandidate === 'string' &&
+      runIdCandidate.startsWith('sentris-run-')
+    ) {
+      addOperatorPlanResultLink(links, {
+        label: `Open run ${runIdCandidate.slice('sentris-run-'.length, 'sentris-run-'.length + 8)}`,
+        href: `/workflows/${workflowId}/runs/${encodeURIComponent(runIdCandidate)}`,
+      });
+    }
+
+    for (const nested of Object.values(record).slice(0, 20)) visit(nested, depth + 1);
+  };
+  visit(result, 0);
+}
+
+function appendOperatorPlanResultLinks(
+  message: string,
+  links: Iterable<OperatorPlanResultLink>,
+): string {
+  const missingLinks = [...links].filter((link) => !message.includes(link.href));
+  if (missingLinks.length === 0) return message.slice(0, MAX_PLAN_COMPLETION_LENGTH);
+
+  const linkLine = missingLinks.map((link) => `[${link.label}](${link.href})`).join(' · ');
+  const availableMessageLength = Math.max(0, MAX_PLAN_COMPLETION_LENGTH - linkLine.length - 2);
+  const boundedMessage =
+    message.length > availableMessageLength
+      ? `${message.slice(0, Math.max(0, availableMessageLength - 1)).trimEnd()}…`
+      : message;
+  return `${boundedMessage}\n\n${linkLine}`;
+}
+
 async function runOperatorPlanJourney(input: {
   base: OperatorActivityInput;
   journey: Extract<OperatorJourney, { kind: 'execute_plan' }>;
   decisions: OperatorDecisionMap;
+  interpretActionStatus: boolean;
 }): Promise<void> {
   const plan = await shortActivities.operatorLoadPlanActivity({
     ...input.base,
     planActionId: input.journey.planActionId,
   });
   const resultsByStepId = new Map<string, unknown>();
+  const resultLinks = new Map<string, OperatorPlanResultLink>();
   for (const [index, step] of plan.steps.entries()) {
     const arguments_ = resolveOperatorPlanStepArguments(step, resultsByStepId);
     const outcome = await prepareAndExecuteOperatorAction({
       base: input.base,
       decisions: input.decisions,
+      interpretActionStatus: input.interpretActionStatus,
       toolCall: {
         toolCallId: `${input.base.turnId}:plan:${plan.planId}:${step.id}`,
         commandName: step.commandName,
@@ -435,9 +592,16 @@ async function runOperatorPlanJourney(input: {
       },
     });
     if (outcome.disposition === 'rejected') {
+      const failureDetail = outcome.error?.replace(/\s+/g, ' ').trim();
+      const boundedDetail = failureDetail
+        ? `${failureDetail.slice(0, MAX_PLAN_FAILURE_DETAIL_LENGTH)}${failureDetail.length > MAX_PLAN_FAILURE_DETAIL_LENGTH ? '…' : ''}`
+        : undefined;
       await shortActivities.operatorCompleteTurnActivity({
         ...input.base,
-        message: `Plan "${plan.title}" stopped at step ${index + 1} of ${plan.steps.length} because "${step.label}" was rejected. Completed actions remain recorded.`,
+        message:
+          outcome.reason === 'action_failed'
+            ? `Plan "${plan.title}" stopped at step ${index + 1} of ${plan.steps.length} because "${step.label}" failed.${boundedDetail ? ` Error: ${boundedDetail}` : ''} Earlier completed actions remain recorded; later steps were not run.`
+            : `Plan "${plan.title}" stopped at step ${index + 1} of ${plan.steps.length} because "${step.label}" was rejected. Completed actions remain recorded; later steps were not run.`,
       });
       return;
     }
@@ -446,18 +610,35 @@ async function runOperatorPlanJourney(input: {
     }
     if (outcome.disposition === 'executed') {
       resultsByStepId.set(step.id, outcome.executed.result);
+      collectOperatorPlanResultLinks(step.commandName, outcome.executed.result, resultLinks);
     } else if (outcome.disposition === 'already_completed' && outcome.result !== undefined) {
       resultsByStepId.set(step.id, outcome.result);
+      collectOperatorPlanResultLinks(step.commandName, outcome.result, resultLinks);
     }
   }
-  await shortActivities.operatorCompleteTurnActivity({
-    ...input.base,
-    message: `Completed all ${plan.steps.length} steps in plan "${plan.title}".`,
-  });
+  let message = `Completed all ${plan.steps.length} steps in plan "${plan.title}".`;
+  if (patched('operator-plan-outcome-summary-v1')) {
+    try {
+      const summary = await operatorModelStepActivity({
+        ...input.base,
+        step: plan.steps.length,
+        mode: 'plan_summary',
+        planTitle: plan.title,
+      });
+      if (summary.finishReason === 'stop' && summary.text.trim()) {
+        message = summary.text.trim();
+      }
+    } catch (error: unknown) {
+      if (isCancellation(error)) throw error;
+    }
+  }
+  message = appendOperatorPlanResultLinks(message, resultLinks.values());
+  await shortActivities.operatorCompleteTurnActivity({ ...input.base, message });
 }
 
 export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Promise<void> {
   const detachedRunFollowing = patched('operator-detached-run-following-v1');
+  const actionStatusOutcomes = patched('operator-action-status-outcome-v1');
   const decisions = new Map<string, OperatorActionDecisionUpdate>();
 
   // Updates can arrive before the workflow reaches its approval wait. Retain the latest
@@ -483,13 +664,23 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
     await shortActivities.operatorSetTurnStatusActivity({ ...base, status: 'running' });
 
     if (input.journey?.kind === 'improve_run' && patched('operator-improve-run-journey-v1')) {
-      await runImproveRunJourney({ base, journey: input.journey, decisions });
+      await runImproveRunJourney({
+        base,
+        journey: input.journey,
+        decisions,
+        interpretActionStatus: actionStatusOutcomes,
+      });
       await condition(allHandlersFinished);
       return;
     }
 
     if (input.journey?.kind === 'execute_plan' && patched('operator-execute-plan-journey-v1')) {
-      await runOperatorPlanJourney({ base, journey: input.journey, decisions });
+      await runOperatorPlanJourney({
+        base,
+        journey: input.journey,
+        decisions,
+        interpretActionStatus: actionStatusOutcomes,
+      });
       await condition(allHandlersFinished);
       return;
     }
@@ -527,6 +718,7 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
           base,
           toolCall,
           decisions,
+          interpretActionStatus: actionStatusOutcomes,
           userConfirmed: Boolean(directToolCall),
         });
         if (outcome.disposition === 'already_completed') {

@@ -544,13 +544,18 @@ describe('Operator activities', () => {
     fetchImpl
       .mockResolvedValueOnce(
         jsonResponse({
-          action: { id: ACTION_ID, version: 4, status: 'pending_approval' },
+          action: {
+            id: ACTION_ID,
+            version: 4,
+            status: 'pending_approval',
+            error: null,
+          },
           disposition: 'wait_for_approval',
         }),
       )
       .mockResolvedValueOnce(
         jsonResponse({
-          action: { id: ACTION_ID },
+          action: { id: ACTION_ID, status: 'succeeded', error: null },
           result: { runId: 'sentris-run-1' },
           launchedRunId: 'sentris-run-1',
         }),
@@ -570,6 +575,7 @@ describe('Operator activities', () => {
     expect(prepared).toEqual({
       actionId: ACTION_ID,
       actionVersion: 4,
+      actionStatus: 'pending_approval',
       disposition: 'wait_for_approval',
     });
     expect(requestBody(fetchImpl.mock.calls[0]?.[1])).toEqual({
@@ -585,6 +591,7 @@ describe('Operator activities', () => {
       organizationId: ORGANIZATION_ID,
     });
     expect(executed.launchedRunId).toBe('sentris-run-1');
+    expect(executed.actionStatus).toBe('succeeded');
   });
 
   test('keeps heartbeating while a long internal action request is in flight', async () => {
@@ -620,13 +627,14 @@ describe('Operator activities', () => {
       );
       resolveFetch(
         jsonResponse({
-          action: { id: ACTION_ID },
+          action: { id: ACTION_ID, status: 'succeeded', error: null },
           result: { inspected: true },
         }),
       );
 
       await expect(executing).resolves.toEqual({
         actionId: ACTION_ID,
+        actionStatus: 'succeeded',
         result: { inspected: true },
       });
       expect(timer.unref).toHaveBeenCalledTimes(1);
@@ -710,7 +718,7 @@ describe('Operator activities', () => {
     fetchImpl
       .mockResolvedValueOnce(
         jsonResponse({
-          action: { id: ACTION_ID },
+          action: { id: ACTION_ID, status: 'executing', error: null },
           result: { kind: 'mcp-operation', state: 'ready_for_dispatch' },
           mcpOperationRequest: request,
         }),

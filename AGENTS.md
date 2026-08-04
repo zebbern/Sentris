@@ -147,6 +147,10 @@ bun run typecheck      # Type check
 bun run lint           # Lint
 ```
 
+The local pre-push hook checks affected TypeScript projects plus test files changed by the
+pushed commits. The complete monorepo suite remains a CI and explicit `bun run test` gate; do
+not restore the full serial suite to every local push.
+
 ### Database
 
 ```bash
@@ -341,7 +345,12 @@ invocation path. Bounded multi-action requests may produce an immutable three-to
 `propose_operator_plan` preview. Run starts a separate patch-gated `execute_plan` journey by
 proposal-action ID; it schedules the existing typed action boundary sequentially with stable
 step identities, keeps Ask/Auto approval semantics, projects progress from the action ledger,
-and supports exact-turn cancellation. Revise creates a new proposal. A later step may bind an
+and supports exact-turn cancellation. The authoritative action status crosses the activity
+boundary, so a failed action stops the plan before later steps run; successful new histories use
+a patch-gated text-only model step to summarize durable results, then append bounded exact
+workflow/run links derived from typed action results. Summarization that is unavailable or
+incomplete falls back to a deterministic completion message. Revise creates a new proposal. A
+later step may bind an
 earlier step's string result into one top-level command argument through bounded RFC 6901 source
 and target pointers; the Workflow resolves the durable activity result deterministically and the
 canonical backend boundary validates the completed command input. Forward references, nested

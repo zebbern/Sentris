@@ -13,6 +13,7 @@ import {
   OperatorPlanProposalResultSchema,
   type McpOperationInvocationRequest,
   type McpOperationResult,
+  type OperatorActionStatus,
   type OperatorCommandName,
   type OperatorModelContext,
   type OperatorPlanProposalResult,
@@ -42,6 +43,7 @@ const MAX_MODEL_TEXT_LENGTH = 20_000;
 const MAX_CONVERSATION_LENGTH = 60_000;
 const MAX_TOOL_CALLS_PER_STEP = 8;
 const MAX_ACTION_LEDGER_LENGTH = 8_000;
+const MAX_PLAN_SUMMARY_LENGTH = 2_000;
 const RUN_OBSERVATION_POLL_MS = 2_000;
 const INTERNAL_REQUEST_HEARTBEAT_INTERVAL_MS = 10_000;
 
@@ -103,6 +105,7 @@ const preparedActionSchema = z
         version: z.number().int().nonnegative(),
         status: z.enum(OPERATOR_ACTION_STATUSES),
         result: z.unknown().optional(),
+        error: z.string().nullable(),
       })
       .passthrough(),
     disposition: z.enum(['execute', 'wait_for_approval', 'rejected', 'already_completed']),
@@ -111,7 +114,13 @@ const preparedActionSchema = z
 
 const executedActionSchema = z
   .object({
-    action: z.object({ id: z.string().uuid() }).passthrough(),
+    action: z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(OPERATOR_ACTION_STATUSES),
+        error: z.string().nullable(),
+      })
+      .passthrough(),
     result: z.unknown(),
     launchedRunId: z.string().optional(),
     mcpOperationRequest: McpOperationInvocationRequestSchema.optional(),
@@ -156,8 +165,9 @@ export interface OperatorActivityInput {
 
 export interface OperatorModelStepInput extends OperatorActivityInput {
   step: number;
-  mode?: 'standard' | 'improve_run_proposal' | 'improve_run_summary';
+  mode?: 'standard' | 'improve_run_proposal' | 'improve_run_summary' | 'plan_summary';
   sourceRunId?: string;
+  planTitle?: string;
   observations?: OperatorRunObservation[];
   toolCallHistory?: OperatorModelToolCall[];
 }
@@ -186,6 +196,8 @@ export interface OperatorPrepareActionInput extends OperatorActivityInput {
 export interface OperatorPreparedActionOutput {
   actionId: string;
   actionVersion: number;
+  actionStatus: OperatorActionStatus;
+  actionError?: string;
   disposition: 'execute' | 'wait_for_approval' | 'rejected' | 'already_completed';
   completedResult?: unknown;
 }
@@ -196,6 +208,8 @@ export interface OperatorExecuteActionInput extends OperatorActivityInput {
 
 export interface OperatorExecuteActionOutput {
   actionId: string;
+  actionStatus: OperatorActionStatus;
+  actionError?: string;
   result: unknown;
   launchedRunId?: string;
   mcpOperationRequest?: McpOperationInvocationRequest;
@@ -374,8 +388,17 @@ export async function operatorModelStepActivity(
       mode === 'improve_run_proposal'
         ? (['get_workflow', 'list_components', 'get_component', 'propose_workflow_edits'] as const)
         : OPERATOR_COMMAND_NAMES;
-    const tools = mode === 'improve_run_summary' ? undefined : buildOperatorTools(commandNames);
-    const system = buildSystemPrompt(context, input.observations ?? [], mode, input.sourceRunId);
+    const tools =
+      mode === 'improve_run_summary' || mode === 'plan_summary'
+        ? undefined
+        : buildOperatorTools(commandNames);
+    const system = buildSystemPrompt(
+      context,
+      input.observations ?? [],
+      mode,
+      input.sourceRunId,
+      input.planTitle,
+    );
     const messages = buildModelMessages(
       context.messages,
       context.actions,
@@ -399,6 +422,7 @@ export async function operatorModelStepActivity(
       'Operator',
     );
     if (providerFailure) {
+      if (mode === 'plan_summary') throw providerFailure;
       const recovery = await generate({
         model,
         system: buildRecoverySystemPrompt(),
@@ -439,7 +463,10 @@ export async function operatorModelStepActivity(
     }
 
     return {
-      text: result.text.slice(0, MAX_MODEL_TEXT_LENGTH),
+      text: result.text.slice(
+        0,
+        mode === 'plan_summary' ? MAX_PLAN_SUMMARY_LENGTH : MAX_MODEL_TEXT_LENGTH,
+      ),
       finishReason: String(result.finishReason),
       toolCalls,
     };
@@ -467,6 +494,8 @@ export async function operatorPrepareActionActivity(
   return {
     actionId: prepared.action.id,
     actionVersion: prepared.action.version,
+    actionStatus: prepared.action.status,
+    ...(prepared.action.error ? { actionError: prepared.action.error } : {}),
     disposition: prepared.disposition,
     ...(prepared.disposition === 'already_completed' && prepared.action.result !== undefined
       ? { completedResult: prepared.action.result }
@@ -486,6 +515,8 @@ export async function operatorExecuteActionActivity(
   );
   return {
     actionId: executed.action.id,
+    actionStatus: executed.action.status,
+    ...(executed.action.error ? { actionError: executed.action.error } : {}),
     result: executed.result,
     ...(executed.launchedRunId ? { launchedRunId: executed.launchedRunId } : {}),
     ...(executed.mcpOperationRequest ? { mcpOperationRequest: executed.mcpOperationRequest } : {}),
@@ -629,6 +660,7 @@ function buildSystemPrompt(
   observations: OperatorRunObservation[],
   mode: NonNullable<OperatorModelStepInput['mode']>,
   sourceRunId?: string,
+  planTitle?: string,
 ): string {
   const route = context.turn.context
     ? `Current product route: ${JSON.stringify(context.turn.context)}`
@@ -661,7 +693,15 @@ function buildSystemPrompt(
             'Do not claim semantic quality beyond the declared criteria and recorded evidence. Briefly offer another revision when the result is not clearly improved.',
             'This is a text-only summary; do not emit tool-call syntax.',
           ]
-        : [];
+        : mode === 'plan_summary'
+          ? [
+              `The durable Operator plan ${JSON.stringify(planTitle ?? 'Untitled plan')} has finished successfully.`,
+              'Summarize the useful outcome from the recorded successful plan actions, not merely that the steps completed.',
+              'Start with one concise outcome sentence, followed by at most five short bullets for important results or next actions. Omit empty or unimportant fields.',
+              'When the durable results contain exact identifiers, add relevant product-relative Markdown links using /workflows/{workflowId} or /workflows/{workflowId}/runs/{runId}. Never invent identifiers, labels, results, or URLs; omit a link if its required IDs are unavailable.',
+              'Keep the entire response under 2,000 characters. This is a text-only summary; do not emit tool-call syntax.',
+            ]
+          : [];
   return [
     'You are the Sentris Operator. Help the user operate their existing security workflows and inspect results.',
     'Use only the provided typed commands. Never claim a command ran unless its action ledger shows success.',

@@ -33,6 +33,7 @@
     "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "typecheck:release-scripts": "tsc -p tsconfig.release-scripts.json",
     "test": "node scripts/test-all.js",
+    "check:pre-push": "node scripts/pre-push.js",
     "test:e2e": "node scripts/e2e-test.js e2e-tests",
     "test:e2e:core": "node scripts/e2e-test.js e2e-tests/core",
     "test:e2e:release": "node scripts/e2e-test.js --require-explicit-instance --strict-services e2e-tests/core/self-hosted-critical-journey.test.ts",

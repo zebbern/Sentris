@@ -1,1 +1,1 @@
-bun run typecheck && bun run test
+node scripts/pre-push.js "$1"
