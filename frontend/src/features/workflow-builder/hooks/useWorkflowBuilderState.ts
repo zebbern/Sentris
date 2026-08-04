@@ -444,6 +444,7 @@ export function useWorkflowBuilderState() {
     workflowId,
     workflowName,
     metadata,
+    isDirty,
     nodes,
     edges,
     designNodes,

@@ -5,6 +5,7 @@ import {
   createOperatorDirectCommandNavigationState,
   createOperatorInvestigateFindingNavigationState,
   createOperatorInvestigateRunNavigationState,
+  createOperatorWorkflowAuthoringNavigationState,
   createOperatorTurnFromHandoff,
   readOperatorImproveRunHandoff,
   readOperatorTurnHandoff,
@@ -122,6 +123,46 @@ describe('Operator run improvement handoff', () => {
     });
   });
 
+  it('carries exact saved-workflow context into an authoring turn', () => {
+    const state = createOperatorWorkflowAuthoringNavigationState(
+      {
+        request: 'Review it and propose a focused improvement.',
+        sourcePath: '/workflows/22222222-2222-4222-8222-222222222222',
+        workflowId: '22222222-2222-4222-8222-222222222222',
+      },
+      () => CLIENT_TURN_ID,
+    );
+
+    const handoff = readOperatorTurnHandoff(state);
+    expect(handoff?.kind).toBe('workflow_authoring');
+    expect(createOperatorTurnFromHandoff(handoff!)).toEqual({
+      clientTurnId: CLIENT_TURN_ID,
+      message: 'Regarding the current saved workflow: Review it and propose a focused improvement.',
+      context: {
+        path: '/workflows/22222222-2222-4222-8222-222222222222',
+        workflowId: '22222222-2222-4222-8222-222222222222',
+      },
+    });
+  });
+
+  it('creates a new-workflow authoring turn without inventing a saved workflow identity', () => {
+    const state = createOperatorWorkflowAuthoringNavigationState(
+      {
+        request: 'Scan a domain and summarize high-confidence findings.',
+        sourcePath: '/workflows/new',
+      },
+      () => CLIENT_TURN_ID,
+    );
+
+    const handoff = readOperatorTurnHandoff(state);
+    expect(createOperatorTurnFromHandoff(handoff!)).toEqual({
+      clientTurnId: CLIENT_TURN_ID,
+      message:
+        'Create a new workflow draft for this request: Scan a domain and summarize high-confidence findings.',
+      context: { path: '/workflows/new' },
+    });
+  });
+
   it('ignores malformed or unrelated navigation state', () => {
     expect(readOperatorImproveRunHandoff(null)).toBeNull();
     expect(readOperatorImproveRunHandoff({ operatorHandoff: { kind: 'improve_run' } })).toBeNull();
@@ -150,6 +191,18 @@ describe('Operator run improvement handoff', () => {
           sourcePath: 'https://example.com/not-an-app-path',
         },
       }),
+    ).toBeNull();
+    expect(
+      readOperatorTurnHandoff(
+        createOperatorWorkflowAuthoringNavigationState(
+          {
+            request: 'Improve this workflow',
+            sourcePath: '/workflows/not-a-uuid',
+            workflowId: 'not-a-uuid',
+          },
+          () => CLIENT_TURN_ID,
+        ),
+      ),
     ).toBeNull();
   });
 });

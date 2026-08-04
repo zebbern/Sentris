@@ -1,4 +1,4 @@
-import { ArrowRight, Blocks, Sparkles, X } from 'lucide-react';
+import { ArrowRight, Blocks, Bot, Sparkles, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 interface NewWorkflowWelcomeProps {
   onDismiss: () => void;
+  onBuildWithOperator: () => void;
 }
 
-export function NewWorkflowWelcome({ onDismiss }: NewWorkflowWelcomeProps) {
+export function NewWorkflowWelcome({ onDismiss, onBuildWithOperator }: NewWorkflowWelcomeProps) {
   return (
     <Card
       className="absolute left-1/2 top-1/2 z-30 w-[calc(100%_-_2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 border-primary/20 bg-background/95 shadow-2xl backdrop-blur"
@@ -38,7 +39,25 @@ export function NewWorkflowWelcome({ onDismiss }: NewWorkflowWelcomeProps) {
 
       <CardContent className="grid gap-3 sm:grid-cols-2">
         <Button
+          type="button"
+          onClick={onBuildWithOperator}
+          className="h-auto justify-between gap-3 whitespace-normal px-4 py-3 text-left sm:col-span-2"
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <Bot className="h-4 w-4 shrink-0" />
+            <span>
+              <span className="block">Build with Operator</span>
+              <span className="mt-0.5 block text-xs font-normal opacity-80">
+                Describe the outcome and review a generated workflow draft
+              </span>
+            </span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0" />
+        </Button>
+
+        <Button
           asChild
+          variant="outline"
           className="h-auto justify-between gap-3 whitespace-normal px-4 py-3 text-left"
         >
           <Link to="/templates?setup=none">

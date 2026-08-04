@@ -19,6 +19,7 @@ export interface WorkflowBuilderToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   onToggleVersionHistory: () => void;
+  onAskOperator: () => void;
   successCriteriaNodes: { id: string; label: string }[];
 }
 
@@ -40,6 +41,7 @@ export function WorkflowBuilderToolbar({
   canUndo,
   canRedo,
   onToggleVersionHistory,
+  onAskOperator,
   successCriteriaNodes,
 }: WorkflowBuilderToolbarProps) {
   return (
@@ -61,6 +63,7 @@ export function WorkflowBuilderToolbar({
       canRedo={canRedo}
       hasAnalyticsSink={hasAnalyticsSink}
       onToggleVersionHistory={onToggleVersionHistory}
+      onAskOperator={onAskOperator}
       successCriteriaNodes={successCriteriaNodes}
     />
   );

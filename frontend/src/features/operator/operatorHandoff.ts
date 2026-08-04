@@ -27,7 +27,19 @@ export interface OperatorDirectCommandHandoff {
   routeContext?: OperatorRouteContext;
 }
 
-export type OperatorTurnHandoff = OperatorImproveRunHandoff | OperatorDirectCommandHandoff;
+export interface OperatorWorkflowAuthoringHandoff {
+  version: typeof OPERATOR_HANDOFF_VERSION;
+  kind: 'workflow_authoring';
+  clientTurnId: string;
+  request: string;
+  sourcePath: string;
+  workflowId?: string;
+}
+
+export type OperatorTurnHandoff =
+  | OperatorImproveRunHandoff
+  | OperatorDirectCommandHandoff
+  | OperatorWorkflowAuthoringHandoff;
 
 export interface OperatorNavigationState {
   operatorHandoff: OperatorTurnHandoff;
@@ -44,6 +56,12 @@ interface OperatorInvestigateFindingInput {
   workflowId?: string;
   runId?: string;
   sourcePath: string;
+}
+
+interface OperatorWorkflowAuthoringInput {
+  request: string;
+  sourcePath: string;
+  workflowId?: string;
 }
 
 const INVESTIGATE_RUN_MESSAGE =
@@ -127,6 +145,22 @@ export function createOperatorInvestigateFindingNavigationState(
   };
 }
 
+export function createOperatorWorkflowAuthoringNavigationState(
+  input: OperatorWorkflowAuthoringInput,
+  createId: () => string = () => crypto.randomUUID(),
+): OperatorNavigationState {
+  return {
+    operatorHandoff: {
+      version: OPERATOR_HANDOFF_VERSION,
+      kind: 'workflow_authoring',
+      clientTurnId: createId(),
+      request: input.request,
+      sourcePath: input.sourcePath,
+      ...(input.workflowId ? { workflowId: input.workflowId } : {}),
+    },
+  };
+}
+
 export function readOperatorTurnHandoff(state: unknown): OperatorTurnHandoff | null {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
   const handoff = (state as { operatorHandoff?: unknown }).operatorHandoff;
@@ -149,6 +183,26 @@ export function readOperatorTurnHandoff(state: unknown): OperatorTurnHandoff | n
     candidate.sourceRunId.trim().length > 0
   ) {
     return candidate as OperatorImproveRunHandoff;
+  }
+
+  if (candidate.kind === 'workflow_authoring') {
+    const authoringCandidate = candidate as Partial<OperatorWorkflowAuthoringHandoff>;
+    const routeContext = OperatorRouteContextSchema.safeParse({
+      path: authoringCandidate.sourcePath,
+      ...(authoringCandidate.workflowId ? { workflowId: authoringCandidate.workflowId } : {}),
+    });
+    if (
+      typeof authoringCandidate.request === 'string' &&
+      authoringCandidate.request.trim().length > 0 &&
+      authoringCandidate.request.length <= 20_000 &&
+      routeContext.success
+    ) {
+      return {
+        ...(authoringCandidate as OperatorWorkflowAuthoringHandoff),
+        request: authoringCandidate.request.trim(),
+        ...(routeContext.data.workflowId ? { workflowId: routeContext.data.workflowId } : {}),
+      };
+    }
   }
 
   if (candidate.kind === 'direct_command') {
@@ -188,6 +242,19 @@ export function createOperatorTurnFromHandoff(handoff: OperatorTurnHandoff): Ope
       message: handoff.message,
       context: handoff.routeContext ?? { path: handoff.sourcePath },
       directCommand: handoff.directCommand,
+    };
+  }
+
+  if (handoff.kind === 'workflow_authoring') {
+    return {
+      clientTurnId: handoff.clientTurnId,
+      message: handoff.workflowId
+        ? `Regarding the current saved workflow: ${handoff.request}`
+        : `Create a new workflow draft for this request: ${handoff.request}`,
+      context: {
+        path: handoff.sourcePath,
+        ...(handoff.workflowId ? { workflowId: handoff.workflowId } : {}),
+      },
     };
   }
 

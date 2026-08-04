@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   ArrowLeft,
+  Bot,
   Play,
   PencilLine,
   MonitorPlay,
@@ -77,6 +78,7 @@ interface TopBarProps {
   isInWorkflowBuilder?: boolean;
   hasAnalyticsSink?: boolean;
   onToggleVersionHistory?: () => void;
+  onAskOperator?: () => void;
   successCriteriaNodes?: { id: string; label: string }[];
 }
 
@@ -100,6 +102,7 @@ export function TopBar({
   canRedo,
   hasAnalyticsSink = false,
   onToggleVersionHistory,
+  onAskOperator,
   successCriteriaNodes = [],
 }: TopBarProps) {
   const navigate = useNavigate();
@@ -393,6 +396,23 @@ export function TopBar({
           </div>
 
           <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-1 md:gap-1.5">
+            {mode === 'design' && onAskOperator ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={TOOLBAR_ICON_BUTTON_CLASS}
+                aria-label={
+                  hasPersistedWorkflow ? 'Ask Operator about workflow' : 'Build with Operator'
+                }
+                title={hasPersistedWorkflow ? 'Ask Operator' : 'Build with Operator'}
+                disabled={!canEdit}
+                onClick={onAskOperator}
+              >
+                <Bot className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+
             {mode === 'design' ? (
               <Button
                 type="button"

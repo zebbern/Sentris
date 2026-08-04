@@ -63,6 +63,57 @@ describe('operatorSessionHasActiveTurn', () => {
       }),
     ).toBe(true);
   });
+
+  it('uses a matching compact activity summary to settle a lagging session snapshot', () => {
+    const runningTurn = {
+      ...turn,
+      status: 'running' as const,
+      error: null,
+      completedAt: null,
+    };
+
+    expect(
+      operatorSessionHasActiveTurn(
+        { ...session, turns: [runningTurn] },
+        {
+          ...session,
+          latestTurn: {
+            id: runningTurn.id,
+            status: 'completed',
+            error: null,
+            createdAt: runningTurn.createdAt,
+            completedAt: '2026-08-02T10:01:00.000Z',
+          },
+        },
+      ),
+    ).toBe(false);
+  });
+
+  it('does not let an older activity summary hide a newer active session turn', () => {
+    const runningTurn = {
+      ...turn,
+      id: 'turn-2',
+      status: 'running' as const,
+      error: null,
+      completedAt: null,
+    };
+
+    expect(
+      operatorSessionHasActiveTurn(
+        { ...session, turns: [turn, runningTurn] },
+        {
+          ...session,
+          latestTurn: {
+            id: turn.id,
+            status: 'failed',
+            error: turn.error,
+            createdAt: turn.createdAt,
+            completedAt: turn.completedAt,
+          },
+        },
+      ),
+    ).toBe(true);
+  });
 });
 
 describe('getOperatorSessionLatestTurnError', () => {

@@ -8,6 +8,7 @@ import { RunWorkflowDialog } from '@/components/workflow/RunWorkflowDialog';
 import { WorkflowBuilderShell } from '@/components/workflow/WorkflowBuilderShell';
 import { TerminalDockPanel } from '@/components/terminal/TerminalDockPanel';
 import { PublishTemplateModal } from '@/features/templates/PublishTemplateModal';
+import { WorkflowOperatorHandoffDialog } from '@/features/operator/WorkflowOperatorHandoffDialog';
 import { VersionHistoryPanel } from '@/features/workflow-builder/components/VersionHistoryPanel';
 import { WorkflowDesignerPane } from '@/features/workflow-builder/components/WorkflowDesignerPane';
 import { WorkflowExecutionPane } from '@/features/workflow-builder/components/WorkflowExecutionPane';
@@ -20,6 +21,7 @@ import { isEntryPointNode } from '@/utils/entryPointUtils';
 const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
   const state = useWorkflowBuilderState();
   const [isWelcomeDismissed, setIsWelcomeDismissed] = useState(false);
+  const [isOperatorDialogOpen, setIsOperatorDialogOpen] = useState(false);
 
   if (state.shouldShowInitialLoader) {
     return (
@@ -53,6 +55,7 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
       onToggleVersionHistory={() =>
         state.setVersionHistoryPanelOpen(!state.versionHistoryPanelOpen)
       }
+      onAskOperator={() => setIsOperatorDialogOpen(true)}
       successCriteriaNodes={state.designNodes.map((node) => ({
         id: node.id,
         label: node.data.label || node.id,
@@ -82,7 +85,12 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
         showSummary={state.mode === 'design'}
         onNavigateToSchedules={state.navigateToSchedules}
       />
-      {shouldShowWelcome && <NewWorkflowWelcome onDismiss={() => setIsWelcomeDismissed(true)} />}
+      {shouldShowWelcome && (
+        <NewWorkflowWelcome
+          onDismiss={() => setIsWelcomeDismissed(true)}
+          onBuildWithOperator={() => setIsOperatorDialogOpen(true)}
+        />
+      )}
       {state.mode === 'design' && state.showDemoComponents && <HistoryDebugger />}
     </div>
   );
@@ -173,6 +181,14 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
           onLoadVersion={state.handleLoadVersion}
         />
       )}
+      <WorkflowOperatorHandoffDialog
+        open={isOperatorDialogOpen}
+        onOpenChange={setIsOperatorDialogOpen}
+        sourcePath={state.id ? `/workflows/${state.id}` : '/workflows/new'}
+        workflowId={state.isNewWorkflow ? undefined : (state.workflowId ?? undefined)}
+        workflowName={state.metadata.name || 'Untitled Workflow'}
+        hasUnsavedChanges={state.isDirty}
+      />
     </>
   );
 });

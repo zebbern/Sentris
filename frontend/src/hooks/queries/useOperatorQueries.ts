@@ -13,6 +13,7 @@ import {
   type OperatorCreateTurn,
   type OperatorRetryTurn,
   type OperatorSessionDetail,
+  type OperatorSessionSummary,
   type OperatorUpdateSession,
 } from '@sentris/shared';
 
@@ -74,8 +75,17 @@ export function getOperatorRunTraceRefetchInterval(
   return Math.min(interval, remainingSettleMs);
 }
 
-export function operatorSessionHasActiveTurn(session: OperatorSessionDetail): boolean {
-  return session.turns.some((turn) => ACTIVE_TURN_STATUSES.has(turn.status));
+export function operatorSessionHasActiveTurn(
+  session: OperatorSessionDetail,
+  activitySummary?: OperatorSessionSummary,
+): boolean {
+  const latestTurn = session.turns[session.turns.length - 1];
+  if (!latestTurn) return false;
+  const activityLatestTurn = activitySummary?.latestTurn;
+  if (activityLatestTurn?.id === latestTurn.id) {
+    return ACTIVE_TURN_STATUSES.has(activityLatestTurn.status);
+  }
+  return ACTIVE_TURN_STATUSES.has(latestTurn.status);
 }
 
 export function getOperatorSessionLatestTurnError(session: OperatorSessionDetail): string | null {
@@ -149,8 +159,14 @@ export function useOperatorActivityStream() {
             const parsed = OperatorActivityStreamSnapshotSchema.safeParse(readEventPayload(event));
             if (!parsed.success) return;
             const sessionsKey = queryKeys.operator.sessions();
-            void queryClient.cancelQueries({ queryKey: sessionsKey, exact: true });
-            queryClient.setQueryData(sessionsKey, parsed.data.sessions);
+            void queryClient
+              .cancelQueries({ queryKey: sessionsKey, exact: true })
+              .then(() => {
+                if (!disposed) queryClient.setQueryData(sessionsKey, parsed.data.sessions);
+              })
+              .catch((error: unknown) => {
+                logger.warn('Failed to apply Operator activity snapshot', error);
+              });
           });
           source.addEventListener('error', (event) => {
             const payload = readEventPayload(event);
@@ -265,8 +281,14 @@ export function useOperatorSessionStream(sessionId: string | undefined) {
             const parsed = OperatorSessionStreamSnapshotSchema.safeParse(readEventPayload(event));
             if (!parsed.success || parsed.data.session.id !== sessionId) return;
             const sessionKey = queryKeys.operator.session(sessionId);
-            void queryClient.cancelQueries({ queryKey: sessionKey, exact: true });
-            queryClient.setQueryData(sessionKey, parsed.data.session);
+            void queryClient
+              .cancelQueries({ queryKey: sessionKey, exact: true })
+              .then(() => {
+                if (!disposed) queryClient.setQueryData(sessionKey, parsed.data.session);
+              })
+              .catch((error: unknown) => {
+                logger.warn('Failed to apply Operator session snapshot', error);
+              });
           });
           source.addEventListener('error', (event) => {
             const payload = readEventPayload(event);

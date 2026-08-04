@@ -4,7 +4,9 @@ import {
   type OperatorApprovalMode,
   type OperatorDirectCommand,
   type OperatorJourney,
+  type OperatorRouteContext,
   type OperatorSessionDetail,
+  type OperatorSessionSummary,
 } from '@sentris/shared';
 import { formatDistanceToNowStrict } from 'date-fns';
 import {
@@ -326,10 +328,12 @@ function SessionModelSettings({ session }: { session: OperatorSessionDetail }) {
 
 function ActiveSession({
   session,
+  activitySummary,
   handoff,
   focusTurnId,
 }: {
   session: OperatorSessionDetail;
+  activitySummary?: OperatorSessionSummary;
   handoff: OperatorTurnHandoff | null;
   focusTurnId: string | null;
 }) {
@@ -343,7 +347,7 @@ function ActiveSession({
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedHandoffRef = useRef<string | null>(null);
   const focusedTurnRef = useRef<string | null>(null);
-  const isActive = operatorSessionHasActiveTurn(session);
+  const isActive = operatorSessionHasActiveTurn(session, activitySummary);
   const latestTurnError = getOperatorSessionLatestTurnError(session);
   const expectedWorkflowDraftCount = session.actions.filter(
     (action) => action.commandName === 'propose_workflow_draft' && action.status === 'succeeded',
@@ -377,7 +381,7 @@ function ActiveSession({
       content: string,
       directCommand?: OperatorDirectCommand,
       journey?: OperatorJourney,
-      options?: { clientTurnId?: string; contextPath?: string },
+      options?: { clientTurnId?: string; context?: OperatorRouteContext },
     ) => {
       if (!content || isActive || createTurn.isPending) return;
 
@@ -387,7 +391,7 @@ function ActiveSession({
           input: {
             clientTurnId: options?.clientTurnId ?? crypto.randomUUID(),
             message: content,
-            context: { path: options?.contextPath ?? location.pathname },
+            context: options?.context ?? { path: location.pathname },
             ...(directCommand ? { directCommand } : {}),
             ...(journey ? { journey } : {}),
           },
@@ -419,7 +423,7 @@ function ActiveSession({
     navigate(location.pathname, { replace: true, state: null });
     void sendTurn(turn.message, turn.directCommand, turn.journey, {
       clientTurnId: turn.clientTurnId,
-      contextPath: turn.context?.path,
+      context: turn.context,
     });
   }, [createTurn.isPending, handoff, isActive, location.pathname, navigate, sendTurn]);
 
@@ -550,6 +554,10 @@ export function OperatorPage() {
   const sessionsQuery = useOperatorSessions();
   const sessionQuery = useOperatorSessionStream(sessionId);
   const latestSessionId = sessionsQuery.data?.[0]?.id;
+  const activeSessionSummary = useMemo(
+    () => sessionsQuery.data?.find((session) => session.id === sessionId),
+    [sessionId, sessionsQuery.data],
+  );
   const focusTurnId = searchParams.get('turnId');
   const unreadSessionIds = useMemo(
     () =>
@@ -625,7 +633,12 @@ export function OperatorPage() {
         ) : null}
 
         {sessionQuery.data ? (
-          <ActiveSession session={sessionQuery.data} handoff={handoff} focusTurnId={focusTurnId} />
+          <ActiveSession
+            session={sessionQuery.data}
+            activitySummary={activeSessionSummary}
+            handoff={handoff}
+            focusTurnId={focusTurnId}
+          />
         ) : null}
       </section>
     </div>
