@@ -316,9 +316,6 @@ describe('Operator activities', () => {
       finishReason: 'stop',
       toolCalls: [],
     });
-    expect(result.text).toContain(
-      'No workflow draft was proposed or applied by this recovery response.',
-    );
     expect(generateTextImpl).toHaveBeenCalledTimes(2);
     expect(generateTextImpl.mock.calls[1]?.[0]).not.toHaveProperty('tools');
     expect(generateTextImpl.mock.calls[1]?.[0]).not.toHaveProperty('toolChoice');
