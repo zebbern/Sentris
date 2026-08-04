@@ -15,6 +15,7 @@ import {
   OperatorPersistedTurnPayloadSchema,
   OperatorPersistedTurnPayloadV1Schema,
   OperatorProposePlanInputSchema,
+  resolveOperatorPlanStepArguments,
   OperatorReadMcpResourceInputSchema,
   OperatorSessionStreamErrorSchema,
   OperatorSessionStreamReadySchema,
@@ -670,6 +671,60 @@ describe('Operator durable plans', () => {
     });
   });
 
+  it('resolves one bounded string argument from an earlier step result', () => {
+    const workflowId = '33333333-3333-4333-8333-333333333333';
+    const steps = OperatorProposePlanInputSchema.parse({
+      title: 'Inspect one discovered workflow',
+      steps: [
+        {
+          id: 'list-workflows',
+          label: 'List workflows',
+          commandName: 'list_workflows',
+          arguments: {},
+        },
+        {
+          id: 'inspect-workflow',
+          label: 'Inspect the workflow',
+          commandName: 'get_workflow',
+          arguments: {},
+          bindings: [
+            {
+              sourceStepId: 'list-workflows',
+              sourcePointer: '/0/id',
+              targetPointer: '/workflowId',
+            },
+          ],
+        },
+        {
+          id: 'list-runs',
+          label: 'List its runs',
+          commandName: 'list_runs',
+          arguments: { limit: 5 },
+          bindings: [
+            {
+              sourceStepId: 'list-workflows',
+              sourcePointer: '/0/id',
+              targetPointer: '/workflowId',
+            },
+          ],
+        },
+      ],
+    }).steps;
+
+    expect(resolveOperatorPlanStepArguments(steps[0]!, new Map())).toEqual({});
+    expect(
+      resolveOperatorPlanStepArguments(
+        steps[1]!,
+        new Map([['list-workflows', [{ id: workflowId }]]]),
+      ),
+    ).toEqual({
+      workflowId,
+    });
+    expect(() =>
+      resolveOperatorPlanStepArguments(steps[1]!, new Map([['list-workflows', []]])),
+    ).toThrow('did not resolve to a string');
+  });
+
   it('rejects duplicate steps, invalid typed arguments, and turn-scoped MCP operations', () => {
     expect(
       OperatorProposePlanInputSchema.safeParse({
@@ -694,6 +749,44 @@ describe('Operator durable plans', () => {
             commandName: 'invoke_mcp_tool',
             arguments: {},
           },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposePlanInputSchema.safeParse({
+        title: 'Forward reference',
+        steps: [
+          {
+            ...validSteps[0],
+            arguments: {},
+            bindings: [
+              {
+                sourceStepId: 'inspect-finding',
+                sourcePointer: '/id',
+                targetPointer: '/runId',
+              },
+            ],
+          },
+          ...validSteps.slice(1),
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposePlanInputSchema.safeParse({
+        title: 'Conflicting argument',
+        steps: [
+          validSteps[0],
+          {
+            ...validSteps[1],
+            bindings: [
+              {
+                sourceStepId: 'inspect-run',
+                sourcePointer: '/findingId',
+                targetPointer: '/findingId',
+              },
+            ],
+          },
+          validSteps[2],
         ],
       }).success,
     ).toBe(false);

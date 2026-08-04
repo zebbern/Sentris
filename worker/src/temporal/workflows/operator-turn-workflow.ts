@@ -13,6 +13,7 @@ import {
 import {
   OperatorRunComparisonResultSchema,
   OperatorPlanProposalResultSchema,
+  resolveOperatorPlanStepArguments,
   OperatorWorkflowApplyResultSchema,
   OperatorWorkflowDraftResultSchema,
   type OperatorCommandName,
@@ -193,7 +194,7 @@ type OperatorDecisionMap = Map<string, OperatorActionDecisionUpdate>;
 type OperatorActionExecutionOutcome =
   | { disposition: 'executed'; executed: OperatorExecuteActionOutput }
   | { disposition: 'rejected' }
-  | { disposition: 'already_completed' };
+  | { disposition: 'already_completed'; result?: unknown };
 
 async function prepareAndExecuteOperatorAction(input: {
   base: OperatorActivityInput;
@@ -207,7 +208,10 @@ async function prepareAndExecuteOperatorAction(input: {
     ...(input.userConfirmed ? { userConfirmed: true } : {}),
   });
   if (prepared.disposition === 'already_completed') {
-    return { disposition: 'already_completed' };
+    return {
+      disposition: 'already_completed',
+      ...(prepared.completedResult !== undefined ? { result: prepared.completedResult } : {}),
+    };
   }
   if (prepared.disposition === 'rejected') return { disposition: 'rejected' };
 
@@ -217,6 +221,7 @@ async function prepareAndExecuteOperatorAction(input: {
       status: 'awaiting_approval',
     });
     let approvalOutcome: 'execute' | 'rejected' | 'already_completed' | undefined;
+    let reconciledCompletedResult: unknown;
     while (!approvalOutcome) {
       const updateArrived = await condition(() => {
         const decision = input.decisions.get(prepared.actionId);
@@ -238,12 +243,16 @@ async function prepareAndExecuteOperatorAction(input: {
       }
       if (reconciled.disposition !== 'wait_for_approval') {
         approvalOutcome = reconciled.disposition;
+        reconciledCompletedResult = reconciled.completedResult;
       }
     }
     await shortActivities.operatorSetTurnStatusActivity({ ...input.base, status: 'running' });
     if (approvalOutcome === 'rejected') return { disposition: 'rejected' };
     if (approvalOutcome === 'already_completed') {
-      return { disposition: 'already_completed' };
+      return {
+        disposition: 'already_completed',
+        ...(reconciledCompletedResult !== undefined ? { result: reconciledCompletedResult } : {}),
+      };
     }
   }
 
@@ -413,14 +422,16 @@ async function runOperatorPlanJourney(input: {
     ...input.base,
     planActionId: input.journey.planActionId,
   });
+  const resultsByStepId = new Map<string, unknown>();
   for (const [index, step] of plan.steps.entries()) {
+    const arguments_ = resolveOperatorPlanStepArguments(step, resultsByStepId);
     const outcome = await prepareAndExecuteOperatorAction({
       base: input.base,
       decisions: input.decisions,
       toolCall: {
         toolCallId: `${input.base.turnId}:plan:${plan.planId}:${step.id}`,
         commandName: step.commandName,
-        arguments: step.arguments,
+        arguments: arguments_,
       },
     });
     if (outcome.disposition === 'rejected') {
@@ -432,6 +443,11 @@ async function runOperatorPlanJourney(input: {
     }
     if (outcome.disposition === 'executed' && outcome.executed.mcpOperationRequest) {
       throw new Error('Operator plans cannot execute turn-scoped MCP operations');
+    }
+    if (outcome.disposition === 'executed') {
+      resultsByStepId.set(step.id, outcome.executed.result);
+    } else if (outcome.disposition === 'already_completed' && outcome.result !== undefined) {
+      resultsByStepId.set(step.id, outcome.result);
     }
   }
   await shortActivities.operatorCompleteTurnActivity({

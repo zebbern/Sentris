@@ -722,6 +722,34 @@ export const OPERATOR_PLAN_COMMAND_NAMES = [
 export const OperatorPlanCommandNameSchema = z.enum(OPERATOR_PLAN_COMMAND_NAMES);
 export type OperatorPlanCommandName = z.infer<typeof OperatorPlanCommandNameSchema>;
 
+const OperatorPlanStepIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z][a-z0-9_-]{0,63}$/);
+
+function isValidJsonPointer(value: string): boolean {
+  if (!value.startsWith('/')) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== '~') continue;
+    if (value[index + 1] !== '0' && value[index + 1] !== '1') return false;
+    index += 1;
+  }
+  return true;
+}
+
+export const OperatorPlanStepBindingSchema = z
+  .object({
+    sourceStepId: OperatorPlanStepIdSchema,
+    sourcePointer: z.string().min(1).max(512).refine(isValidJsonPointer, {
+      message: 'sourcePointer must be a valid non-root RFC 6901 JSON Pointer',
+    }),
+    targetPointer: z.string().regex(/^\/[A-Za-z][A-Za-z0-9_]*$/, {
+      message: 'targetPointer must select one top-level command argument',
+    }),
+  })
+  .strict();
+export type OperatorPlanStepBinding = z.infer<typeof OperatorPlanStepBindingSchema>;
+
 const OPERATOR_PLAN_COMMAND_SCHEMAS = {
   list_workflows: OperatorListWorkflowsInputSchema,
   get_workflow: OperatorGetWorkflowInputSchema,
@@ -745,21 +773,49 @@ const OPERATOR_PLAN_COMMAND_SCHEMAS = {
 
 const OperatorPlanStepBaseSchema = z
   .object({
-    id: z
-      .string()
-      .trim()
-      .regex(/^[a-z][a-z0-9_-]{0,63}$/),
+    id: OperatorPlanStepIdSchema,
     label: z.string().trim().min(1).max(191),
     commandName: OperatorPlanCommandNameSchema,
     arguments: z.record(z.string(), z.unknown()),
+    bindings: z.array(OperatorPlanStepBindingSchema).max(8).optional(),
   })
   .strict();
+
+const OPERATOR_PLAN_STRING_BINDING_PLACEHOLDER = '00000000-0000-4000-8000-000000000000';
+
+function targetArgumentName(targetPointer: string): string {
+  return targetPointer.slice(1);
+}
 
 function validateOperatorPlanStep(
   value: z.infer<typeof OperatorPlanStepBaseSchema>,
   context: z.RefinementCtx,
 ): void {
-  const parsed = OPERATOR_PLAN_COMMAND_SCHEMAS[value.commandName].safeParse(value.arguments);
+  const argumentsForValidation = { ...value.arguments };
+  const seenTargets = new Set<string>();
+  for (const [index, binding] of (value.bindings ?? []).entries()) {
+    const target = targetArgumentName(binding.targetPointer);
+    if (seenTargets.has(target)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['bindings', index, 'targetPointer'],
+        message: `Duplicate binding target "${binding.targetPointer}"`,
+      });
+      continue;
+    }
+    seenTargets.add(target);
+    if (Object.prototype.hasOwnProperty.call(value.arguments, target)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['bindings', index, 'targetPointer'],
+        message: `Bound argument "${target}" cannot also have a literal value`,
+      });
+      continue;
+    }
+    argumentsForValidation[target] = OPERATOR_PLAN_STRING_BINDING_PLACEHOLDER;
+  }
+
+  const parsed = OPERATOR_PLAN_COMMAND_SCHEMAS[value.commandName].safeParse(argumentsForValidation);
   if (parsed.success) return;
   for (const issue of parsed.error.issues.slice(0, 5)) {
     context.addIssue({
@@ -774,6 +830,32 @@ export const OperatorPlanStepSchema =
   OperatorPlanStepBaseSchema.superRefine(validateOperatorPlanStep);
 export type OperatorPlanStep = z.infer<typeof OperatorPlanStepSchema>;
 
+function validateOperatorPlanSequence(
+  steps: readonly z.infer<typeof OperatorPlanStepBaseSchema>[],
+  context: z.RefinementCtx,
+): void {
+  const seen = new Set<string>();
+  for (const [index, step] of steps.entries()) {
+    if (seen.has(step.id)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['steps', index, 'id'],
+        message: `Duplicate plan step id "${step.id}"`,
+      });
+    }
+    for (const [bindingIndex, binding] of (step.bindings ?? []).entries()) {
+      if (!seen.has(binding.sourceStepId)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['steps', index, 'bindings', bindingIndex, 'sourceStepId'],
+          message: `Binding source "${binding.sourceStepId}" must be an earlier plan step`,
+        });
+      }
+    }
+    seen.add(step.id);
+  }
+}
+
 export const OperatorProposePlanInputSchema = z
   .object({
     title: z.string().trim().min(1).max(191),
@@ -782,17 +864,7 @@ export const OperatorProposePlanInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    const seen = new Set<string>();
-    for (const [index, step] of value.steps.entries()) {
-      if (seen.has(step.id)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['steps', index, 'id'],
-          message: `Duplicate plan step id "${step.id}"`,
-        });
-      }
-      seen.add(step.id);
-    }
+    validateOperatorPlanSequence(value.steps, context);
     if (new TextEncoder().encode(JSON.stringify(value)).byteLength > 64 * 1024) {
       context.addIssue({
         code: 'custom',
@@ -815,8 +887,58 @@ export const OperatorPlanProposalResultSchema = z
     summary: z.string().trim().min(1).max(2_000).optional(),
     steps: z.array(OperatorPlanResultStepSchema).min(3).max(8),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => validateOperatorPlanSequence(value.steps, context));
 export type OperatorPlanProposalResult = z.infer<typeof OperatorPlanProposalResultSchema>;
+
+function resolveJsonPointer(value: unknown, pointer: string): unknown {
+  let current = value;
+  for (const encodedToken of pointer.slice(1).split('/')) {
+    const token = encodedToken.replace(/~1/g, '/').replace(/~0/g, '~');
+    if (Array.isArray(current)) {
+      if (!/^(0|[1-9][0-9]*)$/.test(token)) return undefined;
+      const index = Number(token);
+      if (!Number.isSafeInteger(index) || index >= current.length) return undefined;
+      current = current[index];
+      continue;
+    }
+    if (typeof current !== 'object' || current === null) return undefined;
+    if (!Object.prototype.hasOwnProperty.call(current, token)) return undefined;
+    current = (current as Record<string, unknown>)[token];
+  }
+  return current;
+}
+
+export function resolveOperatorPlanStepArguments(
+  step: OperatorPlanStep,
+  resultsByStepId: ReadonlyMap<string, unknown>,
+): Record<string, unknown> {
+  // Old plan histories scheduled their exact stored arguments. Preserve that payload
+  // when no binding exists so replay cannot gain schema defaults after this feature.
+  if (!step.bindings || step.bindings.length === 0) return { ...step.arguments };
+
+  const resolvedArguments = { ...step.arguments };
+  for (const binding of step.bindings) {
+    if (!resultsByStepId.has(binding.sourceStepId)) {
+      throw new Error(
+        `Plan step "${step.id}" cannot resolve result from "${binding.sourceStepId}"`,
+      );
+    }
+    const value = resolveJsonPointer(
+      resultsByStepId.get(binding.sourceStepId),
+      binding.sourcePointer,
+    );
+    if (typeof value !== 'string') {
+      throw new Error(
+        `Plan step "${step.id}" binding ${binding.sourceStepId}${binding.sourcePointer} did not resolve to a string`,
+      );
+    }
+    resolvedArguments[targetArgumentName(binding.targetPointer)] = value;
+  }
+
+  const parsed = OPERATOR_PLAN_COMMAND_SCHEMAS[step.commandName].parse(resolvedArguments);
+  return parsed as Record<string, unknown>;
+}
 
 const McpCapabilitySnapshotIdSchema = z.string().uuid();
 const McpSourceIdSchema = z.string().trim().min(1).max(512);
@@ -933,7 +1055,7 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
   },
   propose_operator_plan: {
     description:
-      'Create an immutable, reviewable plan of 3-8 exact typed Operator commands without executing them. Resolve every command argument before proposing the plan; plan steps cannot reference outputs from earlier steps. MCP snapshot operations are intentionally unavailable because their authority is turn-scoped. The user starts the plan separately with Run plan.',
+      'Create an immutable, reviewable plan of 3-8 typed Operator commands without executing them. Prefer exact literal arguments. A later step may derive one top-level string argument from an earlier step result with bindings: [{ sourceStepId, sourcePointer, targetPointer }], where both pointers are RFC 6901 paths such as sourcePointer "/0/id" and targetPointer "/workflowId". Do not also set a bound argument literally. MCP snapshot operations are intentionally unavailable because their authority is turn-scoped. The user starts the plan separately with Run plan.',
     effect: 'execute',
     inputSchema: OperatorProposePlanInputSchema,
   },

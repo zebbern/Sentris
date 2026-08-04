@@ -105,9 +105,11 @@ reuse the same action rows and the normal Ask/Auto policy still decides conseque
 The action ledger is the progress record rendered by the browser; there is no second plan
 executor or plan-state store. Stop requests cancel the exact Operator Temporal run and record
 the turn as cancelled while retaining completed actions. Revision creates a new immutable
-proposal. Initial plans intentionally exclude turn-scoped MCP snapshots and cross-step output
-bindings; those require a future authority-aware dataflow contract rather than string
-substitution.
+proposal. A later step may copy one string from an earlier step's durable action result into one
+top-level command argument through bounded RFC 6901 source and target pointers. Resolution is a
+deterministic Workflow operation and the completed arguments still pass through the canonical
+backend command schema and action boundary. Forward references, nested targets, literal/bound
+conflicts, general expressions, string templating, and turn-scoped MCP snapshots remain excluded.
 The selected session is projected to the browser through a versioned SSE stream of complete
 Postgres-backed snapshots. TanStack Query remains the frontend cache, with periodic REST
 reads only as a connection fallback; the stream is not a second event store and does not

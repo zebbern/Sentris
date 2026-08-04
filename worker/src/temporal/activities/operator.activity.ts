@@ -102,6 +102,7 @@ const preparedActionSchema = z
         id: z.string().uuid(),
         version: z.number().int().nonnegative(),
         status: z.enum(OPERATOR_ACTION_STATUSES),
+        result: z.unknown().optional(),
       })
       .passthrough(),
     disposition: z.enum(['execute', 'wait_for_approval', 'rejected', 'already_completed']),
@@ -186,6 +187,7 @@ export interface OperatorPreparedActionOutput {
   actionId: string;
   actionVersion: number;
   disposition: 'execute' | 'wait_for_approval' | 'rejected' | 'already_completed';
+  completedResult?: unknown;
 }
 
 export interface OperatorExecuteActionInput extends OperatorActivityInput {
@@ -466,6 +468,9 @@ export async function operatorPrepareActionActivity(
     actionId: prepared.action.id,
     actionVersion: prepared.action.version,
     disposition: prepared.disposition,
+    ...(prepared.disposition === 'already_completed' && prepared.action.result !== undefined
+      ? { completedResult: prepared.action.result }
+      : {}),
   };
 }
 
@@ -668,7 +673,7 @@ function buildSystemPrompt(
     'Call retry_run only when the user explicitly asks to retry an existing run. It preserves the original workflow version and stored inputs.',
     'When the user asks to rerun with changed inputs, first inspect the terminal source run with get_run and its exact immutable version with get_workflow. Use only the non-secret values and exact runtime input IDs returned by that evidence, then call propose_run_input_changes with the smallest justified set/unset operations. Never copy or replace the credential placeholder, and never call run_workflow in the proposal turn; the user launches the reviewed proposal explicitly.',
     'Call update_finding_triage only when the user explicitly asks for that finding change.',
-    'When a user request requires 3-8 exact actions, first use normal read commands to resolve every ID and argument, then call propose_operator_plan. A plan is an immutable preview only: never execute its planned commands in the proposal turn. Plan steps cannot reference outputs from earlier steps, and MCP snapshot operations cannot be planned because their authority is turn-scoped. The user starts an accepted plan with Run plan.',
+    'When a user request requires 3-8 actions, call propose_operator_plan. A plan is an immutable preview only: never execute its planned commands in the proposal turn. Prefer exact literal arguments. When an earlier read must discover a string ID for a later step, omit that target argument and add a binding with sourceStepId, an RFC 6901 sourcePointer such as "/0/id", and a top-level targetPointer such as "/workflowId". Bindings may only reference earlier steps and cannot be used for MCP snapshot operations because their authority is turn-scoped. The user starts an accepted plan with Run plan.',
     'For a terminal run, get_run returns bounded failed/recent trace evidence and run-scoped findings. Use that evidence to explain the likely root cause.',
     'Only when the user explicitly asks for a fix or revision, inspect the exact saved workflow and component definitions and call propose_workflow_edits. Propose edits only for an evidence-supported graph or component-configuration defect, and make the smallest justified change.',
     'Treat wrong invocation inputs or input IDs as invocation guidance; do not weaken a valid workflow contract by adding aliases. Never set credential values in workflow edits. Include sourceRunId on an update proposal derived from a run.',

@@ -111,31 +111,46 @@ beforeEach(() => {
 describe('operatorTurnWorkflow', () => {
   test('executes an immutable plan sequentially through the canonical action boundary', async () => {
     const planActionId = '44444444-4444-4444-8444-444444444444';
+    const workflowId = '55555555-5555-4555-8555-555555555555';
     operatorLoadPlanActivity.mockResolvedValue({
       kind: 'operator-plan',
       planId: planActionId,
-      title: 'Review and triage findings',
+      title: 'Inspect workflow activity',
       steps: [
         {
-          id: 'inspect-run',
-          label: 'Inspect the source run',
-          commandName: 'get_run',
-          arguments: { runId: 'sentris-run-source' },
+          id: 'list-workflows',
+          label: 'List workflows',
+          commandName: 'list_workflows',
+          arguments: { limit: 1 },
           effect: 'read',
         },
         {
-          id: 'inspect-finding',
-          label: 'Inspect the finding',
-          commandName: 'get_finding',
-          arguments: { findingId: 'finding-1' },
+          id: 'inspect-workflow',
+          label: 'Inspect the workflow',
+          commandName: 'get_workflow',
+          arguments: {},
+          bindings: [
+            {
+              sourceStepId: 'list-workflows',
+              sourcePointer: '/0/id',
+              targetPointer: '/workflowId',
+            },
+          ],
           effect: 'read',
         },
         {
-          id: 'triage-finding',
-          label: 'Mark the finding triaged',
-          commandName: 'update_finding_triage',
-          arguments: { findingId: 'finding-1', status: 'triaged' },
-          effect: 'execute',
+          id: 'list-runs',
+          label: 'List its runs',
+          commandName: 'list_runs',
+          arguments: { limit: 5 },
+          bindings: [
+            {
+              sourceStepId: 'list-workflows',
+              sourcePointer: '/0/id',
+              targetPointer: '/workflowId',
+            },
+          ],
+          effect: 'read',
         },
       ],
     });
@@ -146,7 +161,7 @@ describe('operatorTurnWorkflow', () => {
     }));
     operatorExecuteActionActivity.mockImplementation(async ({ actionId }) => ({
       actionId,
-      result: { ok: true },
+      result: actionId.endsWith(':list-workflows') ? [{ id: workflowId }] : { ok: true },
     }));
 
     await operatorTurnWorkflow({
@@ -156,14 +171,19 @@ describe('operatorTurnWorkflow', () => {
 
     expect(operatorModelStepActivity).not.toHaveBeenCalled();
     expect(operatorPrepareActionActivity.mock.calls.map(([call]) => call.toolCallId)).toEqual([
-      `${input.turnId}:plan:${planActionId}:inspect-run`,
-      `${input.turnId}:plan:${planActionId}:inspect-finding`,
-      `${input.turnId}:plan:${planActionId}:triage-finding`,
+      `${input.turnId}:plan:${planActionId}:list-workflows`,
+      `${input.turnId}:plan:${planActionId}:inspect-workflow`,
+      `${input.turnId}:plan:${planActionId}:list-runs`,
     ]);
+    expect(operatorPrepareActionActivity.mock.calls[1]?.[0].arguments).toEqual({ workflowId });
+    expect(operatorPrepareActionActivity.mock.calls[2]?.[0].arguments).toEqual({
+      limit: 5,
+      workflowId,
+    });
     expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(3);
     expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
       ...input,
-      message: 'Completed all 3 steps in plan "Review and triage findings".',
+      message: 'Completed all 3 steps in plan "Inspect workflow activity".',
     });
   });
 

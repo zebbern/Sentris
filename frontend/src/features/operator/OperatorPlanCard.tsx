@@ -50,7 +50,15 @@ export function OperatorPlanCard({
     (step) => stepAction(plan.planId, step.id, executionTurn?.id, actions)?.status === 'succeeded',
   ).length;
   const revisionSummary = plan.steps
-    .map((step, index) => `${index + 1}. ${step.label} (${step.commandName})`)
+    .map((step, index) => {
+      const bindings = (step.bindings ?? [])
+        .map(
+          (binding) =>
+            `${binding.sourceStepId}${binding.sourcePointer} -> ${binding.targetPointer}`,
+        )
+        .join(', ');
+      return `${index + 1}. ${step.label} (${step.commandName})${bindings ? ` using ${bindings}` : ''}`;
+    })
     .join('\n');
 
   return (
@@ -105,6 +113,16 @@ export function OperatorPlanCard({
                   {step.commandName}
                   {step.effect === 'consequential' ? ' · may ask for approval' : ''}
                 </p>
+                {(step.bindings ?? []).map((binding) => (
+                  <p
+                    key={`${binding.sourceStepId}:${binding.sourcePointer}:${binding.targetPointer}`}
+                    className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/80"
+                    title={`${binding.sourceStepId}${binding.sourcePointer} → ${binding.targetPointer}`}
+                  >
+                    uses {binding.sourceStepId}
+                    {binding.sourcePointer} → {binding.targetPointer}
+                  </p>
+                ))}
               </div>
             </li>
           );

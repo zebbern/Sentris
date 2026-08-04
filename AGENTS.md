@@ -341,9 +341,12 @@ invocation path. Bounded multi-action requests may produce an immutable three-to
 `propose_operator_plan` preview. Run starts a separate patch-gated `execute_plan` journey by
 proposal-action ID; it schedules the existing typed action boundary sequentially with stable
 step identities, keeps Ask/Auto approval semantics, projects progress from the action ledger,
-and supports exact-turn cancellation. Revise creates a new proposal. Initial plan steps have
-fully resolved arguments and exclude turn-scoped MCP snapshots and cross-step output bindings;
-do not add string substitution or a second plan executor to bypass that boundary. Workflow
+and supports exact-turn cancellation. Revise creates a new proposal. A later step may bind an
+earlier step's string result into one top-level command argument through bounded RFC 6901 source
+and target pointers; the Workflow resolves the durable activity result deterministically and the
+canonical backend boundary validates the completed command input. Forward references, nested
+targets, literal/bound conflicts, and turn-scoped MCP snapshots remain excluded. Do not add a
+general expression language, string templating, or a second plan executor. Workflow
 authoring also uses typed durable actions: component discovery is
 registry-backed, new-workflow proposals use credential-safe bounded graphs, and existing-workflow
 proposals use bounded operations keyed by stable node and edge IDs. The backend materializes
