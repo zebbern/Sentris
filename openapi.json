@@ -9907,6 +9907,43 @@
           "operator"
         ]
       }
+    },
+    "/api/v1/operator/turns/{turnId}/retry": {
+      "post": {
+        "operationId": "OperatorController_retryTurn",
+        "parameters": [
+          {
+            "name": "turnId",
+            "required": true,
+            "in": "path",
+            "x-nestjs_zod-parent-additional-properties": false,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorRetryTurnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Retry a failed or cancelled Operator turn from its stored request",
+        "tags": [
+          "operator"
+        ]
+      }
     }
   },
   "info": {
@@ -20290,6 +20327,20 @@
         "required": [
           "decision",
           "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "OperatorRetryTurnDto": {
+        "type": "object",
+        "properties": {
+          "clientTurnId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "clientTurnId"
         ],
         "additionalProperties": false
       }

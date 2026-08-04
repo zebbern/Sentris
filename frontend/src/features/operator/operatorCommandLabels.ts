@@ -1,0 +1,28 @@
+import type { OperatorCommandName } from '@sentris/shared';
+
+export const OPERATOR_COMMAND_LABELS: Record<OperatorCommandName, string> = {
+  list_workflows: 'List workflows',
+  get_workflow: 'Inspect workflow',
+  list_components: 'List components',
+  get_component: 'Inspect component',
+  propose_workflow_draft: 'Draft workflow',
+  propose_workflow_edits: 'Draft workflow edits',
+  apply_workflow_draft: 'Save workflow draft',
+  promote_workflow_version: 'Keep candidate version',
+  list_runs: 'List runs',
+  get_run: 'Inspect run',
+  compare_runs: 'Compare runs',
+  propose_run_input_changes: 'Propose run input changes',
+  propose_operator_plan: 'Propose action plan',
+  run_workflow: 'Run workflow',
+  cancel_run: 'Cancel run',
+  retry_run: 'Retry run',
+  list_findings: 'List findings',
+  get_finding: 'Inspect finding',
+  update_finding_triage: 'Update finding triage',
+  list_mcp_servers: 'List MCP servers',
+  list_mcp_capabilities: 'Inspect MCP capabilities',
+  invoke_mcp_tool: 'Run MCP tool',
+  read_mcp_resource: 'Read MCP resource',
+  get_mcp_prompt: 'Get MCP prompt',
+};

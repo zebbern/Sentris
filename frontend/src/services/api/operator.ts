@@ -4,6 +4,7 @@ import type {
   OperatorCreateSession,
   OperatorCreateTurn,
   OperatorRunImprovementLookup,
+  OperatorRetryTurn,
   OperatorSessionDetail,
   OperatorSessionSummary,
   OperatorTurnAccepted,
@@ -58,6 +59,9 @@ export const operatorApi = {
 
   cancelTurn: (turnId: string) =>
     httpPost<OperatorTurnView>(`/operator/turns/${encodeURIComponent(turnId)}/cancel`, {}),
+
+  retryTurn: (turnId: string, input: OperatorRetryTurn) =>
+    httpPost<OperatorTurnAccepted>(`/operator/turns/${encodeURIComponent(turnId)}/retry`, input),
 
   decideAction: (actionId: string, input: OperatorActionDecision) =>
     httpPost<OperatorActionView>(

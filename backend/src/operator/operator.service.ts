@@ -23,6 +23,7 @@ import {
   type OperatorPlanProposalResult,
   type OperatorRunObservation,
   type OperatorRunImprovementLookup,
+  type OperatorRetryTurn,
   type OperatorSessionDetail,
   type OperatorSessionSummary,
   type OperatorTurnAccepted,
@@ -78,7 +79,7 @@ export class OperatorService {
       model: input.model,
       auth: user,
     });
-    return this.toSessionSummary(session, null);
+    return this.toSessionSummary(session, null, []);
   }
 
   async listSessions(auth: AuthContext | null): Promise<OperatorSessionSummary[]> {
@@ -90,10 +91,24 @@ export class OperatorService {
     const latestTurns = await this.repository.listLatestTurns(
       sessions.map((session) => session.id),
     );
-    const latestTurnBySessionId = new Map(latestTurns.map((turn) => [turn.sessionId, turn]));
-    return sessions.map((session) =>
-      this.toSessionSummary(session, latestTurnBySessionId.get(session.id) ?? null),
+    const latestTurnActions = await this.repository.listActionsForTurns(
+      latestTurns.map((turn) => turn.id),
     );
+    const latestTurnBySessionId = new Map(latestTurns.map((turn) => [turn.sessionId, turn]));
+    const actionsByTurnId = new Map<string, OperatorActionRecord[]>();
+    for (const action of latestTurnActions) {
+      const turnActions = actionsByTurnId.get(action.turnId) ?? [];
+      turnActions.push(action);
+      actionsByTurnId.set(action.turnId, turnActions);
+    }
+    return sessions.map((session) => {
+      const latestTurn = latestTurnBySessionId.get(session.id) ?? null;
+      return this.toSessionSummary(
+        session,
+        latestTurn,
+        latestTurn ? (actionsByTurnId.get(latestTurn.id) ?? []) : [],
+      );
+    });
   }
 
   async getRunImprovement(
@@ -133,8 +148,13 @@ export class OperatorService {
         this.repository.listActions(session.id),
       ]);
     }
+    const latestTurn = turns.at(-1) ?? null;
     return {
-      ...this.toSessionSummary(session, turns.at(-1) ?? null),
+      ...this.toSessionSummary(
+        session,
+        latestTurn,
+        latestTurn ? actions.filter((action) => action.turnId === latestTurn.id) : [],
+      ),
       turns: turns.map((turn) => this.toTurnView(turn)),
       messages: messages.map((message) => this.toMessageView(message)),
       actions: actions.map((action) => this.toActionView(action)),
@@ -168,7 +188,10 @@ export class OperatorService {
     });
     if (!updated) throw new NotFoundException('Operator session not found');
     const latestTurn = await this.repository.findLatestTurn(updated.id);
-    return this.toSessionSummary(updated, latestTurn ?? null);
+    const latestTurnActions = latestTurn
+      ? await this.repository.listActionsForTurns([latestTurn.id])
+      : [];
+    return this.toSessionSummary(updated, latestTurn ?? null, latestTurnActions);
   }
 
   async createTurn(
@@ -263,6 +286,41 @@ export class OperatorService {
       if (described.status === 'RUNNING') throw error;
     }
     return this.toTurnView(context.turn);
+  }
+
+  async retryTurn(
+    auth: AuthContext | null,
+    turnId: string,
+    input: OperatorRetryTurn,
+  ): Promise<OperatorTurnAccepted> {
+    const user = this.requireUserAuth(auth);
+    const context = await this.repository.getTurnWithSession(turnId);
+    if (
+      !context ||
+      context.session.organizationId !== user.organizationId ||
+      context.session.userId !== user.userId
+    ) {
+      throw new NotFoundException('Operator turn not found');
+    }
+    if (context.turn.status !== 'failed' && context.turn.status !== 'cancelled') {
+      throw new ConflictException(`Operator turn cannot be retried from ${context.turn.status}`);
+    }
+
+    const message = await this.repository.findUserMessageForTurn(context.turn.id);
+    if (!message) throw new ConflictException('Operator turn has no stored user request to retry');
+    const payload = readOperatorTurnPayload(context.turn.context);
+    return this.createTurnForSession(
+      context.session,
+      {
+        clientTurnId: input.clientTurnId,
+        message: message.content,
+        ...(payload.routeContext ? { context: payload.routeContext } : {}),
+        ...(payload.directCommand ? { directCommand: payload.directCommand } : {}),
+        ...(payload.journey ? { journey: payload.journey } : {}),
+      },
+      user,
+      false,
+    );
   }
 
   private async reconcileStaleApprovedAction(
@@ -378,7 +436,11 @@ export class OperatorService {
     ]);
     return {
       session: {
-        ...this.toSessionSummary(session, turn),
+        ...this.toSessionSummary(
+          session,
+          turn,
+          actions.filter((action) => action.turnId === turn.id),
+        ),
         organizationId: session.organizationId,
         userId: session.userId,
       },
@@ -787,7 +849,16 @@ export class OperatorService {
   private toSessionSummary(
     session: OperatorSessionRecord,
     latestTurn: OperatorTurnRecord | null,
+    latestTurnActions: OperatorActionRecord[],
   ): OperatorSessionSummary {
+    let currentAction: OperatorActionRecord | null = null;
+    for (let index = latestTurnActions.length - 1; index >= 0; index -= 1) {
+      const action = latestTurnActions[index];
+      if (!['succeeded', 'failed', 'rejected'].includes(action.status)) {
+        currentAction = action;
+        break;
+      }
+    }
     return {
       id: session.id,
       title: session.title,
@@ -804,6 +875,18 @@ export class OperatorService {
             id: latestTurn.id,
             status: latestTurn.status,
             error: latestTurn.error,
+            actionCount: latestTurnActions.length,
+            settledActionCount: latestTurnActions.filter((action) =>
+              ['succeeded', 'failed', 'rejected'].includes(action.status),
+            ).length,
+            currentAction: currentAction
+              ? {
+                  id: currentAction.id,
+                  commandName: currentAction.commandName,
+                  status: currentAction.status,
+                  version: currentAction.version,
+                }
+              : null,
             createdAt: latestTurn.createdAt.toISOString(),
             completedAt: latestTurn.completedAt?.toISOString() ?? null,
           }

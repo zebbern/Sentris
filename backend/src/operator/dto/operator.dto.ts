@@ -7,6 +7,7 @@ import {
   OperatorCreateSessionSchema,
   OperatorCreateTurnSchema,
   OperatorRunImprovementLookupSchema,
+  OperatorRetryTurnSchema,
   OperatorTurnStatusSchema,
   OperatorUpdateSessionSchema,
   OperatorWorkflowDraftDetailSchema,
@@ -17,6 +18,7 @@ export class CreateOperatorSessionDto extends createZodDto(OperatorCreateSession
 export class UpdateOperatorSessionDto extends createZodDto(OperatorUpdateSessionSchema) {}
 export class CreateOperatorTurnDto extends createZodDto(OperatorCreateTurnSchema) {}
 export class OperatorActionDecisionDto extends createZodDto(OperatorActionDecisionSchema) {}
+export class OperatorRetryTurnDto extends createZodDto(OperatorRetryTurnSchema) {}
 export class OperatorWorkflowDraftDetailDto extends createZodDto(
   OperatorWorkflowDraftDetailSchema,
 ) {}

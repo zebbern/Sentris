@@ -11,6 +11,7 @@ import {
   type OperatorActionDecision,
   type OperatorCreateSession,
   type OperatorCreateTurn,
+  type OperatorRetryTurn,
   type OperatorSessionDetail,
   type OperatorUpdateSession,
 } from '@sentris/shared';
@@ -574,6 +575,29 @@ export function useCancelOperatorTurn() {
   });
 }
 
+export function useRetryOperatorTurn() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      sessionId: _sessionId,
+      turnId,
+      input,
+    }: {
+      sessionId: string;
+      turnId: string;
+      input: OperatorRetryTurn;
+    }) => api.operator.retryTurn(turnId, input),
+    meta: { suppressGlobalError: true },
+    onSuccess: (_turn, variables) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.operator.sessions() });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.operator.session(variables.sessionId),
+      });
+    },
+  });
+}
+
 export function useDecideOperatorAction() {
   const queryClient = useQueryClient();
 
@@ -589,6 +613,7 @@ export function useDecideOperatorAction() {
     }) => api.operator.decideAction(actionId, input),
     meta: { suppressGlobalError: true },
     onSuccess: (_action, variables) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.operator.sessions() });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.operator.session(variables.sessionId),
       });

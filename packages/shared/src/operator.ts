@@ -1415,10 +1415,26 @@ export const OperatorActionDecisionSchema = z
   .strict();
 export type OperatorActionDecision = z.infer<typeof OperatorActionDecisionSchema>;
 
+export const OperatorRetryTurnSchema = z.object({ clientTurnId: z.string().uuid() }).strict();
+export type OperatorRetryTurn = z.infer<typeof OperatorRetryTurnSchema>;
+
+export interface OperatorTaskActionSummary {
+  id: string;
+  commandName: OperatorCommandName;
+  status: OperatorActionStatus;
+  version: number;
+}
+
 export interface OperatorLatestTurnSummary {
   id: string;
   status: OperatorTurnStatus;
   error: string | null;
+  /** Optional while clients can still hold pre-progress cached snapshots. */
+  actionCount?: number;
+  /** Optional while clients can still hold pre-progress cached snapshots. */
+  settledActionCount?: number;
+  /** The latest unfinished action, when the turn currently has one. */
+  currentAction?: OperatorTaskActionSummary | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -1500,6 +1516,18 @@ const OperatorSessionSummaryStreamSchema = z
         id: z.string().uuid(),
         status: OperatorTurnStatusSchema,
         error: z.string().nullable(),
+        actionCount: z.number().int().nonnegative().optional(),
+        settledActionCount: z.number().int().nonnegative().optional(),
+        currentAction: z
+          .object({
+            id: z.string().uuid(),
+            commandName: OperatorCommandNameSchema,
+            status: OperatorActionStatusSchema,
+            version: z.number().int().nonnegative(),
+          })
+          .strict()
+          .nullable()
+          .optional(),
         createdAt: z.string(),
         completedAt: z.string().nullable(),
       })

@@ -275,6 +275,24 @@ export class OperatorRepository {
       .orderBy(asc(operatorActionsTable.createdAt));
   }
 
+  async listActionsForTurns(turnIds: string[]): Promise<OperatorActionRecord[]> {
+    if (turnIds.length === 0) return Promise.resolve([]);
+    return this.db
+      .select()
+      .from(operatorActionsTable)
+      .where(inArray(operatorActionsTable.turnId, turnIds))
+      .orderBy(asc(operatorActionsTable.createdAt), asc(operatorActionsTable.id));
+  }
+
+  async findUserMessageForTurn(turnId: string): Promise<OperatorMessageRecord | undefined> {
+    const [message] = await this.db
+      .select()
+      .from(operatorMessagesTable)
+      .where(and(eq(operatorMessagesTable.turnId, turnId), eq(operatorMessagesTable.role, 'user')))
+      .limit(1);
+    return message;
+  }
+
   async createTurn(input: {
     id: string;
     session: OperatorSessionRecord;

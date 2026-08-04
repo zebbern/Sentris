@@ -12,7 +12,6 @@ import {
   OperatorRunWorkflowInputSchema,
   type OperatorActionStatus,
   type OperatorActionView,
-  type OperatorCommandName,
   type FindingTriageStatus,
   type OperatorMessageView,
   type OperatorTurnView,
@@ -40,6 +39,7 @@ import { OperatorRunComparisonCard } from './OperatorRunComparisonCard';
 import { OperatorRunInputProposalCard } from './OperatorRunInputProposalCard';
 import { OperatorPlanCard } from './OperatorPlanCard';
 import { OperatorWorkflowDraftCard } from './OperatorWorkflowDraftCard';
+import { OPERATOR_COMMAND_LABELS } from './operatorCommandLabels';
 
 const ACTION_STATUS_LABELS: Record<OperatorActionStatus, string> = {
   proposed: 'Proposed',
@@ -59,33 +59,6 @@ const ACTION_STATUS_STYLES: Record<OperatorActionStatus, string> = {
   executing: 'border-blue-500/40 bg-blue-500/10 text-blue-600 dark:text-blue-300',
   succeeded: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
   failed: 'border-destructive/40 bg-destructive/10 text-destructive',
-};
-
-const COMMAND_LABELS: Record<OperatorCommandName, string> = {
-  list_workflows: 'List workflows',
-  get_workflow: 'Inspect workflow',
-  list_components: 'List components',
-  get_component: 'Inspect component',
-  propose_workflow_draft: 'Draft workflow',
-  propose_workflow_edits: 'Draft workflow edits',
-  apply_workflow_draft: 'Save workflow draft',
-  promote_workflow_version: 'Keep candidate version',
-  list_runs: 'List runs',
-  get_run: 'Inspect run',
-  compare_runs: 'Compare runs',
-  propose_run_input_changes: 'Propose run input changes',
-  propose_operator_plan: 'Propose action plan',
-  run_workflow: 'Run workflow',
-  cancel_run: 'Cancel run',
-  retry_run: 'Retry run',
-  list_findings: 'List findings',
-  get_finding: 'Inspect finding',
-  update_finding_triage: 'Update finding triage',
-  list_mcp_servers: 'List MCP servers',
-  list_mcp_capabilities: 'Inspect MCP capabilities',
-  invoke_mcp_tool: 'Run MCP tool',
-  read_mcp_resource: 'Read MCP resource',
-  get_mcp_prompt: 'Get MCP prompt',
 };
 
 type TimelineEvent =
@@ -368,7 +341,7 @@ function ActionEvent({
         ) : (
           <CircleDot className="h-3.5 w-3.5 text-muted-foreground" />
         )}
-        <span className="text-xs font-semibold">{COMMAND_LABELS[action.commandName]}</span>
+        <span className="text-xs font-semibold">{OPERATOR_COMMAND_LABELS[action.commandName]}</span>
         <Badge
           variant="outline"
           className={cn('ml-auto h-5 px-1.5 text-[10px]', ACTION_STATUS_STYLES[action.status])}

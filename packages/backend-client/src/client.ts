@@ -3317,6 +3317,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/operator/turns/{turnId}/retry': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retry a failed or cancelled Operator turn from its stored request */
+    post: operations['OperatorController_retryTurn'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6254,6 +6271,10 @@ export interface components {
       /** @enum {string} */
       decision: 'approved' | 'rejected';
       expectedVersion: number;
+    };
+    OperatorRetryTurnDto: {
+      /** Format: uuid */
+      clientTurnId: string;
     };
   };
   responses: never;
@@ -12311,6 +12332,29 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_retryTurn: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        turnId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OperatorRetryTurnDto'];
+      };
+    };
     responses: {
       202: {
         headers: {

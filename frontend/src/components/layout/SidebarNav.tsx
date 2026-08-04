@@ -8,6 +8,7 @@ import { useAuth, useAuthProvider } from '@/auth/auth-context';
 import { UserButton } from '@/components/auth/UserButton';
 import { useIsMac } from '@/hooks/useIsMac';
 import { prefetchRoute } from '@/lib/prefetch-routes';
+import { OperatorTaskTray } from '@/features/operator/OperatorTaskTray';
 
 const footerIconButtonClass =
   'h-7 w-7 min-h-7 min-w-7 shrink-0 flex items-center justify-center rounded-md p-0';
@@ -277,6 +278,7 @@ export function SidebarNav({
               sidebarCollapsed={!sidebarOpen}
             />
           )}
+          <OperatorTaskTray className={footerIconButtonClass} />
           {sidebarOpen && (
             <ThemeToggleButton
               theme={theme}

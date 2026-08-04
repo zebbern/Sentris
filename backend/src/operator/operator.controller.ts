@@ -17,6 +17,7 @@ import {
   OperatorActionDecisionSchema,
   OperatorCreateSessionSchema,
   OperatorCreateTurnSchema,
+  OperatorRetryTurnSchema,
   OperatorUpdateSessionSchema,
   type OperatorActionView,
   type OperatorRunImprovementLookup,
@@ -39,6 +40,7 @@ import {
   OperatorRunIdParamDto,
   OperatorRunIdParamSchema,
   OperatorRunImprovementLookupDto,
+  OperatorRetryTurnDto,
   OperatorTurnIdParamDto,
   OperatorTurnIdParamSchema,
   OperatorWorkflowDraftDetailDto,
@@ -161,5 +163,16 @@ export class OperatorController {
     @Param(new ZodValidationPipe(OperatorTurnIdParamSchema)) params: OperatorTurnIdParamDto,
   ): Promise<OperatorTurnView> {
     return this.operatorService.cancelTurn(auth, params.turnId);
+  }
+
+  @Post('turns/:turnId/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Retry a failed or cancelled Operator turn from its stored request' })
+  retryTurn(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param(new ZodValidationPipe(OperatorTurnIdParamSchema)) params: OperatorTurnIdParamDto,
+    @Body(new ZodValidationPipe(OperatorRetryTurnSchema)) body: OperatorRetryTurnDto,
+  ): Promise<OperatorTurnAccepted> {
+    return this.operatorService.retryTurn(auth, params.turnId, body);
   }
 }
