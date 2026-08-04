@@ -65,7 +65,7 @@ interface OperatorWorkflowAuthoringInput {
 }
 
 const INVESTIGATE_RUN_MESSAGE =
-  'Investigate this run. Review its status, stored output, recent and failed trace evidence, and findings. Explain what happened and recommend the most useful next step. Do not make changes unless I ask.';
+  'Investigate this run. Review its status, stored output, Agent tool, resource, and prompt activity with its MCP sources, recent and failed trace evidence, findings, and artifacts. Explain what happened and recommend the most useful next step. Do not make changes unless I ask.';
 const INVESTIGATE_FINDING_MESSAGE =
   'Investigate this finding. Review its bounded raw evidence, source run and workflow context, and current triage state. Explain what it means, how credible it is, and recommend the most useful next step. Do not change triage or workflows unless I ask.';
 const REVISE_WORKFLOW_DRAFT_MESSAGE = (draftId: string) =>

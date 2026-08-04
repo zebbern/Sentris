@@ -4,6 +4,7 @@ import { ArtifactMetadataSchema } from './artifacts.js';
 import { ExecutionStatusSchema } from './execution.js';
 import { LLM_PROVIDER_IDS } from './ai-model-catalog.js';
 import { FindingTriageStatusSchema, UpdateFindingTriageSchema } from './finding-triage.js';
+import { AgentCapabilityTraceSchema } from './mcp-capabilities.js';
 import {
   FindingDataAvailabilitySchema,
   FindingObservationSeveritySchema,
@@ -530,7 +531,57 @@ export const OperatorListRunsInputSchema = z
   })
   .strict();
 
-export const OperatorGetRunInputSchema = z.object({ runId: RunIdSchema }).strict();
+export const OperatorGetRunInputSchema = z
+  .object({
+    runId: RunIdSchema,
+    includeAgentIo: z.boolean().optional(),
+  })
+  .strict();
+
+export const OperatorRunAgentOperationSchema = z
+  .object({
+    agentRunId: z.string().min(1),
+    nodeRef: z.string().min(1),
+    toolCallId: z.string().min(1),
+    toolName: z.string().min(1),
+    capability: AgentCapabilityTraceSchema.optional(),
+    status: z.enum(['running', 'completed', 'failed']),
+    startedAt: z.string().datetime(),
+    finishedAt: z.string().datetime().optional(),
+    durationMs: z.number().int().nonnegative().optional(),
+    inputSummary: z.unknown().optional(),
+    outputSummary: z.unknown().optional(),
+    errorSummary: z.unknown().optional(),
+    input: z.unknown().optional(),
+    output: z.unknown().optional(),
+    error: z.unknown().optional(),
+  })
+  .strict();
+export type OperatorRunAgentOperation = z.infer<typeof OperatorRunAgentOperationSchema>;
+
+export const OperatorRunAgentSummarySchema = z
+  .object({
+    agentRunId: z.string().min(1),
+    nodeRef: z.string().min(1),
+    status: z.enum(['running', 'completed', 'failed']),
+    startedAt: z.string().datetime(),
+    finishedAt: z.string().datetime().optional(),
+  })
+  .strict();
+
+export const OperatorRunAgentActivityEvidenceSchema = z
+  .object({
+    availability: z.enum(['available', 'unavailable']),
+    capturedOperationCount: z.number().int().nonnegative(),
+    truncated: z.boolean(),
+    agentRuns: z.array(OperatorRunAgentSummarySchema),
+    operations: z.array(OperatorRunAgentOperationSchema),
+    error: z.string().optional(),
+  })
+  .strict();
+export type OperatorRunAgentActivityEvidence = z.infer<
+  typeof OperatorRunAgentActivityEvidenceSchema
+>;
 
 export const OperatorRunFindingSummarySchema = z
   .object({
@@ -586,6 +637,15 @@ export const OperatorRunInspectionResultSchema = z
     status: z.object({ status: ExecutionStatusSchema }).passthrough(),
     terminal: z.boolean(),
     result: z.unknown().optional(),
+    agentActivity: OperatorRunAgentActivityEvidenceSchema.optional(),
+    links: z
+      .object({
+        workflow: z.string().startsWith('/workflows/'),
+        run: z.string().startsWith('/workflows/'),
+        mcpLibrary: z.literal('/mcp-library').optional(),
+      })
+      .strict()
+      .optional(),
     diagnostics: z
       .object({
         trace: OperatorRunTraceEvidenceSchema,
@@ -1195,7 +1255,7 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
   },
   get_run: {
     description:
-      'Inspect one workflow run. Terminal runs include a bounded result, failed/recent trace evidence, and run-scoped findings; active runs include current status.',
+      'Inspect one workflow run. Returns bounded Agent tool/resource/prompt activity with readable MCP source metadata alongside status. Terminal runs also include a bounded result, failed/recent trace evidence, and run-scoped findings. Set includeAgentIo only when the user explicitly requests the bounded raw Agent operation input/output.',
     effect: 'read',
     inputSchema: OperatorGetRunInputSchema,
   },

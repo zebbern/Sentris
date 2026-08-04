@@ -4,6 +4,7 @@ import type { AuthContext } from '../../auth/types';
 import type { FindingsQueryService } from '../../analytics/findings-query.service';
 import type { FindingTriageService } from '../../findings/finding-triage.service';
 import type { ArtifactsService } from '../../storage/artifacts.service';
+import type { AgentTraceService } from '../../agent-trace/agent-trace.service';
 import type { TraceService } from '../../trace/trace.service';
 import type { WorkflowsService } from '../../workflows/workflows.service';
 import { OperatorCommandService } from '../operator-command.service';
@@ -34,6 +35,7 @@ describe('OperatorCommandService', () => {
   let workflowAuthoring: Record<string, ReturnType<typeof vi.fn>>;
   let trace: Record<string, ReturnType<typeof vi.fn>>;
   let artifacts: Record<string, ReturnType<typeof vi.fn>>;
+  let agentTrace: Record<string, ReturnType<typeof vi.fn>>;
   let service: OperatorCommandService;
 
   beforeEach(() => {
@@ -99,6 +101,13 @@ describe('OperatorCommandService', () => {
     artifacts = {
       listRunArtifacts: vi.fn().mockResolvedValue({ runId: 'sentris-run-1', artifacts: [] }),
     };
+    agentTrace = {
+      summarizeRunCapabilityActivity: vi.fn().mockResolvedValue({
+        truncated: false,
+        agentRuns: [],
+        operations: [],
+      }),
+    };
     service = new OperatorCommandService(
       workflows as unknown as WorkflowsService,
       findings as unknown as FindingsQueryService,
@@ -107,6 +116,7 @@ describe('OperatorCommandService', () => {
       workflowAuthoring as unknown as OperatorWorkflowAuthoringService,
       trace as unknown as TraceService,
       artifacts as unknown as ArtifactsService,
+      agentTrace as unknown as AgentTraceService,
     );
   });
 
@@ -752,6 +762,39 @@ describe('OperatorCommandService', () => {
         },
       ],
     });
+    agentTrace.summarizeRunCapabilityActivity.mockResolvedValue({
+      truncated: false,
+      agentRuns: [
+        {
+          agentRunId: 'agent-run-1',
+          nodeRef: 'agent-node',
+          status: 'completed',
+          startedAt: '2026-08-02T10:00:00.000Z',
+          finishedAt: '2026-08-02T10:00:00.911Z',
+        },
+      ],
+      operations: [
+        {
+          agentRunId: 'agent-run-1',
+          nodeRef: 'agent-node',
+          toolCallId: 'call-1',
+          toolName: 'sentris_mcp_read_resource',
+          capability: {
+            kind: 'resource',
+            displayName: 'instructions.md',
+            sourceId: 'mcp-node',
+            sourceName: 'Local MCP acceptance',
+            target: 'demo://resource/static/document/instructions.md',
+          },
+          status: 'completed',
+          startedAt: '2026-08-02T10:00:00.000Z',
+          finishedAt: '2026-08-02T10:00:00.911Z',
+          durationMs: 911,
+          input: {},
+          output: { contents: [{ text: 'full operation output' }] },
+        },
+      ],
+    });
 
     const response = await service.execute({
       commandName: 'get_run',
@@ -765,6 +808,34 @@ describe('OperatorCommandService', () => {
     });
     const result = response.result as any;
 
+    expect(agentTrace.summarizeRunCapabilityActivity).toHaveBeenCalledWith(runId, {
+      maxAgentRuns: 8,
+      maxOperations: 12,
+    });
+    expect(result.agentActivity).toEqual(
+      expect.objectContaining({
+        availability: 'available',
+        capturedOperationCount: 1,
+        operations: [
+          expect.objectContaining({
+            status: 'completed',
+            durationMs: 911,
+            capability: expect.objectContaining({
+              displayName: 'instructions.md',
+              sourceName: 'Local MCP acceptance',
+            }),
+            outputSummary: expect.any(String),
+          }),
+        ],
+      }),
+    );
+    expect(result.agentActivity.operations[0]).not.toHaveProperty('input');
+    expect(result.agentActivity.operations[0]).not.toHaveProperty('output');
+    expect(result.links).toEqual({
+      workflow: `/workflows/${WORKFLOW_ID}`,
+      run: `/workflows/${WORKFLOW_ID}/runs/${runId}`,
+      mcpLibrary: '/mcp-library',
+    });
     expect(trace.summarizeRun).toHaveBeenCalledWith(
       runId,
       { failedLimit: 8, recentLimit: 8 },
@@ -805,6 +876,22 @@ describe('OperatorCommandService', () => {
     expect(JSON.stringify(result.diagnostics.artifacts)).not.toContain('not-needed-by-operator');
     expect(JSON.stringify(result)).not.toContain('stack-must-not-enter-operator-context');
     expect(JSON.stringify(result)).not.toContain('raw-must-not-enter-operator-context');
+
+    const explicitResponse = await service.execute({
+      commandName: 'get_run',
+      arguments: { runId, includeAgentIo: true },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+    const explicitResult = explicitResponse.result as any;
+    expect(explicitResult.agentActivity.operations[0].input).toEqual({});
+    expect(explicitResult.agentActivity.operations[0].output).toEqual({
+      contents: [{ text: 'full operation output' }],
+    });
   });
 
   it('keeps terminal run inspection available when diagnostic sources are unavailable', async () => {
@@ -820,6 +907,9 @@ describe('OperatorCommandService', () => {
     trace.summarizeRun.mockRejectedValue(new Error('trace store unavailable'));
     findings.listFindings.mockRejectedValue(new Error('finding index unavailable'));
     artifacts.listRunArtifacts.mockRejectedValue(new Error('artifact store unavailable'));
+    agentTrace.summarizeRunCapabilityActivity.mockRejectedValue(
+      new Error('Agent trace store unavailable'),
+    );
 
     const response = await service.execute({
       commandName: 'get_run',
@@ -836,6 +926,14 @@ describe('OperatorCommandService', () => {
       expect.objectContaining({
         terminal: true,
         result: { status: 'FAILED', result: null },
+        agentActivity: {
+          availability: 'unavailable',
+          capturedOperationCount: 0,
+          truncated: false,
+          agentRuns: [],
+          operations: [],
+          error: 'Agent trace store unavailable',
+        },
         diagnostics: {
           trace: { availability: 'unavailable', error: 'trace store unavailable' },
           findings: {
@@ -878,8 +976,16 @@ describe('OperatorCommandService', () => {
     });
 
     expect(response.result).toEqual(
-      expect.objectContaining({ terminal: false, status: { status: 'RUNNING' } }),
+      expect.objectContaining({
+        terminal: false,
+        status: { status: 'RUNNING' },
+        agentActivity: expect.objectContaining({ availability: 'available' }),
+      }),
     );
+    expect(agentTrace.summarizeRunCapabilityActivity).toHaveBeenCalledWith(runId, {
+      maxAgentRuns: 8,
+      maxOperations: 12,
+    });
     expect(workflows.getRunResult).not.toHaveBeenCalled();
     expect(trace.summarizeRun).not.toHaveBeenCalled();
     expect(findings.listFindings).not.toHaveBeenCalled();

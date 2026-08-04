@@ -104,7 +104,7 @@ describe('Operator run improvement handoff', () => {
     expect(createOperatorTurnFromHandoff(handoff!)).toEqual({
       clientTurnId: CLIENT_TURN_ID,
       message:
-        'Investigate this run. Review its status, stored output, recent and failed trace evidence, and findings. Explain what happened and recommend the most useful next step. Do not make changes unless I ask.',
+        'Investigate this run. Review its status, stored output, Agent tool, resource, and prompt activity with its MCP sources, recent and failed trace evidence, findings, and artifacts. Explain what happened and recommend the most useful next step. Do not make changes unless I ask.',
       context: {
         path: '/workflows/22222222-2222-4222-8222-222222222222/runs/sentris-run-source',
         workflowId: '22222222-2222-4222-8222-222222222222',

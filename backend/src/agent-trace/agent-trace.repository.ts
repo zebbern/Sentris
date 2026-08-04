@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, asc, eq, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
 
 import { DRIZZLE_TOKEN } from '../database/database.module';
 import { agentTraceEventsTable, type AgentTraceEventRecord } from '../database/schema';
@@ -17,6 +17,16 @@ export interface AgentTraceEventInput {
   timestamp: string;
   part: Record<string, unknown>;
 }
+
+const AGENT_ACTIVITY_PART_TYPES = [
+  'message-start',
+  'finish',
+  'tool-input-available',
+  'tool-output-available',
+  'tool-input-error',
+  'tool-output-error',
+  'data-tool-error',
+] as const;
 
 @Injectable()
 export class AgentTraceRepository {
@@ -60,6 +70,23 @@ export class AgentTraceRepository {
         ),
       )
       .orderBy(asc(agentTraceEventsTable.sequence));
+  }
+
+  async listRunActivityEvents(
+    workflowRunId: string,
+    limit: number,
+  ): Promise<AgentTraceEventRecord[]> {
+    return this.db
+      .select()
+      .from(agentTraceEventsTable)
+      .where(
+        and(
+          eq(agentTraceEventsTable.workflowRunId, workflowRunId),
+          inArray(agentTraceEventsTable.partType, [...AGENT_ACTIVITY_PART_TYPES]),
+        ),
+      )
+      .orderBy(desc(agentTraceEventsTable.timestamp), desc(agentTraceEventsTable.id))
+      .limit(limit);
   }
 
   async getRunMetadata(

@@ -6,6 +6,7 @@ import {
   OPERATOR_COMMAND_DEFINITIONS,
   OperatorCompareRunsInputSchema,
   OperatorGetFindingInputSchema,
+  OperatorGetRunInputSchema,
   OperatorGetWorkflowInputSchema,
   OperatorRunWorkflowInputSchema,
   OperatorRunComparisonResultSchema,
@@ -166,6 +167,15 @@ describe('Operator run controls', () => {
         },
       }).directCommand,
     ).toEqual({ commandName: 'get_finding', arguments: { findingId: 'finding-1' } });
+  });
+
+  it('includes raw Agent operation I/O only when explicitly requested', () => {
+    expect(
+      OperatorGetRunInputSchema.parse({
+        runId: 'sentris-run-source',
+        includeAgentIo: true,
+      }),
+    ).toEqual({ runId: 'sentris-run-source', includeAgentIo: true });
   });
 
   it('accepts one bounded improve-run journey separately from direct commands', () => {

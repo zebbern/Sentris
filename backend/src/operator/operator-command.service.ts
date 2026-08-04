@@ -25,6 +25,7 @@ import {
   type OperatorCommandName,
   type OperatorRunComparisonAssessment,
   type OperatorRunComparisonEvidence,
+  type OperatorRunAgentActivityEvidence,
   type OperatorRunInputChange,
   type TraceEventPayload,
   type WorkflowRuntimeInputDefinition,
@@ -37,6 +38,7 @@ import { FindingsQuerySchema } from '../analytics/dto/findings-query.dto';
 import { FindingsQueryService } from '../analytics/findings-query.service';
 import { FindingTriageService } from '../findings/finding-triage.service';
 import { ArtifactsService } from '../storage/artifacts.service';
+import { AgentTraceService } from '../agent-trace/agent-trace.service';
 import { TraceService } from '../trace/trace.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
@@ -51,8 +53,11 @@ const MAX_RUN_FAILED_TRACE_EVENTS = 8;
 const MAX_RUN_RECENT_TRACE_EVENTS = 8;
 const MAX_RUN_FINDINGS = 10;
 const MAX_RUN_ARTIFACTS = 10;
+const MAX_RUN_AGENT_TURNS = 8;
+const MAX_RUN_AGENT_OPERATIONS = 12;
 const MAX_RUN_RESULT_CHARS = 10_000;
 const MAX_RUN_FINDING_CHARS = 1_000;
+const MAX_RUN_AGENT_IO_CHARS = 2_000;
 const MAX_EVIDENCE_TEXT_CHARS = 400;
 const MAX_EVIDENCE_VALUE_CHARS = 600;
 
@@ -192,6 +197,15 @@ function toBoundedEvidenceValue(value: unknown): unknown {
   };
 }
 
+function toBoundedEvidenceSummary(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+  if (serialized === undefined) return undefined;
+  return serialized.length <= MAX_EVIDENCE_VALUE_CHARS
+    ? serialized
+    : `${serialized.slice(0, MAX_EVIDENCE_VALUE_CHARS)}…`;
+}
+
 function compactTraceEvent(
   event: TraceEventPayload,
   includeDiagnosticDetails = true,
@@ -290,6 +304,7 @@ export class OperatorCommandService {
     private readonly operatorWorkflowAuthoringService: OperatorWorkflowAuthoringService,
     private readonly traceService: TraceService,
     private readonly artifactsService: ArtifactsService,
+    private readonly agentTraceService: AgentTraceService,
   ) {}
 
   async execute(input: {
@@ -686,8 +701,20 @@ export class OperatorCommandService {
     const run = await this.workflowsService.getRun(input.runId, auth);
     const status = await this.workflowsService.getRunStatus(input.runId, run.temporalRunId, auth);
     const terminal = (TERMINAL_STATUSES as readonly string[]).includes(status.status);
+    const agentActivity = await this.getRunAgentActivityEvidence(
+      input.runId,
+      input.includeAgentIo === true,
+    );
+    const links = {
+      workflow: `/workflows/${encodeURIComponent(run.workflowId)}`,
+      run: `/workflows/${encodeURIComponent(run.workflowId)}/runs/${encodeURIComponent(input.runId)}`,
+      ...(agentActivity.availability === 'available' &&
+      agentActivity.operations.some((operation) => operation.capability?.sourceName)
+        ? { mcpLibrary: '/mcp-library' as const }
+        : {}),
+    };
     if (!terminal) {
-      return { result: toBoundedJson({ run, status, terminal }) };
+      return { result: toBoundedJson({ run, status, terminal, agentActivity, links }) };
     }
 
     const [result, trace, findings, artifacts, invocation] = await Promise.all([
@@ -703,10 +730,68 @@ export class OperatorCommandService {
         status,
         terminal,
         result: toBoundedJson(result, MAX_RUN_RESULT_CHARS),
+        agentActivity,
+        links,
         diagnostics: { trace, findings, artifacts },
         invocation,
       }),
     };
+  }
+
+  private async getRunAgentActivityEvidence(
+    runId: string,
+    includeIo: boolean,
+  ): Promise<OperatorRunAgentActivityEvidence> {
+    try {
+      const summary = await this.agentTraceService.summarizeRunCapabilityActivity(runId, {
+        maxAgentRuns: MAX_RUN_AGENT_TURNS,
+        maxOperations: MAX_RUN_AGENT_OPERATIONS,
+      });
+      return {
+        availability: 'available',
+        capturedOperationCount: summary.operations.length,
+        truncated: summary.truncated,
+        agentRuns: summary.agentRuns,
+        operations: summary.operations.map((operation) => ({
+          agentRunId: operation.agentRunId,
+          nodeRef: operation.nodeRef,
+          toolCallId: operation.toolCallId,
+          toolName: operation.toolName,
+          ...(operation.capability ? { capability: operation.capability } : {}),
+          status: operation.status,
+          startedAt: operation.startedAt,
+          ...(operation.finishedAt ? { finishedAt: operation.finishedAt } : {}),
+          ...(operation.durationMs !== undefined ? { durationMs: operation.durationMs } : {}),
+          ...(operation.input !== undefined
+            ? { inputSummary: toBoundedEvidenceSummary(operation.input) }
+            : {}),
+          ...(operation.output !== undefined
+            ? { outputSummary: toBoundedEvidenceSummary(operation.output) }
+            : {}),
+          ...(operation.error !== undefined
+            ? { errorSummary: toBoundedEvidenceSummary(operation.error) }
+            : {}),
+          ...(includeIo && operation.input !== undefined
+            ? { input: toBoundedJson(operation.input, MAX_RUN_AGENT_IO_CHARS) }
+            : {}),
+          ...(includeIo && operation.output !== undefined
+            ? { output: toBoundedJson(operation.output, MAX_RUN_AGENT_IO_CHARS) }
+            : {}),
+          ...(includeIo && operation.error !== undefined
+            ? { error: toBoundedJson(operation.error, MAX_RUN_AGENT_IO_CHARS) }
+            : {}),
+        })),
+      };
+    } catch (error: unknown) {
+      return {
+        availability: 'unavailable',
+        capturedOperationCount: 0,
+        truncated: false,
+        agentRuns: [],
+        operations: [],
+        error: errorMessage(error),
+      };
+    }
   }
 
   private async getRunInputInspection(
