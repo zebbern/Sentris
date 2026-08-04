@@ -349,7 +349,7 @@ describe('ValidationDock', () => {
     expect(screen.getByText('All validated')).toBeInTheDocument();
   });
 
-  it('flags required MCP with no usable tools', () => {
+  it('flags required MCP when the selected server is not ready for capability discovery', () => {
     secretCatalog = {
       data: [{ id: 'secret-1', name: 'OPENAI_API_KEY' }],
       isLoading: false,
@@ -363,7 +363,7 @@ describe('ValidationDock', () => {
           transportType: 'http',
           hasHeaders: false,
           enabled: true,
-          lastHealthStatus: 'healthy',
+          lastHealthStatus: 'unhealthy',
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-01T00:00:00.000Z',
         },
@@ -402,7 +402,9 @@ describe('ValidationDock', () => {
     );
 
     expect(
-      screen.getByText(/Not configured: No selected MCP servers expose usable tools\./),
+      screen.getByText(
+        /Not configured: No selected MCP servers are ready for capability discovery\./,
+      ),
     ).toBeInTheDocument();
   });
 });

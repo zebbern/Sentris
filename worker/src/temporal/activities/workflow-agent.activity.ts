@@ -19,14 +19,22 @@ import {
   ExecutionScopeSchema,
   JsonObjectSchema,
   MCP_CAPABILITY_CONTRACT_VERSION,
+  McpOperationSchema,
   McpOperationDispatchPlanSchema,
   McpOperationResultSchema,
+  PromptDescriptorSchema,
+  ResourceDescriptorSchema,
+  ResourceTemplateDescriptorSchema,
   SecretEncryption,
   ToolDescriptorSchema,
   parseMasterKey,
   type ExecutionScope,
   type JsonObject,
+  type McpOperation,
   type McpOperationResult,
+  type PromptDescriptor,
+  type ResourceDescriptor,
+  type ResourceTemplateDescriptor,
   type ToolDescriptor,
 } from '@sentris/shared';
 import {
@@ -121,6 +129,8 @@ const toolStatusSchema = z
     status: z.enum(['not-requested', 'configured', 'degraded']),
     connectedNodeCount: z.number().int().nonnegative(),
     availableToolCount: z.number().int().nonnegative().optional(),
+    availableResourceCount: z.number().int().nonnegative().optional(),
+    availablePromptCount: z.number().int().nonnegative().optional(),
     message: z.string().optional(),
   })
   .strict();
@@ -148,6 +158,8 @@ const storedToolCallSchema = z
     toolName: z.string().min(1),
     sourceId: z.string().min(1),
     arguments: JsonObjectSchema,
+    authorizationTarget: z.string().min(1).optional(),
+    operation: McpOperationSchema.optional(),
   })
   .strict();
 
@@ -178,6 +190,9 @@ const storedRootStateSchema = z
     model: LLMProviderSchema(),
     credential: credentialSchema,
     tools: z.array(ToolDescriptorSchema),
+    resources: z.array(ResourceDescriptorSchema).default([]),
+    resourceTemplates: z.array(ResourceTemplateDescriptorSchema).default([]),
+    prompts: z.array(PromptDescriptorSchema).default([]),
     toolStatus: toolStatusSchema,
     authority: authorityRefSchema.optional(),
     startDeliveryCompleted: z.boolean(),
@@ -346,6 +361,9 @@ async function setupWorkflowAgent(
     model: withoutResolvedCredential(model),
     credential,
     tools: capability.tools,
+    resources: capability.resources,
+    resourceTemplates: capability.resourceTemplates,
+    prompts: capability.prompts,
     toolStatus: capability.toolStatus,
     ...(capability.authority ? { authority: capability.authority } : {}),
     startDeliveryCompleted: false,
@@ -431,7 +449,8 @@ async function runWorkflowAgentModelStep(
     selectAgentApiKey(modelConfig.provider, modelConfig),
     activityOverrides.modelFactories,
   );
-  const tools = buildModelTools(root.tools);
+  const modelOperations = buildModelOperations(root);
+  const tools = buildModelTools(modelOperations);
   const activityContext = Context.current();
   const result = (activityOverrides.streamTextImpl ?? streamText)({
     model: languageModel,
@@ -487,7 +506,7 @@ async function runWorkflowAgentModelStep(
     );
   }
   const descriptors = new Map(
-    root.tools.map((descriptor) => [descriptor.canonicalName, descriptor]),
+    modelOperations.map((descriptor) => [descriptor.modelName, descriptor]),
   );
   const toolCalls: WorkflowAgentToolCall[] = rawToolCalls.map((call) => {
     const descriptor = descriptors.get(call.toolName);
@@ -501,8 +520,10 @@ async function runWorkflowAgentModelStep(
     return {
       modelToolCallId: call.toolCallId,
       toolName: call.toolName,
-      sourceId: descriptor.source.sourceId,
+      sourceId: descriptor.sourceId,
       arguments: argumentsResult.data,
+      authorizationTarget: descriptor.authorizationTarget,
+      operation: descriptor.toOperation(argumentsResult.data),
     };
   });
   await Promise.all(
@@ -577,12 +598,14 @@ export async function workflowAgentPrepareToolActivity(
     scope: input.authority.scope,
     capabilitySnapshotId: input.authority.capabilitySnapshotId,
     sourceId: call.sourceId,
-    authorizationTarget: call.toolName,
-    operation: {
-      kind: 'tool-call' as const,
-      name: call.toolName,
-      arguments: call.arguments,
-    },
+    authorizationTarget: call.authorizationTarget ?? call.toolName,
+    operation:
+      call.operation ??
+      ({
+        kind: 'tool-call' as const,
+        name: call.toolName,
+        arguments: call.arguments,
+      } satisfies McpOperation),
     requestedAt: input.requestedAt,
     deadlineAt: input.deadlineAt,
   };
@@ -812,6 +835,9 @@ async function prepareCapabilityAccess(
   availability: 'required' | 'best-effort',
 ): Promise<{
   tools: ToolDescriptor[];
+  resources: ResourceDescriptor[];
+  resourceTemplates: ResourceTemplateDescriptor[];
+  prompts: PromptDescriptor[];
   toolStatus: AgentToolStatus;
   authority?: { scope: ExecutionScope; capabilitySnapshotId: string };
 }> {
@@ -819,6 +845,9 @@ async function prepareCapabilityAccess(
   if (allowedNodeIds.length === 0) {
     return {
       tools: [],
+      resources: [],
+      resourceTemplates: [],
+      prompts: [],
       toolStatus: {
         requested: false,
         status: 'not-requested',
@@ -858,16 +887,25 @@ async function prepareCapabilityAccess(
     ) {
       throw new Error('run authority did not return the durable MCP contract');
     }
-    if (authority.snapshot.tools.length === 0) {
-      throw new Error('capability snapshot contained zero tools');
+    const availableResourceCount =
+      authority.snapshot.resources.length + authority.snapshot.resourceTemplates.length;
+    const availableCapabilityCount =
+      authority.snapshot.tools.length + availableResourceCount + authority.snapshot.prompts.length;
+    if (availableCapabilityCount === 0) {
+      throw new Error('capability snapshot contained zero usable capabilities');
     }
     return {
       tools: authority.snapshot.tools,
+      resources: authority.snapshot.resources,
+      resourceTemplates: authority.snapshot.resourceTemplates,
+      prompts: authority.snapshot.prompts,
       toolStatus: {
         requested: true,
         status: 'configured',
         connectedNodeCount: allowedNodeIds.length,
         availableToolCount: authority.snapshot.tools.length,
+        availableResourceCount,
+        availablePromptCount: authority.snapshot.prompts.length,
       },
       authority: {
         scope: authority.snapshot.scope,
@@ -877,12 +915,16 @@ async function prepareCapabilityAccess(
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     if (availability === 'required') {
-      throw new ConfigurationError(`Connected MCP tools are required but unavailable: ${message}`, {
-        configKey: 'toolAvailability',
-      });
+      throw new ConfigurationError(
+        `Connected MCP capabilities are required but unavailable: ${message}`,
+        { configKey: 'toolAvailability' },
+      );
     }
     return {
       tools: [],
+      resources: [],
+      resourceTemplates: [],
+      prompts: [],
       toolStatus: {
         requested: true,
         status: 'degraded',
@@ -962,12 +1004,163 @@ function withoutResolvedCredential(model: LlmProviderConfig): LlmProviderConfig 
   return LLMProviderSchema().parse(sanitized);
 }
 
-function buildModelTools(descriptors: ToolDescriptor[]): ToolSet {
+interface WorkflowAgentModelOperation {
+  modelName: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  sourceId: string;
+  authorizationTarget: string;
+  toOperation: (input: JsonObject) => McpOperation;
+}
+
+function buildModelOperations(root: StoredRootState): WorkflowAgentModelOperation[] {
+  const operations: WorkflowAgentModelOperation[] = root.tools.map((descriptor) => ({
+    modelName: descriptor.canonicalName,
+    description: descriptor.description ?? descriptor.displayName,
+    inputSchema: descriptor.inputSchema,
+    sourceId: descriptor.source.sourceId,
+    authorizationTarget: descriptor.canonicalName,
+    toOperation: (input) => ({
+      kind: 'tool-call',
+      name: descriptor.canonicalName,
+      arguments: input,
+    }),
+  }));
+  const claimedNames = new Set(operations.map((operation) => operation.modelName));
+
+  for (const descriptor of root.resources) {
+    operations.push(
+      claimModelOperation(claimedNames, {
+        modelName: modelOperationName(
+          'read_resource',
+          descriptor.name,
+          descriptor.sourceId,
+          descriptor.uri,
+        ),
+        description: `Read the MCP resource "${descriptor.name}" at ${descriptor.uri}.${descriptor.description ? ` ${descriptor.description}` : ''}`,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        sourceId: descriptor.sourceId,
+        authorizationTarget: descriptor.uri,
+        toOperation: () => ({ kind: 'resource-read', uri: descriptor.uri }),
+      }),
+    );
+  }
+  for (const descriptor of root.resourceTemplates) {
+    operations.push(
+      claimModelOperation(claimedNames, {
+        modelName: modelOperationName(
+          'read_resource',
+          descriptor.name,
+          descriptor.sourceId,
+          descriptor.uriTemplate,
+        ),
+        description: `Read an MCP resource matching ${descriptor.uriTemplate}.${descriptor.description ? ` ${descriptor.description}` : ''}`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            uri: {
+              type: 'string',
+              description: `A fully expanded resource URI matching ${descriptor.uriTemplate}`,
+            },
+          },
+          required: ['uri'],
+          additionalProperties: false,
+        },
+        sourceId: descriptor.sourceId,
+        authorizationTarget: descriptor.uriTemplate,
+        toOperation: (input) => {
+          const uri = input.uri;
+          if (typeof uri !== 'string' || uri.trim().length === 0) {
+            throw new ValidationError(`AI Agent produced an invalid URI for ${descriptor.name}.`);
+          }
+          return { kind: 'resource-read', uri: uri.trim() };
+        },
+      }),
+    );
+  }
+  for (const descriptor of root.prompts) {
+    const properties = Object.fromEntries(
+      descriptor.arguments.map((argument) => [
+        argument.name,
+        {
+          type: 'string',
+          ...(argument.description ? { description: argument.description } : {}),
+        },
+      ]),
+    );
+    operations.push(
+      claimModelOperation(claimedNames, {
+        modelName: modelOperationName(
+          'get_prompt',
+          descriptor.name,
+          descriptor.sourceId,
+          descriptor.name,
+        ),
+        description: `Retrieve the MCP prompt "${descriptor.name}".${descriptor.description ? ` ${descriptor.description}` : ''}`,
+        inputSchema: {
+          type: 'object',
+          properties,
+          required: descriptor.arguments
+            .filter((argument) => argument.required === true)
+            .map((argument) => argument.name),
+          additionalProperties: false,
+        },
+        sourceId: descriptor.sourceId,
+        authorizationTarget: descriptor.name,
+        toOperation: (input) => {
+          const args = Object.fromEntries(
+            Object.entries(input).map(([name, value]) => {
+              if (typeof value !== 'string') {
+                throw new ValidationError(
+                  `AI Agent produced a non-string argument for MCP prompt ${descriptor.name}.`,
+                );
+              }
+              return [name, value];
+            }),
+          );
+          return { kind: 'prompt-get', name: descriptor.name, arguments: args };
+        },
+      }),
+    );
+  }
+  return operations;
+}
+
+function claimModelOperation(
+  claimedNames: Set<string>,
+  operation: WorkflowAgentModelOperation,
+): WorkflowAgentModelOperation {
+  if (claimedNames.has(operation.modelName)) {
+    throw new ConfigurationError(`MCP model operation name collision: ${operation.modelName}`);
+  }
+  claimedNames.add(operation.modelName);
+  return operation;
+}
+
+function modelOperationName(
+  kind: 'read_resource' | 'get_prompt',
+  label: string,
+  sourceId: string,
+  target: string,
+): string {
+  const slug = label
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 48);
+  const hash = createHash('sha256')
+    .update(`${kind}\0${sourceId}\0${target}`)
+    .digest('hex')
+    .slice(0, 12);
+  return `sentris_mcp_${kind}_${slug || 'capability'}_${hash}`;
+}
+
+function buildModelTools(descriptors: WorkflowAgentModelOperation[]): ToolSet {
   return Object.fromEntries(
     descriptors.map((descriptor) => [
-      descriptor.canonicalName,
+      descriptor.modelName,
       tool({
-        description: descriptor.description ?? descriptor.displayName,
+        description: descriptor.description,
         inputSchema: jsonSchema<JsonObject>(descriptor.inputSchema),
       }),
     ]),

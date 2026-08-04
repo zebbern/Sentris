@@ -160,12 +160,12 @@ export const aiAgentInputSchema = inputs({
     z
       .unknown()
       .optional()
-      .describe('Anchor port for tool-mode nodes; data is not consumed by the agent.'),
+      .describe('Anchor port for MCP capability nodes; data is not consumed by the agent.'),
     {
-      label: 'Connected Tools',
-      description: 'Connect tool-mode nodes here to scope gateway tool discovery for this agent.',
+      label: 'Connected MCP',
+      description: 'Connect MCP nodes here to scope tools, resources, and prompts for this agent.',
       allowAny: true,
-      reason: 'Tool-mode port acts as a graph anchor; payloads are not consumed by the agent.',
+      reason: 'The MCP port acts as a graph anchor; payloads are not consumed by the agent.',
       connectionType: { kind: 'contract', name: 'mcp.tool' },
     },
   ),
@@ -263,16 +263,15 @@ export const aiAgentParameterSchema = parameters({
     z
       .enum(['required', 'best-effort'])
       .default('required')
-      .describe('How to handle unavailable MCP tools.'),
+      .describe('How to handle unavailable MCP capabilities.'),
     {
-      label: 'Tool Availability',
+      label: 'MCP Availability',
       editor: 'select',
       options: [
         { label: 'Required', value: 'required' },
         { label: 'Best effort', value: 'best-effort' },
       ],
-      description:
-        'Fail when connected tools are unavailable, or continue with built-in capabilities.',
+      description: 'Fail when connected MCP is unavailable, or continue without it.',
     },
   ),
 });
@@ -297,11 +296,14 @@ export const aiAgentOutputSchema = outputs({
       status: z.enum(['not-requested', 'configured', 'degraded']),
       connectedNodeCount: z.number().int().nonnegative(),
       availableToolCount: z.number().int().nonnegative().optional(),
+      availableResourceCount: z.number().int().nonnegative().optional(),
+      availablePromptCount: z.number().int().nonnegative().optional(),
       message: z.string().optional(),
     }),
     {
-      label: 'Tool Status',
-      description: 'Whether connected MCP tools were requested and configured for this agent run.',
+      label: 'MCP Status',
+      description:
+        'Whether connected MCP capabilities were requested and configured for this agent run.',
       connectionType: { kind: 'primitive', name: 'json' },
     },
   ),
@@ -662,12 +664,12 @@ const definition = defineComponent({
   inputs: aiAgentInputSchema,
   outputs: aiAgentOutputSchema,
   parameters: aiAgentParameterSchema,
-  docs: `An AI SDK-powered agent that maintains conversation memory, calls MCP tools via the gateway, and streams progress events.
+  docs: `An AI SDK-powered agent that maintains conversation memory, uses MCP tools, resources, and prompts through the durable run boundary, and streams progress events.
 
 How it behaves:
 - Memory → The agent maintains a conversation state object you can persist between turns.
 - Model → Connect a chat model configuration output into the Chat Model input or customise the defaults below.
-- MCP → Connect tool-mode nodes to the tools port; the gateway resolves the tool set for this agent.
+- MCP → Connect MCP nodes to the Connected MCP port; the run snapshot resolves tools, resources, and prompts for this agent.
 
 Typical workflow:
 1. Entry Point (or upstream Chat Model) → wire its text output into User Input.
@@ -680,7 +682,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
     version: '1.1.0',
     type: 'process',
     category: 'ai',
-    description: 'AI SDK agent with conversation memory and MCP tool calling via gateway.',
+    description: 'Durable AI SDK agent with conversation memory and MCP capabilities.',
     icon: 'Bot',
     author: {
       name: 'SentrisAI',

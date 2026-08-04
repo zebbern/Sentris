@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ExecutionInspector } from '@/components/timeline/ExecutionInspector';
@@ -16,12 +16,28 @@ import { WorkflowBuilderToolbar } from '@/features/workflow-builder/components/W
 import { HistoryDebugger } from '@/features/workflow-builder/components/HistoryDebugger';
 import { NewWorkflowWelcome } from '@/features/workflow-builder/components/NewWorkflowWelcome';
 import { useWorkflowBuilderState } from '@/features/workflow-builder/hooks/useWorkflowBuilderState';
+import { useWorkflowRunReadiness } from '@/features/agent-readiness/useWorkflowRunReadiness';
 import { isEntryPointNode } from '@/utils/entryPointUtils';
 
 const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
   const state = useWorkflowBuilderState();
   const [isWelcomeDismissed, setIsWelcomeDismissed] = useState(false);
   const [isOperatorDialogOpen, setIsOperatorDialogOpen] = useState(false);
+  const runReadiness = useWorkflowRunReadiness({
+    nodes: state.nodes,
+    edges: state.edges,
+    enabled: state.runDialogOpen,
+  });
+  const runReadinessIssues = useMemo(
+    () => [
+      ...new Set(
+        runReadiness.readiness.configurationIssues.map(
+          (issue) => `${issue.nodeLabel}: ${issue.message}`,
+        ),
+      ),
+    ],
+    [runReadiness.readiness.configurationIssues],
+  );
 
   if (state.shouldShowInitialLoader) {
     return (
@@ -120,6 +136,10 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
       runtimeInputs={state.runtimeInputs}
       initialValues={state.prefilledRuntimeValues}
       initialScopeId={state.requestedScopeId}
+      readinessRows={runReadiness.readiness.rows}
+      readinessIssues={runReadinessIssues}
+      readinessPending={runReadiness.isPending}
+      readinessError={runReadiness.error}
       onRun={(inputs, scopeId) =>
         state.executeWorkflow({ inputs, versionId: state.pendingVersionId, scopeId })
       }

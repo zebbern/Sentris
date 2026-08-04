@@ -6,7 +6,7 @@ import type { SecretSummary } from '@/schemas/secret';
 import { getNodeValidationWarnings } from '@/utils/connectionValidation';
 import {
   evaluateLlmProviderReadiness,
-  evaluateMcpToolsReadiness,
+  evaluateMcpCapabilitiesReadiness,
   findLlmProviderInput,
   getAcceptedLlmProviderIds,
   getProducedLlmProviderId,
@@ -131,7 +131,7 @@ export function evaluateWorkflowAgentNodeReadiness(input: {
   if (mcpEdges.length === 0) {
     return [
       ...rows,
-      evaluateMcpToolsReadiness({
+      evaluateMcpCapabilitiesReadiness({
         connected: false,
         policy: toolAvailability(input.node),
         servers: input.mcpServers,
@@ -144,7 +144,7 @@ export function evaluateWorkflowAgentNodeReadiness(input: {
     ...rows,
     ...mcpEdges.map((edge) => {
       const source = input.nodes.find((node) => node.id === edge.source);
-      return evaluateMcpToolsReadiness({
+      return evaluateMcpCapabilitiesReadiness({
         connected: true,
         policy: toolAvailability(input.node),
         selection: source ? selection(source) : undefined,

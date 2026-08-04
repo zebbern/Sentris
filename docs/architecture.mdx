@@ -503,17 +503,19 @@ sticky routing. Nginx sends the run route through the ordinary backend upstream.
 SDK-independent shared capability-catalog and invocation contracts now back durable
 grants, immutable snapshots, invocation attempts, and the worker-owned runtime boundary.
 The generic workflow AI Agent materializes graph-derived v2 run authority in a setup
-activity and executes each model/tool step through a patch-gated Temporal child Workflow.
+activity and executes each model/MCP step through a patch-gated Temporal child Workflow.
 Inline provider keys are sealed before object storage; the child receives sanitized input,
 while native provider messages and tool results remain behind compact organization-scoped
-refs.
+refs. Its immutable snapshot exposes tools, exact resources, resource templates, and prompts
+as bounded model operations that dispatch through the same canonical durable invocation path.
 
 Studio remains on its v1 sessionful controller, `mcp_affinity` routing, and Redis session
 registry while its facade migration is pending. The gateway's outbound proxy remains an
 explicit v1 client pool scoped by run and endpoint until the worker runtime manager and
 canonical outbound client are implemented.
 
-The remaining target includes complete resources/prompts product behavior,
+The remaining target includes resource/prompt browsing and result presentation beyond
+Operator and workflow Agents,
 Continue-As-New for unbounded agent turns, MCP Tasks, the bounded Studio migration, and
 compatibility cleanup. See
 [ADR: Stateless MCP Facade, Runtime Leases, and Durable Agents](./architecture/adr-stateless-mcp-runtime-and-temporal-agents.md).

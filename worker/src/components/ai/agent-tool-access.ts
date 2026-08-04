@@ -8,6 +8,8 @@ export interface AgentToolStatus {
   status: 'not-requested' | 'configured' | 'degraded';
   connectedNodeCount: number;
   availableToolCount?: number;
+  availableResourceCount?: number;
+  availablePromptCount?: number;
   message?: string;
 }
 
@@ -110,7 +112,7 @@ export function getToolAvailabilityPrompt(toolStatus: AgentToolStatus): string {
 
   return (
     '\n\n# Tool Availability\n' +
-    `Connected MCP tools are unavailable for this run: ${toolStatus.message}.\n` +
+    `Connected MCP capabilities are unavailable for this run: ${toolStatus.message}.\n` +
     'Continue with built-in capabilities and state this limitation in the final result.'
   );
 }

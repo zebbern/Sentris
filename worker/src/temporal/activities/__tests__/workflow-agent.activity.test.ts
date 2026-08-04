@@ -93,6 +93,7 @@ describe('workflow Agent activities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.SECRET_STORE_MASTER_KEY = '12345678901234567890123456789012';
+    delete process.env.INTERNAL_SERVICE_TOKEN;
     storage = createStorage();
     nodeIO = {
       recordStart: vi.fn(async () => undefined),
@@ -269,6 +270,199 @@ describe('workflow Agent activities', () => {
         part: expect.objectContaining({ type: 'finish' }),
       }),
     );
+  });
+
+  test('turns resource and prompt-only MCP authority into durable model operations', async () => {
+    const sourceId = 'mcp-node';
+    const grantId = '66666666-6666-4666-8666-666666666666';
+    const snapshotId = '77777777-7777-4777-8777-777777777777';
+    const authority = {
+      grant: {
+        id: grantId,
+        organizationId: 'org-1',
+        subject: { kind: 'run', runId: 'run-1' },
+        sources: [{ sourceId, toolAccess: { mode: 'all' } }],
+        createdAt: '2026-08-04T10:00:00.000Z',
+      },
+      snapshot: {
+        id: snapshotId,
+        scope: {
+          kind: 'run',
+          runId: 'run-1',
+          organizationId: 'org-1',
+          invokingNodeId: 'agent-1',
+          capabilityGrantId: grantId,
+        },
+        version: '2',
+        configFingerprint: 'a'.repeat(64),
+        runtimeBindings: {
+          [sourceId]: {
+            runtimeKey: {
+              sourceId: 'saved-server',
+              transport: 'stdio',
+              configFingerprint: 'b'.repeat(64),
+              organizationId: 'org-1',
+              principalPartitionHash: 'c'.repeat(64),
+              credentialReference: 'mcp-server:saved-server',
+              credentialGeneration: 1,
+            },
+            protocolEra: 'modern',
+            protocolVersion: '2026-07-28',
+            capabilityFingerprint: 'd'.repeat(64),
+          },
+        },
+        tools: [],
+        resources: [
+          {
+            sourceId,
+            uri: 'fixture://report',
+            name: 'Latest report',
+            description: 'Current investigation report',
+          },
+        ],
+        resourceTemplates: [
+          {
+            sourceId,
+            uriTemplate: 'fixture://reports/{id}',
+            name: 'Report by ID',
+          },
+        ],
+        prompts: [
+          {
+            sourceId,
+            name: 'summarize_report',
+            description: 'Prepare a report summary',
+            arguments: [{ name: 'reportId', required: true }],
+          },
+        ],
+        createdAt: '2026-08-04T10:00:00.000Z',
+      },
+      manifest: {
+        capabilitySnapshotId: snapshotId,
+        capabilityGrantId: grantId,
+        version: '2',
+        entries: [
+          {
+            operationKind: 'resource-read',
+            operationTarget: 'fixture://report',
+            sourceId,
+            destination: 'mcp-activity',
+            retryPolicy: 'reviewed-idempotent',
+          },
+          {
+            operationKind: 'resource-read',
+            operationTarget: 'fixture://reports/{id}',
+            sourceId,
+            destination: 'mcp-activity',
+            retryPolicy: 'reviewed-idempotent',
+          },
+          {
+            operationKind: 'prompt-get',
+            operationTarget: 'summarize_report',
+            sourceId,
+            destination: 'mcp-activity',
+            retryPolicy: 'reviewed-idempotent',
+          },
+        ],
+      },
+    };
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify(authority), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    const streamTextImpl = vi.fn((options: { tools: Record<string, unknown> }) => {
+      const names = Object.keys(options.tools);
+      const exactResource = names.find((name) => name.includes('read_resource_Latest_report'))!;
+      const templatedResource = names.find((name) => name.includes('read_resource_Report_by_ID'))!;
+      const prompt = names.find((name) => name.includes('get_prompt_summarize_report'))!;
+      const toolCalls = [
+        { toolCallId: 'resource-call', toolName: exactResource, input: {} },
+        {
+          toolCallId: 'template-call',
+          toolName: templatedResource,
+          input: { uri: 'fixture://reports/42' },
+        },
+        {
+          toolCallId: 'prompt-call',
+          toolName: prompt,
+          input: { reportId: '42' },
+        },
+      ];
+      return {
+        fullStream: (async function* () {})(),
+        text: Promise.resolve(''),
+        finishReason: Promise.resolve('tool-calls'),
+        response: Promise.resolve({
+          messages: [
+            {
+              role: 'assistant',
+              content: toolCalls.map((call) => ({ type: 'tool-call', ...call })),
+            },
+          ],
+        }),
+        toolCalls: Promise.resolve(toolCalls),
+      };
+    });
+    const model = vi.fn(() => ({ provider: 'gemini', modelId: 'gemini-test' }));
+    process.env.INTERNAL_SERVICE_TOKEN = 'internal-token';
+    agentActivities.initializeWorkflowAgentActivityOverrides({
+      fetchImpl: fetchImpl as any,
+      streamTextImpl: streamTextImpl as any,
+      modelFactories: {
+        createOpenAI: vi.fn() as any,
+        createAnthropic: vi.fn() as any,
+        createGoogleGenerativeAI: vi.fn(() => model) as any,
+      },
+    });
+
+    const setup = await agentActivities.workflowAgentSetupActivity({
+      ...input,
+      component: {
+        ...input.component,
+        metadata: { connectedToolNodeIds: [sourceId] },
+      },
+      initialStateFileId: ROOT_ID,
+    });
+    expect(setup.toolStatus).toEqual({
+      requested: true,
+      status: 'configured',
+      connectedNodeCount: 1,
+      availableToolCount: 0,
+      availableResourceCount: 2,
+      availablePromptCount: 1,
+    });
+
+    await agentActivities.workflowAgentModelStepActivity({
+      ...input,
+      state: setup.state,
+      outputStateFileId: MODEL_ID,
+      step: 0,
+    });
+
+    expect(parseStored(storage, MODEL_ID).toolCalls).toEqual([
+      expect.objectContaining({
+        sourceId,
+        authorizationTarget: 'fixture://report',
+        operation: { kind: 'resource-read', uri: 'fixture://report' },
+      }),
+      expect.objectContaining({
+        sourceId,
+        authorizationTarget: 'fixture://reports/{id}',
+        operation: { kind: 'resource-read', uri: 'fixture://reports/42' },
+      }),
+      expect.objectContaining({
+        sourceId,
+        authorizationTarget: 'summarize_report',
+        operation: {
+          kind: 'prompt-get',
+          name: 'summarize_report',
+          arguments: { reportId: '42' },
+        },
+      }),
+    ]);
   });
 
   test('rejects a provider-declared model error before checkpointing model state', async () => {

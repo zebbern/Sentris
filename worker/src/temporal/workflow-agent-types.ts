@@ -1,4 +1,4 @@
-import type { ExecutionScope, JsonObject, McpOperationResult } from '@sentris/shared';
+import type { ExecutionScope, JsonObject, McpOperation, McpOperationResult } from '@sentris/shared';
 
 import type { AgentToolStatus } from '../components/ai/agent-tool-access.js';
 import type { AgentActivityTimeout } from '../components/ai/agent-execution-profile.js';
@@ -48,6 +48,10 @@ export interface WorkflowAgentToolCall {
   toolName: string;
   sourceId: string;
   arguments: JsonObject;
+  /** Absent only on model deltas created before generalized MCP operations. */
+  authorizationTarget?: string;
+  /** Absent only on model deltas created before generalized MCP operations. */
+  operation?: McpOperation;
 }
 
 export interface WorkflowAgentModelStepOutput {

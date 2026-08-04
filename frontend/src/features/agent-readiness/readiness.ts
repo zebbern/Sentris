@@ -4,7 +4,7 @@ import { getMcpAgentReadiness } from '@/lib/mcpReadiness';
 import type { InputPort, OutputPort } from '@/schemas/component';
 import type { SecretSummary } from '@/schemas/secret';
 
-export type AgentReadinessKind = 'model' | 'credential' | 'mcp-tools';
+export type AgentReadinessKind = 'model' | 'credential' | 'mcp-capabilities';
 export type AgentReadinessState =
   | 'ready'
   | 'loading'
@@ -375,7 +375,7 @@ function availabilityRow(
 ) {
   if (policy === 'best-effort') {
     return row(
-      'mcp-tools',
+      'mcp-capabilities',
       state === 'error' ? 'error' : 'degraded',
       state === 'error' ? 'Error' : 'Degraded',
       detail,
@@ -383,12 +383,13 @@ function availabilityRow(
       false,
     );
   }
-  if (state === 'loading') return row('mcp-tools', 'loading', 'Loading', detail, true, false);
-  if (state === 'error') return row('mcp-tools', 'error', 'Error', detail, true, true);
-  return row('mcp-tools', 'not-configured', 'Not configured', detail, true, true);
+  if (state === 'loading')
+    return row('mcp-capabilities', 'loading', 'Loading', detail, true, false);
+  if (state === 'error') return row('mcp-capabilities', 'error', 'Error', detail, true, true);
+  return row('mcp-capabilities', 'not-configured', 'Not configured', detail, true, true);
 }
 
-export function evaluateMcpToolsReadiness(input: {
+export function evaluateMcpCapabilitiesReadiness(input: {
   connected: boolean;
   policy: 'required' | 'best-effort';
   selection?: McpSelection;
@@ -397,10 +398,10 @@ export function evaluateMcpToolsReadiness(input: {
 }): AgentReadinessRow {
   if (!input.connected) {
     return row(
-      'mcp-tools',
+      'mcp-capabilities',
       'not-configured',
       'Not connected',
-      'No MCP node is connected.',
+      'No MCP capability node is connected.',
       false,
       false,
     );
@@ -409,11 +410,11 @@ export function evaluateMcpToolsReadiness(input: {
     return availabilityRow(
       input.policy,
       'error',
-      'MCP server or tool catalog could not be loaded.',
+      'MCP server or capability catalog could not be loaded.',
     );
   }
   if (input.servers.isLoading || input.tools.isLoading) {
-    return availabilityRow(input.policy, 'loading', 'Loading MCP server and tool catalogs.');
+    return availabilityRow(input.policy, 'loading', 'Loading MCP server and capability catalogs.');
   }
 
   const selection = input.selection ?? { useAllEnabled: false, serverIds: [], toolExclusions: [] };
@@ -423,22 +424,11 @@ export function evaluateMcpToolsReadiness(input: {
   );
   const exclusions = new Set(selection.toolExclusions);
   const usableServers = selectedServers.filter((server) => {
-    const toolCounts = input.tools.items
-      .filter((tool) => tool.serverId === server.id)
-      .reduce(
-        (counts, tool) => ({
-          total: counts.total + 1,
-          enabled:
-            counts.enabled +
-            (tool.enabled && !exclusions.has(`${server.id}:${tool.toolName}`) ? 1 : 0),
-        }),
-        { enabled: 0, total: 0 },
-      );
     return (
       getMcpAgentReadiness({
         enabled: server.enabled,
         healthStatus: server.lastHealthStatus ?? null,
-        toolCounts,
+        requireTools: false,
       }).status === 'ready'
     );
   });
@@ -447,8 +437,26 @@ export function evaluateMcpToolsReadiness(input: {
     return availabilityRow(
       input.policy,
       'not-configured',
-      'No selected MCP servers expose usable tools.',
+      'No selected MCP servers are ready for capability discovery.',
     );
   }
-  return row('mcp-tools', 'ready', 'Ready', 'Selected MCP tools are available.', false, false);
+  const usableServerIds = new Set(usableServers.map((server) => server.id));
+  const enabledToolCount = input.tools.items.filter(
+    (tool) =>
+      usableServerIds.has(tool.serverId) &&
+      tool.enabled &&
+      !exclusions.has(`${tool.serverId}:${tool.toolName}`),
+  ).length;
+  const toolDetail =
+    enabledToolCount > 0
+      ? `${enabledToolCount} enabled tool${enabledToolCount === 1 ? '' : 's'} available; `
+      : '';
+  return row(
+    'mcp-capabilities',
+    'ready',
+    'Ready',
+    `${toolDetail}resources and prompts are discovered from the selected server${usableServers.length === 1 ? '' : 's'} when the run starts.`,
+    false,
+    false,
+  );
 }

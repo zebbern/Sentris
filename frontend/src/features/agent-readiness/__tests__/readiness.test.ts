@@ -6,7 +6,7 @@ import {
   evaluateLlmCredentialReadiness,
   evaluateLlmModelReadiness,
   evaluateLlmProviderReadiness,
-  evaluateMcpToolsReadiness,
+  evaluateMcpCapabilitiesReadiness,
   findLlmProviderInput,
   isLlmProviderInput,
   type CatalogState,
@@ -183,7 +183,7 @@ describe('agent readiness', () => {
 
   it('keeps no connected MCP node optional and non-blocking', () => {
     expect(
-      evaluateMcpToolsReadiness({
+      evaluateMcpCapabilitiesReadiness({
         connected: false,
         policy: 'required',
         servers: { items: [], isLoading: false, error: null },
@@ -194,7 +194,7 @@ describe('agent readiness', () => {
 
   it('keeps degraded best-effort MCP selections non-blocking', () => {
     expect(
-      evaluateMcpToolsReadiness({
+      evaluateMcpCapabilitiesReadiness({
         connected: true,
         policy: 'best-effort',
         selection: { useAllEnabled: false, serverIds: ['server-1'], toolExclusions: [] },
@@ -208,16 +208,20 @@ describe('agent readiness', () => {
     ).toMatchObject({ state: 'degraded', blocksCreation: false, blocksExecution: false });
   });
 
-  it('blocks required MCP when selected servers expose no usable tools', () => {
+  it('keeps a healthy capability server ready when it exposes resources or prompts only', () => {
     expect(
-      evaluateMcpToolsReadiness({
+      evaluateMcpCapabilitiesReadiness({
         connected: true,
         policy: 'required',
         selection: { useAllEnabled: false, serverIds: ['server-1'], toolExclusions: [] },
-        servers: { items: [server()], isLoading: false, error: null },
+        servers: {
+          items: [server({ lastHealthStatus: 'healthy' })],
+          isLoading: false,
+          error: null,
+        },
         tools: { items: [tool({ enabled: false })], isLoading: false, error: null },
       }),
-    ).toMatchObject({ state: 'not-configured', blocksCreation: true, blocksExecution: true });
+    ).toMatchObject({ state: 'ready', blocksCreation: false, blocksExecution: false });
   });
 
   it('honors use-all-enabled, explicit selections, disabled servers, and tool exclusions', () => {
@@ -236,7 +240,7 @@ describe('agent readiness', () => {
       error: null,
     };
     expect(
-      evaluateMcpToolsReadiness({
+      evaluateMcpCapabilitiesReadiness({
         connected: true,
         policy: 'required',
         selection: { useAllEnabled: true, serverIds: [], toolExclusions: ['server-1:excluded'] },
@@ -245,7 +249,7 @@ describe('agent readiness', () => {
       }),
     ).toMatchObject({ state: 'ready' });
     expect(
-      evaluateMcpToolsReadiness({
+      evaluateMcpCapabilitiesReadiness({
         connected: true,
         policy: 'required',
         selection: { useAllEnabled: false, serverIds: ['server-2'], toolExclusions: [] },
@@ -259,7 +263,7 @@ describe('agent readiness', () => {
     const failedServers = { items: [], isLoading: false, error: Error('offline') };
     const tools = { items: [], isLoading: false, error: null };
     expect(
-      evaluateMcpToolsReadiness({
+      evaluateMcpCapabilitiesReadiness({
         connected: true,
         policy: 'required',
         servers: failedServers,
@@ -267,7 +271,7 @@ describe('agent readiness', () => {
       }),
     ).toMatchObject({ state: 'error', blocksCreation: true, blocksExecution: true });
     expect(
-      evaluateMcpToolsReadiness({
+      evaluateMcpCapabilitiesReadiness({
         connected: true,
         policy: 'best-effort',
         servers: failedServers,

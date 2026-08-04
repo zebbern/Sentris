@@ -234,7 +234,10 @@ that advertises only the legacy tool protocol receives a v1 authority and contin
 the legacy activities; a history advertising neither receives no snapshot. This supports
 worker-first/backend-second deployment without routing a v1 manifest through new backend
 operation endpoints. The generic workflow-graph AI Agent now uses patch-gated durable
-child turns over this contract. A true follow-up turn for a completed workflow Agent remains
+child turns over this contract. Its setup snapshot exposes tools plus exact resources,
+resource templates, and prompts as bounded model operations; every selected operation is
+recorded and dispatched with its canonical typed identity through the same durable invocation
+path. A true follow-up turn for a completed workflow Agent remains
 separate work: it needs a new child turn, server-owned continuation state, and fresh run
 authority rather than a Signal to the closed child. Remaining work is Continue-As-New rollover and
 cross-run-ID deduplication, MCP Tasks, the Task 8 unbound-source migration, and the

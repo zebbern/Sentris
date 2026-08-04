@@ -17,6 +17,7 @@ export function getMcpAgentReadiness(input: {
   enabled: boolean;
   healthStatus?: McpHealthStatus | null;
   toolCounts?: ToolCounts | null;
+  requireTools?: boolean;
 }): AgentReadiness {
   if (!input.enabled) {
     return { status: 'disabled', label: 'Disabled', tone: 'muted' };
@@ -30,7 +31,7 @@ export function getMcpAgentReadiness(input: {
     return { status: 'needs-test', label: 'Needs test', tone: 'warning' };
   }
 
-  if (!input.toolCounts || input.toolCounts.enabled <= 0) {
+  if (input.requireTools !== false && (!input.toolCounts || input.toolCounts.enabled <= 0)) {
     return { status: 'no-tools', label: 'No tools', tone: 'warning' };
   }
 

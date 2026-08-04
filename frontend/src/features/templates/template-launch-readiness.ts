@@ -6,7 +6,7 @@ import { getMcpAgentReadiness } from '@/lib/mcpReadiness';
 import {
   evaluateCredentialMappingReadiness,
   evaluateLlmModelReadiness,
-  evaluateMcpToolsReadiness,
+  evaluateMcpCapabilitiesReadiness,
   findLlmProviderInput,
   getAcceptedLlmProviderIds,
   getProducedLlmProviderId,
@@ -363,7 +363,7 @@ export function evaluateTemplateLaunchReadiness(input: {
   };
 
   const mcp = input.requirements.mcp.map((requirement) => {
-    const readiness = evaluateMcpToolsReadiness({
+    const readiness = evaluateMcpCapabilitiesReadiness({
       connected: true,
       policy: requirement.policy,
       selection: requirement.selection,
@@ -373,7 +373,8 @@ export function evaluateTemplateLaunchReadiness(input: {
     return {
       ...readiness,
       id: `template:mcp:${requirement.mcpNodeId}\u0000${requirement.agentNodeId}`,
-      label: requirement.policy === 'best-effort' ? 'MCP tools (optional)' : 'MCP tools',
+      label:
+        requirement.policy === 'best-effort' ? 'MCP capabilities (optional)' : 'MCP capabilities',
       detail: mcpDetail({
         requirement,
         readiness,

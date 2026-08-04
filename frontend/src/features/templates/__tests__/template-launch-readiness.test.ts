@@ -591,7 +591,7 @@ describe('template launch readiness', () => {
           error: null,
         },
         mcpTools: { items: [tool()], isLoading: false, error: null },
-      }).find((row) => row.kind === 'mcp-tools'),
+      }).find((row) => row.kind === 'mcp-capabilities'),
     ).toMatchObject({ state: 'ready' });
   });
 
@@ -615,7 +615,7 @@ describe('template launch readiness', () => {
           error: null,
         },
         mcpTools: { items: [tool()], isLoading: false, error: null },
-      }).find((row) => row.kind === 'mcp-tools'),
+      }).find((row) => row.kind === 'mcp-capabilities'),
     ).toMatchObject({ state: 'ready' });
   });
 
@@ -643,8 +643,8 @@ describe('template launch readiness', () => {
           isLoading: false,
           error: null,
         },
-      }).find((row) => row.kind === 'mcp-tools'),
-    ).toMatchObject({ state: 'not-configured', blocksCreation: true });
+      }).find((row) => row.kind === 'mcp-capabilities'),
+    ).toMatchObject({ state: 'ready', blocksCreation: false });
   });
 
   it('keeps the current Gemini template best-effort MCP state non-blocking', () => {
@@ -652,7 +652,7 @@ describe('template launch readiness', () => {
     expect(requirements.models).toEqual([
       expect.objectContaining({ provider: 'gemini', modelId: 'gemini-3.5-flash' }),
     ]);
-    expect(evaluate(requirements).find((row) => row.kind === 'mcp-tools')).toMatchObject({
+    expect(evaluate(requirements).find((row) => row.kind === 'mcp-capabilities')).toMatchObject({
       state: 'degraded',
       blocksCreation: false,
       blocksExecution: false,

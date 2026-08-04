@@ -251,13 +251,13 @@ describe('evaluateWorkflowAgentNodeReadiness', () => {
       tools: [tool()],
     });
 
-    expect(ignored.find((row) => row.kind === 'mcp-tools')).toMatchObject({
+    expect(ignored.find((row) => row.kind === 'mcp-capabilities')).toMatchObject({
       label: 'Not connected',
       blocksExecution: false,
     });
-    expect(required.find((row) => row.kind === 'mcp-tools')).toMatchObject({
-      label: 'Not configured',
-      blocksExecution: true,
+    expect(required.find((row) => row.kind === 'mcp-capabilities')).toMatchObject({
+      label: 'Ready',
+      blocksExecution: false,
     });
   });
 
@@ -282,8 +282,8 @@ describe('evaluateWorkflowAgentNodeReadiness', () => {
         edges: [{ id: 'tools-handle', source: 'mcp', target: 'agent', targetHandle: 'tools' }],
         servers: [server()],
         tools: [tool()],
-      }).find((row) => row.kind === 'mcp-tools'),
-    ).toMatchObject({ state: 'degraded', blocksExecution: false });
+      }).find((row) => row.kind === 'mcp-capabilities'),
+    ).toMatchObject({ state: 'ready', blocksExecution: false });
   });
 
   it('permits subscription OAuth only for the Claude Code component', () => {

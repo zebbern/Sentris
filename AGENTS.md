@@ -401,6 +401,8 @@ the secret-store master key before durable storage, and only a sanitized compone
 plus compact state/authority refs enter the child history. Model steps and canonical MCP
 operations are separate durable activities; native AI SDK continuation messages, tool
 arguments, and tool results are checkpointed in organization-scoped object storage.
+The immutable run snapshot exposes tools, exact resources, resource templates, and prompts
+to the model as bounded operations that retain their canonical typed identity through dispatch.
 Top-level and For Each nodes share this execution boundary; pre-patch histories retain
 the legacy single-activity loop. Provider-declared model finish errors are classified at one
 worker-local boundary before either durable or legacy Agent paths can record success; Operator's
@@ -408,7 +410,8 @@ single text-only recovery remains the only caller-specific behavior. Do not add 
 in-process agent loop or route these calls back through the legacy run gateway.
 
 Remaining work is Continue-As-New, MCP Tasks, the Task 8 compatibility cleanup, the
-bounded Studio migration, and complete resources/prompts behavior. See
+bounded Studio migration, and resource/prompt browsing and result presentation beyond
+Operator and workflow Agents. See
 `docs/architecture/adr-stateless-mcp-runtime-and-temporal-agents.md` and the linked
 design spec. Do not expand the legacy session architecture while this migration is in
 progress.
