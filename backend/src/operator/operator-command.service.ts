@@ -7,6 +7,8 @@ import {
   OperatorRunComparisonResultSchema,
   OperatorRunInputProposalResultSchema,
   OperatorPlanProposalResultSchema,
+  OperatorListWorkflowsResultSchema,
+  OperatorWorkflowInspectionResultSchema,
   OperatorWorkflowPromotionResultSchema,
   MCP_CAPABILITY_CONTRACT_VERSION,
   McpOperationSchema,
@@ -464,7 +466,11 @@ export class OperatorCommandService {
             workflow.description?.toLowerCase().includes(search),
         )
       : workflows;
-    return { result: toBoundedJson(filtered.slice(0, input.limit)) };
+    return {
+      result: toBoundedJson(
+        OperatorListWorkflowsResultSchema.parse(filtered.slice(0, input.limit)),
+      ),
+    };
   }
 
   private async getWorkflow(
@@ -495,7 +501,7 @@ export class OperatorCommandService {
           : 'Workflow graph is too large for Operator authoring';
     }
     return {
-      result: {
+      result: OperatorWorkflowInspectionResultSchema.parse({
         id: workflow.id,
         name: workflow.name,
         description: workflow.description,
@@ -515,7 +521,7 @@ export class OperatorCommandService {
               ? (node.data as { label: string }).label
               : null,
         })),
-      },
+      }),
     };
   }
 

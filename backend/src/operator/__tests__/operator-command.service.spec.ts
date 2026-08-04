@@ -520,7 +520,19 @@ describe('OperatorCommandService', () => {
         id: versionId,
         version: 4,
         graph: {
-          nodes: [{ id: 'entry', type: 'core.workflow.entrypoint', data: { label: 'Start' } }],
+          name: 'npm investigation',
+          description: 'Investigate one npm package',
+          nodes: [
+            {
+              id: 'entry',
+              type: 'core.workflow.entrypoint',
+              position: { x: 0, y: 0 },
+              data: {
+                label: 'Start',
+                config: { params: {}, inputOverrides: {} },
+              },
+            },
+          ],
           edges: [],
         },
       },

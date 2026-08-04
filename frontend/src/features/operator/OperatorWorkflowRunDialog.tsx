@@ -1,8 +1,4 @@
-import {
-  WorkflowGraphSchema,
-  WorkflowRuntimeInputDefinitionsSchema,
-  type OperatorWorkflowApplyResult,
-} from '@sentris/shared';
+import { WorkflowGraphSchema, WorkflowRuntimeInputDefinitionsSchema } from '@sentris/shared';
 import type { Edge, Node } from '@xyflow/react';
 import { useCallback, useMemo } from 'react';
 
@@ -17,15 +13,36 @@ import {
 import { useComponents } from '@/hooks/queries/useComponentQueries';
 import { useMcpAllTools, useMcpServers } from '@/hooks/queries/useMcpServerQueries';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
-import { useWorkflowVersion } from '@/hooks/queries/useWorkflowQueries';
+import { useWorkflow, useWorkflowVersion } from '@/hooks/queries/useWorkflowQueries';
 import type { FrontendNodeData } from '@/schemas/node';
 import { isEntryPointComponentRef } from '@/utils/entryPointUtils';
 
+export type OperatorWorkflowRunSelection =
+  | {
+      workflowId: string;
+      name: string;
+      versionId?: undefined;
+      version?: undefined;
+    }
+  | {
+      workflowId: string;
+      name: string;
+      versionId: string;
+      version: number;
+    };
+
+interface ResolvedOperatorWorkflowRunSelection {
+  workflowId: string;
+  name: string;
+  versionId: string;
+  version: number;
+}
+
 interface OperatorWorkflowRunDialogProps {
-  workflow: OperatorWorkflowApplyResult | null;
+  workflow: OperatorWorkflowRunSelection | null;
   onOpenChange: (open: boolean) => void;
   onRun: (
-    workflow: OperatorWorkflowApplyResult,
+    workflow: ResolvedOperatorWorkflowRunSelection,
     inputs: Record<string, unknown>,
     scopeId?: string | null,
   ) => void;
@@ -42,13 +59,18 @@ export function OperatorWorkflowRunDialog({
 }: OperatorWorkflowRunDialogProps) {
   const open = workflow !== null;
   const versionQuery = useWorkflowVersion(workflow?.workflowId, workflow?.versionId);
+  const currentWorkflowQuery = useWorkflow(
+    workflow && !workflow.versionId ? workflow.workflowId : undefined,
+  );
   const componentsQuery = useComponents();
   const secretsQuery = useSecrets({ enabled: open });
 
-  const parsedGraph = useMemo(
-    () => (versionQuery.data ? WorkflowGraphSchema.safeParse(versionQuery.data.graph) : null),
-    [versionQuery.data],
-  );
+  const parsedGraph = useMemo(() => {
+    const savedGraph = workflow?.versionId
+      ? versionQuery.data?.graph
+      : currentWorkflowQuery.data?.graph;
+    return savedGraph ? WorkflowGraphSchema.safeParse(savedGraph) : null;
+  }, [currentWorkflowQuery.data?.graph, versionQuery.data?.graph, workflow?.versionId]);
   const graph = parsedGraph?.success ? parsedGraph.data : null;
   const nodes = useMemo<Node<FrontendNodeData>[]>(
     () =>
@@ -153,20 +175,36 @@ export function OperatorWorkflowRunDialog({
   );
   const readinessPending = Boolean(
     open &&
-    (versionQuery.isLoading ||
+    ((workflow?.versionId ? versionQuery.isLoading : currentWorkflowQuery.isLoading) ||
       componentsQuery.isLoading ||
       secretsQuery.isLoading ||
       (hasConnectedCustomMcp && (mcpServersQuery.isLoading || mcpToolsQuery.isLoading))),
   );
-  const readinessError = versionQuery.error
-    ? errorMessage(versionQuery.error, 'Could not load the saved workflow version.')
+  const workflowQueryError = workflow?.versionId ? versionQuery.error : currentWorkflowQuery.error;
+  const resolvedWorkflow = useMemo<ResolvedOperatorWorkflowRunSelection | null>(() => {
+    if (!workflow) return null;
+    if (workflow.versionId) {
+      return { ...workflow, versionId: workflow.versionId, version: workflow.version };
+    }
+    const versionId = currentWorkflowQuery.data?.currentVersionId;
+    const version = currentWorkflowQuery.data?.currentVersion;
+    return versionId && version ? { ...workflow, versionId, version } : null;
+  }, [
+    currentWorkflowQuery.data?.currentVersion,
+    currentWorkflowQuery.data?.currentVersionId,
+    workflow,
+  ]);
+  const readinessError = workflowQueryError
+    ? errorMessage(workflowQueryError, 'Could not load the saved workflow version.')
     : componentsQuery.error
       ? errorMessage(componentsQuery.error, 'Could not load component readiness metadata.')
-      : parsedGraph && !parsedGraph.success
-        ? 'The saved workflow version has an invalid graph contract.'
-        : runtimeInputResult && !runtimeInputResult.success
-          ? 'The saved workflow version has an invalid runtime-input contract.'
-          : null;
+      : workflow && !workflow.versionId && currentWorkflowQuery.data && !resolvedWorkflow
+        ? 'This workflow does not have a current version to run.'
+        : parsedGraph && !parsedGraph.success
+          ? 'The saved workflow version has an invalid graph contract.'
+          : runtimeInputResult && !runtimeInputResult.success
+            ? 'The saved workflow version has an invalid runtime-input contract.'
+            : null;
   const readinessIssues = [
     ...new Set(
       readiness.configurationIssues.map((issue) => `${issue.nodeLabel}: ${issue.message}`),
@@ -187,7 +225,7 @@ export function OperatorWorkflowRunDialog({
         workflow ? `/workflows/${encodeURIComponent(workflow.workflowId)}` : undefined
       }
       onRun={(inputs, scopeId) => {
-        if (workflow) onRun(workflow, inputs, scopeId);
+        if (resolvedWorkflow) onRun(resolvedWorkflow, inputs, scopeId);
       }}
     />
   );

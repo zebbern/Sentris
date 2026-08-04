@@ -46,14 +46,18 @@ export const WorkflowRuntimeInputDefinitionsSchema = z
 
 export type WorkflowRuntimeInputDefinition = z.infer<typeof WorkflowRuntimeInputDefinitionSchema>;
 
-export interface WorkflowRuntimeInputDescriptor {
-  id: string;
-  label: string;
-  type: WorkflowRuntimeInputType;
-  required: boolean;
-  description?: string;
-  hasDefaultValue: boolean;
-}
+export const WorkflowRuntimeInputDescriptorSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    label: z.string().trim().min(1),
+    type: WorkflowRuntimeInputTypeSchema,
+    required: z.boolean(),
+    description: z.string().optional(),
+    hasDefaultValue: z.boolean(),
+  })
+  .strict();
+
+export type WorkflowRuntimeInputDescriptor = z.infer<typeof WorkflowRuntimeInputDescriptorSchema>;
 
 export type WorkflowRuntimeInputValidationIssue =
   | {

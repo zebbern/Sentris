@@ -2,7 +2,9 @@ import {
   FindingTriageStatusSchema,
   OperatorGetFindingInputSchema,
   OperatorGetRunInputSchema,
+  OperatorListWorkflowsResultSchema,
   OperatorUpdateFindingTriageInputSchema,
+  OperatorWorkflowInspectionResultSchema,
   OperatorWorkflowApplyResultSchema,
   OperatorWorkflowDraftResultSchema,
   OperatorWorkflowPromotionResultSchema,
@@ -15,7 +17,6 @@ import {
   type FindingTriageStatus,
   type OperatorMessageView,
   type OperatorTurnView,
-  type OperatorWorkflowApplyResult,
   type OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
 import {
@@ -38,8 +39,10 @@ import { OperatorRunActivity, type OperatorRunCommandRequest } from './OperatorR
 import { OperatorRunEvidenceCard } from './OperatorRunEvidenceCard';
 import { OperatorRunComparisonCard } from './OperatorRunComparisonCard';
 import { OperatorRunInputProposalCard } from './OperatorRunInputProposalCard';
+import { OperatorSavedWorkflowCard } from './OperatorSavedWorkflowCard';
 import { OperatorPlanCard } from './OperatorPlanCard';
 import { OperatorWorkflowDraftCard } from './OperatorWorkflowDraftCard';
+import type { OperatorWorkflowRunSelection } from './OperatorWorkflowRunDialog';
 import { OPERATOR_COMMAND_LABELS } from './operatorCommandLabels';
 
 const ACTION_STATUS_LABELS: Record<OperatorActionStatus, string> = {
@@ -267,7 +270,7 @@ interface ActionEventProps {
   runCommandDisabled: boolean;
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
   onRunCommand: (request: OperatorRunCommandRequest) => void;
-  onRunSavedWorkflow: (workflow: OperatorWorkflowApplyResult) => void;
+  onRunSavedWorkflow: (workflow: OperatorWorkflowRunSelection) => void;
   workflowDrafts: OperatorWorkflowDraftDetail[];
   appliedDraftIds: ReadonlySet<string>;
   keptVersionIds: ReadonlySet<string>;
@@ -294,6 +297,14 @@ function ActionEvent({
   const argumentsPreview = formatPreview(action.arguments);
   const draftResult = OperatorWorkflowDraftResultSchema.safeParse(action.result);
   const applyResult = OperatorWorkflowApplyResultSchema.safeParse(action.result);
+  const listedWorkflows =
+    action.status === 'succeeded' && action.commandName === 'list_workflows'
+      ? OperatorListWorkflowsResultSchema.safeParse(action.result)
+      : null;
+  const inspectedWorkflow =
+    action.status === 'succeeded' && action.commandName === 'get_workflow'
+      ? OperatorWorkflowInspectionResultSchema.safeParse(action.result)
+      : null;
   const runComparison = OperatorRunComparisonResultSchema.safeParse(action.result);
   const runInputProposal = OperatorRunInputProposalResultSchema.safeParse(action.result);
   const planProposal = OperatorPlanProposalResultSchema.safeParse(action.result);
@@ -311,13 +322,17 @@ function ActionEvent({
       ? action.error
       : workflowAuthoringResult
         ? null
-        : runComparison.success
+        : listedWorkflows?.success
           ? null
-          : runInputProposal.success
+          : inspectedWorkflow?.success
             ? null
-            : planProposal.success
+            : runComparison.success
               ? null
-              : formatPreview(action.result);
+              : runInputProposal.success
+                ? null
+                : planProposal.success
+                  ? null
+                  : formatPreview(action.result);
   const isActive = action.status === 'executing' || action.status === 'approved';
   const workflowDraft = draftResult.success
     ? workflowDrafts.find(
@@ -414,6 +429,24 @@ function ActionEvent({
           />
         ) : null}
 
+        {listedWorkflows?.success ? (
+          <OperatorSavedWorkflowCard
+            kind="list"
+            result={listedWorkflows.data}
+            disabled={runCommandDisabled}
+            onRun={onRunSavedWorkflow}
+          />
+        ) : null}
+
+        {inspectedWorkflow?.success ? (
+          <OperatorSavedWorkflowCard
+            kind="inspection"
+            result={inspectedWorkflow.data}
+            disabled={runCommandDisabled}
+            onRun={onRunSavedWorkflow}
+          />
+        ) : null}
+
         {runComparison.success ? (
           <OperatorRunComparisonCard
             result={runComparison.data}
@@ -500,7 +533,7 @@ interface OperatorTimelineProps {
   workflowDrafts?: OperatorWorkflowDraftDetail[];
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
   onRunCommand?: (request: OperatorRunCommandRequest) => void;
-  onRunSavedWorkflow?: (workflow: OperatorWorkflowApplyResult) => void;
+  onRunSavedWorkflow?: (workflow: OperatorWorkflowRunSelection) => void;
   pendingCancelTurnId?: string;
   onCancelTurn?: (turnId: string) => void;
 }

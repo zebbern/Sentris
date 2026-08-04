@@ -79,6 +79,119 @@ describe('OperatorTimeline', () => {
     expect(onDecision).toHaveBeenCalledWith(pendingAction, 'rejected');
   });
 
+  it('opens configure-and-run from a structured saved workflow list', () => {
+    const onRunSavedWorkflow = mock(() => {});
+    const workflowId = '22222222-2222-4222-8222-222222222222';
+    const listAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'list-workflows-action',
+      commandName: 'list_workflows',
+      effect: 'read',
+      status: 'succeeded',
+      approvalRequired: false,
+      runId: null,
+      arguments: { limit: 25 },
+      result: [
+        {
+          id: workflowId,
+          name: 'npm package investigation',
+          description: 'Investigate one npm package',
+          organizationId: 'organization-1',
+          lastRun: null,
+          latestRunStatus: null,
+          runCount: 3,
+          nodeCount: 8,
+          createdAt: '2026-08-01T10:00:00.000Z',
+          updatedAt: '2026-08-02T10:00:00.000Z',
+          tags: ['npm'],
+        },
+      ],
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={[listAction]}
+        isActive={false}
+        onDecision={mock(() => {})}
+        onRunSavedWorkflow={onRunSavedWorkflow}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getByRole('link', { name: 'npm package investigation' })).toHaveAttribute(
+      'href',
+      `/workflows/${workflowId}`,
+    );
+    expect(screen.queryByText('Result')).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Configure and run npm package investigation' }),
+    );
+    expect(onRunSavedWorkflow).toHaveBeenCalledWith({
+      workflowId,
+      name: 'npm package investigation',
+    });
+  });
+
+  it('preserves the inspected immutable workflow version when configuring a run', () => {
+    const onRunSavedWorkflow = mock(() => {});
+    const workflowId = '22222222-2222-4222-8222-222222222222';
+    const versionId = '33333333-3333-4333-8333-333333333333';
+    const inspectionAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'inspect-workflow-action',
+      commandName: 'get_workflow',
+      effect: 'read',
+      status: 'succeeded',
+      approvalRequired: false,
+      runId: null,
+      arguments: { workflowId, version: 4 },
+      result: {
+        id: workflowId,
+        name: 'npm package investigation',
+        description: 'Investigate one npm package',
+        versionId,
+        version: 4,
+        runtimeInputs: [
+          {
+            id: 'packageSpec',
+            label: 'npm package and optional version',
+            type: 'text',
+            required: true,
+            hasDefaultValue: false,
+          },
+        ],
+        nodeCount: 8,
+        edgeCount: 7,
+        editableGraph: null,
+        credentialPlaceholder: '__SENTRIS_PRESERVE_CREDENTIAL__',
+        nodes: [{ id: 'entry', type: 'core.workflow.entrypoint', label: 'Start' }],
+      },
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={[inspectionAction]}
+        isActive={false}
+        onDecision={mock(() => {})}
+        onRunSavedWorkflow={onRunSavedWorkflow}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getByText('Version 4 · 8 nodes · 1 input')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Configure and run npm package investigation' }),
+    );
+    expect(onRunSavedWorkflow).toHaveBeenCalledWith({
+      workflowId,
+      name: 'npm package investigation',
+      versionId,
+      version: 4,
+    });
+  });
+
   it('disables the proposal save action after a succeeded apply for the same draft', () => {
     const draftId = '11111111-1111-4111-8111-111111111111';
     const proposalAction: OperatorActionView = {

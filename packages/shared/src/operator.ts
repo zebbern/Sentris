@@ -9,6 +9,7 @@ import {
   FindingObservationSeveritySchema,
 } from './findings/findingObservation.js';
 import type { JsonValue, McpOperationInvocationRequest } from './mcp-invocation.js';
+import { WorkflowRuntimeInputDescriptorSchema } from './workflow-runtime-inputs.js';
 import {
   WorkflowEdgeSchema,
   WorkflowGraphObjectSchema,
@@ -100,6 +101,28 @@ export const OperatorGetWorkflowInputSchema = z
   })
   .strict();
 
+export const OperatorWorkflowSummaryResultSchema = z
+  .object({
+    id: WorkflowIdSchema,
+    name: z.string().trim().min(1),
+    description: z.string().nullable(),
+    organizationId: z.string().nullable(),
+    lastRun: z.string().datetime().nullable(),
+    latestRunStatus: ExecutionStatusSchema.nullable(),
+    runCount: z.number().int().nonnegative(),
+    nodeCount: z.number().int().nonnegative(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    tags: z.array(z.string()),
+  })
+  .strict();
+export type OperatorWorkflowSummaryResult = z.infer<typeof OperatorWorkflowSummaryResultSchema>;
+
+export const OperatorListWorkflowsResultSchema = z
+  .array(OperatorWorkflowSummaryResultSchema)
+  .max(100);
+export type OperatorListWorkflowsResult = z.infer<typeof OperatorListWorkflowsResultSchema>;
+
 export const OperatorListComponentsInputSchema = z
   .object({
     search: z.string().trim().min(1).max(191).optional(),
@@ -143,6 +166,36 @@ export const OperatorWorkflowGraphSchema = WorkflowGraphObjectSchema.extend({
     });
   }
 });
+
+export const OperatorWorkflowInspectionResultSchema = z
+  .object({
+    id: WorkflowIdSchema,
+    name: z.string().trim().min(1),
+    description: z.string().nullable(),
+    versionId: z.string().uuid(),
+    version: z.number().int().positive(),
+    runtimeInputs: z.array(WorkflowRuntimeInputDescriptorSchema),
+    nodeCount: z.number().int().nonnegative(),
+    edgeCount: z.number().int().nonnegative(),
+    editableGraph: OperatorWorkflowGraphSchema.nullable(),
+    credentialPlaceholder: z.string().trim().min(1),
+    authoringUnavailable: z.string().trim().min(1).optional(),
+    nodes: z
+      .array(
+        z
+          .object({
+            id: z.string().trim().min(1),
+            type: z.string().trim().min(1),
+            label: z.string().nullable(),
+          })
+          .strict(),
+      )
+      .max(50),
+  })
+  .strict();
+export type OperatorWorkflowInspectionResult = z.infer<
+  typeof OperatorWorkflowInspectionResultSchema
+>;
 
 const OperatorWorkflowEntityIdSchema = z.string().trim().min(1).max(191);
 
