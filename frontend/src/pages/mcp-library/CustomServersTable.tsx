@@ -40,7 +40,7 @@ interface CustomServersTableProps {
   readinessByServer: Record<string, AgentReadiness>;
   onCreateNew: () => void;
   onToggle: (serverId: string) => void;
-  onViewTools: (serverId: string) => void;
+  onViewCapabilities: (serverId: string) => void;
   onTestConnection: (serverId: string) => void;
   onEdit: (serverId: string) => void;
   onDelete: (serverId: string) => void;
@@ -61,7 +61,7 @@ export function CustomServersTable({
   readinessByServer,
   onCreateNew,
   onToggle,
-  onViewTools,
+  onViewCapabilities,
   onTestConnection,
   onEdit,
   onDelete,
@@ -215,13 +215,13 @@ export function CustomServersTable({
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label="View tools"
-                                        onClick={() => onViewTools(server.id)}
+                                        aria-label="View capabilities"
+                                        onClick={() => onViewCapabilities(server.id)}
                                       >
                                         <Wrench className="h-4 w-4" />
                                       </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent>View tools</TooltipContent>
+                                    <TooltipContent>View capabilities</TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
 

@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { McpCatalogSchema } from '@sentris/shared';
 
 import { mcpServers } from '../../database/schema/mcp-servers';
 
@@ -112,6 +113,15 @@ export class McpToolResponseDto extends createZodDto(McpToolResponseSchema) {
   }
 }
 
+export const McpServerCapabilitiesResponseSchema = z.object({
+  catalog: McpCatalogSchema.nullable(),
+  discoveredAt: z.string().datetime().nullable(),
+});
+
+export class McpServerCapabilitiesResponseDto extends createZodDto(
+  McpServerCapabilitiesResponseSchema,
+) {}
+
 export const TestConnectionResponseSchema = z.object({
   success: z.boolean(),
   message: z.string().optional(),
@@ -143,6 +153,7 @@ export class HealthStatusResponseDto extends createZodDto(HealthStatusResponseSc
 // Export classes with both names for backward compatibility (as values)
 export const McpServerResponse = McpServerResponseDto;
 export const McpToolResponse = McpToolResponseDto;
+export const McpServerCapabilitiesResponse = McpServerCapabilitiesResponseDto;
 export const TestConnectionResponse = TestConnectionResponseDto;
 export const TestEnabledServerResponse = TestEnabledServerResponseDto;
 export const HealthStatusResponse = HealthStatusResponseDto;
@@ -150,6 +161,7 @@ export const HealthStatusResponse = HealthStatusResponseDto;
 // Type aliases for use in type annotations
 export type McpServerResponse = McpServerResponseDto;
 export type McpToolResponse = McpToolResponseDto;
+export type McpServerCapabilitiesResponse = McpServerCapabilitiesResponseDto;
 export type TestConnectionResponse = TestConnectionResponseDto;
 export type TestEnabledServerResponse = TestEnabledServerResponseDto;
 export type HealthStatusResponse = HealthStatusResponseDto;

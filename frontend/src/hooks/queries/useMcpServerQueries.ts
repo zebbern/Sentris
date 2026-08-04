@@ -1,5 +1,5 @@
 import { skipToken, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { CreateMcpServer, UpdateMcpServer } from '@sentris/shared';
+import type { CreateMcpServer, McpCatalog, UpdateMcpServer } from '@sentris/shared';
 import { getApiAuthHeaders, API_BASE_URL } from '@/services/api';
 import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
 import { queryKeys } from '@/lib/queryKeys';
@@ -43,6 +43,11 @@ export interface TestEnabledMcpServerResponse {
   toolCount?: number;
 }
 
+export interface McpServerCapabilitiesResponse {
+  catalog: McpCatalog | null;
+  discoveredAt: string | null;
+}
+
 async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = await getApiAuthHeaders();
   const { signal, ...restOptions } = options;
@@ -82,6 +87,20 @@ export function useMcpAllTools(options?: { enabled?: boolean }) {
       options?.enabled === false
         ? skipToken
         : () => apiRequest<McpToolResponse[]>('/api/v1/mcp-servers/tools'),
+    staleTime: 120_000,
+  });
+}
+
+export function useMcpServerCapabilities(serverId: string | null, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.mcpServers.capabilities(serverId ?? '__none__'),
+    queryFn:
+      serverId && options?.enabled !== false
+        ? () =>
+            apiRequest<McpServerCapabilitiesResponse>(
+              `/api/v1/mcp-servers/${serverId}/capabilities`,
+            )
+        : skipToken,
     staleTime: 120_000,
   });
 }
@@ -146,9 +165,10 @@ export function useTestMcpConnection() {
         `/api/v1/mcp-servers/${id}/test`,
         { method: 'POST' },
       ),
-    onSuccess: () => {
+    onSuccess: (_result, id) => {
       qc.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
       qc.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
+      qc.invalidateQueries({ queryKey: queryKeys.mcpServers.capabilities(id) });
       qc.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
     },
   });
@@ -165,17 +185,6 @@ export function useTestEnabledMcpServers() {
       qc.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
       qc.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
       qc.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
-    },
-  });
-}
-
-export function useFetchServerTools() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (serverId: string) =>
-      apiRequest<McpToolResponse[]>(`/api/v1/mcp-servers/${serverId}/tools`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
     },
   });
 }

@@ -35,12 +35,17 @@ mock.module('@/components/ui/sheet', () => {
 });
 
 // --- Mutable mock state for MCP server queries ---
-import type { McpServerResponse, McpToolResponse } from '@/hooks/queries/useMcpServerQueries';
+import type {
+  McpServerCapabilitiesResponse,
+  McpServerResponse,
+  McpToolResponse,
+} from '@/hooks/queries/useMcpServerQueries';
 import type { McpGroupResponse, McpGroupTemplateResponse } from '@/services/mcpGroupsApi';
 
 const mockQueryState: {
   servers: McpServerResponse[];
   tools: McpToolResponse[];
+  capabilities: McpServerCapabilitiesResponse;
   groups: McpGroupResponse[];
   groupTemplates: McpGroupTemplateResponse[];
   isLoading: boolean;
@@ -50,12 +55,12 @@ const mockQueryState: {
   toggleServer: any;
   testConnection: any;
   testEnabledServers: any;
-  fetchServerTools: any;
   toggleTool: any;
   discoverTools: any;
 } = {
   servers: [],
   tools: [],
+  capabilities: { catalog: null, discoveredAt: null },
   groups: [],
   groupTemplates: [],
   isLoading: false,
@@ -65,7 +70,6 @@ const mockQueryState: {
   toggleServer: mock().mockResolvedValue({ id: 'srv-1', enabled: true, name: 'Test' }),
   testConnection: mock().mockResolvedValue({ success: true, message: 'OK' }),
   testEnabledServers: mock().mockResolvedValue([]),
-  fetchServerTools: mock().mockResolvedValue([]),
   toggleTool: mock().mockResolvedValue({ id: 'tool-1', toolName: 'test', enabled: true }),
   discoverTools: mock().mockResolvedValue([]),
 };
@@ -80,6 +84,11 @@ mock.module('@/hooks/queries/useMcpServerQueries', () => ({
     data: mockQueryState.tools,
     isLoading: false,
   }),
+  useMcpServerCapabilities: () => ({
+    data: mockQueryState.capabilities,
+    isLoading: false,
+    error: null,
+  }),
   useDeleteMcpServer: () => ({
     mutateAsync: mockQueryState.deleteServer,
   }),
@@ -91,9 +100,6 @@ mock.module('@/hooks/queries/useMcpServerQueries', () => ({
   }),
   useTestEnabledMcpServers: () => ({
     mutateAsync: mockQueryState.testEnabledServers,
-  }),
-  useFetchServerTools: () => ({
-    mutateAsync: mockQueryState.fetchServerTools,
   }),
   useToggleMcpTool: () => ({
     mutateAsync: mockQueryState.toggleTool,
@@ -202,6 +208,7 @@ const baseTool: McpToolResponse = {
 interface MockQueryOverrides {
   servers?: McpServerResponse[];
   tools?: McpToolResponse[];
+  capabilities?: McpServerCapabilitiesResponse;
   groups?: McpGroupResponse[];
   groupTemplates?: McpGroupTemplateResponse[];
   isLoading?: boolean;
@@ -211,13 +218,13 @@ interface MockQueryOverrides {
   toggleServer?: (...args: any[]) => Promise<any>;
   testConnection?: (...args: any[]) => Promise<any>;
   testEnabledServers?: (...args: any[]) => Promise<any>;
-  fetchServerTools?: (...args: any[]) => Promise<any>;
   discoverTools?: (...args: any[]) => Promise<any>;
 }
 
 const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.servers = overrides.servers ?? [baseServer, secondServer];
   mockQueryState.tools = overrides.tools ?? [baseTool];
+  mockQueryState.capabilities = overrides.capabilities ?? { catalog: null, discoveredAt: null };
   mockQueryState.groups = overrides.groups ?? [];
   mockQueryState.groupTemplates = overrides.groupTemplates ?? [];
   mockQueryState.isLoading = overrides.isLoading ?? false;
@@ -230,7 +237,6 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.testConnection =
     overrides.testConnection ?? mock().mockResolvedValue({ success: true, message: 'OK' });
   mockQueryState.testEnabledServers = overrides.testEnabledServers ?? mock().mockResolvedValue([]);
-  mockQueryState.fetchServerTools = overrides.fetchServerTools ?? mock().mockResolvedValue([]);
   mockQueryState.discoverTools = overrides.discoverTools ?? mock().mockResolvedValue([]);
 
   return mockQueryState;
@@ -381,7 +387,7 @@ describe('McpLibraryPage', () => {
     await waitFor(() => expect(testEnabledServers).toHaveBeenCalledTimes(1));
   });
 
-  it('uses the persistent connection test when discovering tools from the tools dialog', async () => {
+  it('uses the persistent connection test when discovering capabilities from the dialog', async () => {
     const testConnection = mock().mockResolvedValue({
       success: true,
       message: 'Connection successful (1 tools discovered)',
@@ -405,11 +411,64 @@ describe('McpLibraryPage', () => {
     });
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: /View tools/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Discover Tools/i }));
+    fireEvent.click(screen.getByRole('button', { name: /View capabilities/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Discover capabilities/i }));
 
     await waitFor(() => expect(testConnection).toHaveBeenCalledWith('srv-001'));
     expect(discoverTools).not.toHaveBeenCalled();
+  });
+
+  it('shows discovered resources, templates, and prompts for a saved server', () => {
+    setupStore({
+      servers: [baseServer],
+      capabilities: {
+        discoveredAt: ISO,
+        catalog: {
+          protocolEra: 'modern',
+          protocolVersion: '2026-07-28',
+          capabilityFingerprint: 'a'.repeat(64),
+          tools: [],
+          resources: [
+            {
+              sourceId: 'srv-001',
+              uri: 'sentris://reference/readme',
+              name: 'Reference README',
+              description: 'Saved reference material',
+              mimeType: 'text/markdown',
+            },
+          ],
+          resourceTemplates: [
+            {
+              sourceId: 'srv-001',
+              uriTemplate: 'sentris://packages/{name}',
+              name: 'Package reference',
+            },
+          ],
+          prompts: [
+            {
+              sourceId: 'srv-001',
+              name: 'investigate-package',
+              description: 'Investigate a package',
+              arguments: [{ name: 'package', required: true }],
+            },
+          ],
+        },
+      },
+    });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /View capabilities/i }));
+    const resourcesTab = screen.getByRole('tab', { name: /Resources \(2\)/i });
+    fireEvent.mouseDown(resourcesTab);
+    fireEvent.click(resourcesTab);
+    expect(screen.getByText('Reference README')).toBeInTheDocument();
+    expect(screen.getByText('sentris://packages/{name}')).toBeInTheDocument();
+
+    const promptsTab = screen.getByRole('tab', { name: /Prompts \(1\)/i });
+    fireEvent.mouseDown(promptsTab);
+    fireEvent.click(promptsTab);
+    expect(screen.getByText('investigate-package')).toBeInTheDocument();
+    expect(screen.getByText('package *')).toBeInTheDocument();
   });
 
   it('shows ErrorBanner when error is set', () => {

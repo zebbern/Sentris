@@ -12,7 +12,7 @@ interface UseMcpLibraryDataOptions {
   groups: McpGroupResponse[];
   groupTemplates: McpGroupTemplateResponse[];
   searchQuery: string;
-  selectedServerForTools: string | null;
+  selectedServerForCapabilities: string | null;
 }
 
 export function useMcpLibraryData({
@@ -21,7 +21,7 @@ export function useMcpLibraryData({
   groups,
   groupTemplates,
   searchQuery,
-  selectedServerForTools,
+  selectedServerForCapabilities,
 }: UseMcpLibraryDataOptions) {
   const getGroupServers = useCallback(
     (groupId: string): McpGroupServerResponse[] => {
@@ -104,22 +104,24 @@ export function useMcpLibraryData({
   }, [servers, toolCountsByServer]);
 
   const serverTools = useMemo(() => {
-    if (!selectedServerForTools) return [];
-    return tools.filter((t) => t.serverId === selectedServerForTools);
-  }, [tools, selectedServerForTools]);
+    if (!selectedServerForCapabilities) return [];
+    return tools.filter((t) => t.serverId === selectedServerForCapabilities);
+  }, [tools, selectedServerForCapabilities]);
 
   const selectedServer = useMemo<{ name?: string; transportType?: TransportType } | null>(() => {
-    if (!selectedServerForTools) return null;
-    const direct = servers.find((s) => s.id === selectedServerForTools);
+    if (!selectedServerForCapabilities) return null;
+    const direct = servers.find((s) => s.id === selectedServerForCapabilities);
     if (direct) return direct;
     for (const group of groups) {
-      const match = getGroupServers(group.id).find((s) => s.serverId === selectedServerForTools);
+      const match = getGroupServers(group.id).find(
+        (s) => s.serverId === selectedServerForCapabilities,
+      );
       if (match) {
         return { name: match.serverName, transportType: match.transportType };
       }
     }
     return null;
-  }, [servers, selectedServerForTools, groups, getGroupServers]);
+  }, [servers, selectedServerForCapabilities, groups, getGroupServers]);
 
   const getGroupServerHealthStatus = useCallback(
     (server: { serverId: string; healthStatus: McpHealthStatus }) =>

@@ -3,7 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Plug, Plus, RefreshCw } from 'lucide-react';
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMcpServers, useMcpAllTools } from '@/hooks/queries/useMcpServerQueries';
+import {
+  useMcpServers,
+  useMcpAllTools,
+  useMcpServerCapabilities,
+} from '@/hooks/queries/useMcpServerQueries';
 import { useMcpGroupsWithServers, useMcpGroupTemplates } from '@/hooks/queries/useMcpGroupQueries';
 import { queryKeys } from '@/lib/queryKeys';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -21,7 +25,7 @@ import {
   CustomServersTable,
   ServerEditorSheet,
   DeleteServerDialog,
-  ToolsDialog,
+  CapabilitiesDialog,
   useEditorActions,
   useJsonImport,
   useGroupActions,
@@ -53,13 +57,16 @@ export function McpLibraryPage() {
 
   // ------ Extracted hooks ------
   const actions = useMcpLibraryActions({ servers, setCheckingServers });
+  const capabilitiesQuery = useMcpServerCapabilities(actions.selectedServerForCapabilities, {
+    enabled: actions.capabilitiesDialogOpen,
+  });
   const data = useMcpLibraryData({
     servers,
     tools,
     groups,
     groupTemplates,
     searchQuery,
-    selectedServerForTools: actions.selectedServerForTools,
+    selectedServerForCapabilities: actions.selectedServerForCapabilities,
   });
   const editor = useEditorActions({ servers, setCheckingServers });
   const jsonImport = useJsonImport({
@@ -193,9 +200,12 @@ export function McpLibraryPage() {
             getGroupServerToolCounts={data.getGroupServerToolCounts}
             getGroupServerReadiness={data.getGroupServerReadiness}
             onToggle={actions.handleToggle}
-            onViewTools={actions.handleViewTools}
-            onDiscoverTools={(serverId) =>
-              actions.handleDiscoverServerTools(serverId, data.getServerDiscoveryImage(serverId))
+            onViewCapabilities={actions.handleViewCapabilities}
+            onDiscoverCapabilities={(serverId) =>
+              actions.handleDiscoverServerCapabilities(
+                serverId,
+                data.getServerDiscoveryImage(serverId),
+              )
             }
             onRemoveGroup={groupActions.handleRemoveGroup}
           />
@@ -211,7 +221,7 @@ export function McpLibraryPage() {
             readinessByServer={data.readinessByServer}
             onCreateNew={editor.handleCreateNew}
             onToggle={actions.handleToggle}
-            onViewTools={actions.handleViewTools}
+            onViewCapabilities={actions.handleViewCapabilities}
             onTestConnection={actions.handleTestConnection}
             onEdit={editor.handleEdit}
             onDelete={actions.openDeleteDialog}
@@ -260,16 +270,19 @@ export function McpLibraryPage() {
             onDelete={actions.handleDelete}
           />
 
-          {/* Tools Dialog */}
-          <ToolsDialog
-            open={actions.toolsDialogOpen}
-            onOpenChange={actions.setToolsDialogOpen}
+          <CapabilitiesDialog
+            open={actions.capabilitiesDialogOpen}
+            onOpenChange={actions.setCapabilitiesDialogOpen}
             serverName={data.selectedServer?.name ?? 'Unknown'}
             tools={data.serverTools}
-            selectedServerForTools={actions.selectedServerForTools}
+            catalog={capabilitiesQuery.data?.catalog ?? null}
+            catalogDiscoveredAt={capabilitiesQuery.data?.discoveredAt ?? null}
+            isLoadingCatalog={capabilitiesQuery.isLoading}
+            catalogError={capabilitiesQuery.error?.message}
+            selectedServerId={actions.selectedServerForCapabilities}
             discoveringServerIds={actions.discoveringServerIds}
             onToggleTool={actions.handleToggleTool}
-            onDiscoverTools={actions.handleDiscoverServerTools}
+            onDiscoverCapabilities={actions.handleDiscoverServerCapabilities}
           />
 
           <ConfirmDialog {...dialogProps} />

@@ -5,7 +5,6 @@ import {
   useToggleMcpServer,
   useTestMcpConnection,
   useTestEnabledMcpServers,
-  useFetchServerTools,
   useToggleMcpTool,
   type McpServerResponse,
 } from '@/hooks/queries/useMcpServerQueries';
@@ -26,15 +25,16 @@ export function useMcpLibraryActions({ servers, setCheckingServers }: UseMcpLibr
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serverToDelete, setServerToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [toolsDialogOpen, setToolsDialogOpen] = useState(false);
-  const [selectedServerForTools, setSelectedServerForTools] = useState<string | null>(null);
+  const [capabilitiesDialogOpen, setCapabilitiesDialogOpen] = useState(false);
+  const [selectedServerForCapabilities, setSelectedServerForCapabilities] = useState<string | null>(
+    null,
+  );
 
   // ------ Mutations ------
   const deleteServerMutation = useDeleteMcpServer();
   const toggleServerMutation = useToggleMcpServer();
   const testConnectionMutation = useTestMcpConnection();
   const testEnabledServersMutation = useTestEnabledMcpServers();
-  const fetchServerToolsMutation = useFetchServerTools();
   const toggleToolMutation = useToggleMcpTool();
 
   // ------ Handlers ------
@@ -107,23 +107,19 @@ export function useMcpLibraryActions({ servers, setCheckingServers }: UseMcpLibr
     }
   }, [servers, setCheckingServers, testEnabledServersMutation, toast]);
 
-  const handleViewTools = useCallback(
-    async (serverId: string) => {
-      setSelectedServerForTools(serverId);
-      setToolsDialogOpen(true);
-      await fetchServerToolsMutation.mutateAsync(serverId);
-    },
-    [fetchServerToolsMutation],
-  );
+  const handleViewCapabilities = useCallback((serverId: string) => {
+    setSelectedServerForCapabilities(serverId);
+    setCapabilitiesDialogOpen(true);
+  }, []);
 
-  const handleDiscoverServerTools = useCallback(
+  const handleDiscoverServerCapabilities = useCallback(
     async (serverId: string, _image?: string) => {
       if (discoveringServerIds.has(serverId)) return;
       setDiscoveringServerIds((prev) => new Set(prev).add(serverId));
       try {
         const result = await testConnectionMutation.mutateAsync(serverId);
         toast({
-          title: result.success ? 'Tool discovery complete' : 'Tool discovery failed',
+          title: result.success ? 'Capability discovery complete' : 'Capability discovery failed',
           description: result.message ?? `Discovered ${result.toolCount ?? 0} tool(s).`,
           variant: result.success ? 'default' : 'destructive',
         });
@@ -173,17 +169,17 @@ export function useMcpLibraryActions({ servers, setCheckingServers }: UseMcpLibr
     deleteDialogOpen,
     setDeleteDialogOpen,
     isDeleting,
-    toolsDialogOpen,
-    setToolsDialogOpen,
-    selectedServerForTools,
+    capabilitiesDialogOpen,
+    setCapabilitiesDialogOpen,
+    selectedServerForCapabilities,
 
     // Handlers
     handleDelete,
     handleToggle,
     handleTestConnection,
     handleTestEnabledServers,
-    handleViewTools,
-    handleDiscoverServerTools,
+    handleViewCapabilities,
+    handleDiscoverServerCapabilities,
     handleToggleTool,
     openDeleteDialog,
   };

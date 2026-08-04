@@ -83,6 +83,8 @@ function makeServerRecord(overrides: Partial<McpServerRecord> = {}): McpServerRe
     healthCheckUrl: null,
     lastHealthCheck: null,
     lastHealthStatus: null,
+    capabilityCatalog: null,
+    capabilityCatalogDiscoveredAt: null,
     groupId: null,
     registrySourceName: null,
     organizationId: DEFAULT_ORGANIZATION_ID,
@@ -145,6 +147,7 @@ describe('McpServersService', () => {
       listTools: vi.fn(),
       listAllToolsForOrganization: vi.fn(),
       upsertTools: vi.fn(),
+      persistDiscovery: vi.fn(),
       toggleToolEnabled: vi.fn(),
       clearTools: vi.fn(),
     };
@@ -649,6 +652,24 @@ describe('McpServersService', () => {
     expect(result[0].serverName).toBe('test-mcp-server');
   });
 
+  it('returns the latest complete saved-server capability catalog', async () => {
+    const catalog = makeCatalog();
+    repo.findById.mockResolvedValue(
+      makeServerRecord({
+        capabilityCatalog: catalog,
+        capabilityCatalogDiscoveredAt: new Date('2026-08-04T12:34:56.000Z'),
+      }),
+    );
+
+    await expect(service.getServerCapabilities(authContext, 'server-1')).resolves.toEqual({
+      catalog,
+      discoveredAt: '2026-08-04T12:34:56.000Z',
+    });
+    expect(repo.findById).toHaveBeenCalledWith('server-1', {
+      organizationId: DEFAULT_ORGANIZATION_ID,
+    });
+  });
+
   it('tests HTTP MCP servers through the secret-free saved-server workflow input', async () => {
     const runtimeKey = makeRuntimeKey('http');
     runtimeConfigService.buildRuntimeKey.mockResolvedValue(runtimeKey);
@@ -662,14 +683,14 @@ describe('McpServersService', () => {
         },
       }),
     );
-    repo.upsertTools.mockResolvedValue([]);
+    repo.persistDiscovery.mockResolvedValue(undefined);
     repo.updateHealthStatus.mockResolvedValue(undefined);
 
     const result = await service.testServerConnection(authContext, 'server-1');
 
     expect(result).toEqual({
       success: true,
-      message: 'Connection successful (1 tools discovered)',
+      message: 'Connection successful (1 tools, 0 resources, 0 templates, 0 prompts discovered)',
       toolCount: 1,
     });
     expect(runtimeConfigService.buildRuntimeKey).toHaveBeenCalledWith(authContext, 'server-1');
@@ -679,16 +700,8 @@ describe('McpServersService', () => {
     expect(serializedWorkflowInput).not.toContain('localhost:3100');
     expect(encryption.decryptHeaders).not.toHaveBeenCalled();
     expect(secretResolver.resolveMcpConfig).not.toHaveBeenCalled();
-    expect(repo.upsertTools).toHaveBeenCalledWith('server-1', [
-      {
-        toolName: 'fetch_url',
-        description: 'Fetches a URL',
-        inputSchema: { type: 'object', properties: { url: { type: 'string' } } },
-      },
-    ]);
-    expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'healthy', {
-      organizationId: DEFAULT_ORGANIZATION_ID,
-    });
+    expect(repo.persistDiscovery).toHaveBeenCalledWith('server-1', makeCatalog());
+    expect(repo.updateHealthStatus).not.toHaveBeenCalled();
   });
 
   it('tests STDIO MCP servers through the same saved-server runtime workflow', async () => {
@@ -702,27 +715,19 @@ describe('McpServersService', () => {
         args: ['--stdio'],
       }),
     );
-    repo.upsertTools.mockResolvedValue([]);
+    repo.persistDiscovery.mockResolvedValue(undefined);
     repo.updateHealthStatus.mockResolvedValue(undefined);
 
     const result = await service.testServerConnection(authContext, 'server-1');
 
     expect(result).toEqual({
       success: true,
-      message: 'Connection successful (1 tools discovered)',
+      message: 'Connection successful (1 tools, 0 resources, 0 templates, 0 prompts discovered)',
       toolCount: 1,
     });
     expect(savedServerDiscovery.discover).toHaveBeenCalledWith(runtimeKey);
-    expect(repo.upsertTools).toHaveBeenCalledWith('server-1', [
-      {
-        toolName: 'fetch_url',
-        description: 'Fetches a URL',
-        inputSchema: { type: 'object', properties: { url: { type: 'string' } } },
-      },
-    ]);
-    expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'healthy', {
-      organizationId: DEFAULT_ORGANIZATION_ID,
-    });
+    expect(repo.persistDiscovery).toHaveBeenCalledWith('server-1', makeCatalog());
+    expect(repo.updateHealthStatus).not.toHaveBeenCalled();
   });
 
   it('marks STDIO MCP servers unhealthy when discovery workflow returns failed status', async () => {
@@ -745,7 +750,7 @@ describe('McpServersService', () => {
       success: false,
       message: 'MCP saved-server discovery failed: Failed to parse JSON',
     });
-    expect(repo.upsertTools).not.toHaveBeenCalled();
+    expect(repo.persistDiscovery).not.toHaveBeenCalled();
     expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'unhealthy', {
       organizationId: DEFAULT_ORGANIZATION_ID,
     });
@@ -762,7 +767,7 @@ describe('McpServersService', () => {
       success: false,
       message: 'Invalid MCP catalog',
     });
-    expect(repo.upsertTools).not.toHaveBeenCalled();
+    expect(repo.persistDiscovery).not.toHaveBeenCalled();
     expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'unhealthy', {
       organizationId: DEFAULT_ORGANIZATION_ID,
     });
@@ -839,7 +844,7 @@ describe('McpServersService', () => {
     const testSpy = vi.spyOn(service, 'testServerConnection');
     testSpy.mockResolvedValueOnce({
       success: true,
-      message: 'Connection successful (1 tools discovered)',
+      message: 'Connection successful (1 tools, 0 resources, 0 templates, 0 prompts discovered)',
       toolCount: 1,
     });
     testSpy.mockResolvedValueOnce({
@@ -857,7 +862,7 @@ describe('McpServersService', () => {
         serverId: 'server-1',
         serverName: 'fetch-reference',
         success: true,
-        message: 'Connection successful (1 tools discovered)',
+        message: 'Connection successful (1 tools, 0 resources, 0 templates, 0 prompts discovered)',
         toolCount: 1,
       },
       {
@@ -879,7 +884,7 @@ describe('McpServersService', () => {
     testSpy.mockRejectedValueOnce(new Error('container exited before MCP initialized'));
     testSpy.mockResolvedValueOnce({
       success: true,
-      message: 'Connection successful (1 tools discovered)',
+      message: 'Connection successful (1 tools, 0 resources, 0 templates, 0 prompts discovered)',
       toolCount: 1,
     });
 
@@ -896,7 +901,7 @@ describe('McpServersService', () => {
         serverId: 'server-2',
         serverName: 'working-fetch',
         success: true,
-        message: 'Connection successful (1 tools discovered)',
+        message: 'Connection successful (1 tools, 0 resources, 0 templates, 0 prompts discovered)',
         toolCount: 1,
       },
     ]);

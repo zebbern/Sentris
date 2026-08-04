@@ -57,8 +57,8 @@ interface ImportedGroupsSectionProps {
   getGroupServerToolCounts: (server: { serverId: string; toolCount: number }) => ToolCounts | null;
   getGroupServerReadiness: (server: GroupServer) => AgentReadiness;
   onToggle: (serverId: string) => void;
-  onViewTools: (serverId: string) => void;
-  onDiscoverTools: (serverId: string, image?: string) => void;
+  onViewCapabilities: (serverId: string) => void;
+  onDiscoverCapabilities: (serverId: string, image?: string) => void;
   onRemoveGroup: (groupId: string, groupName: string) => void;
 }
 
@@ -73,8 +73,8 @@ export function ImportedGroupsSection({
   getGroupServerToolCounts,
   getGroupServerReadiness,
   onToggle,
-  onViewTools,
-  onDiscoverTools,
+  onViewCapabilities,
+  onDiscoverCapabilities,
   onRemoveGroup,
 }: ImportedGroupsSectionProps) {
   return (
@@ -264,7 +264,7 @@ export function ImportedGroupsSection({
                                             variant="outline"
                                             size="sm"
                                             className="h-7 px-2 font-mono text-xs"
-                                            onClick={() => onViewTools(server.serverId)}
+                                            onClick={() => onViewCapabilities(server.serverId)}
                                           >
                                             {toolCounts.enabled}/{toolCounts.total}
                                           </Button>
@@ -295,13 +295,13 @@ export function ImportedGroupsSection({
                                           <Button
                                             variant="ghost"
                                             size="icon"
-                                            aria-label="View tools"
-                                            onClick={() => onViewTools(server.serverId)}
+                                            aria-label="View capabilities"
+                                            onClick={() => onViewCapabilities(server.serverId)}
                                           >
                                             <Wrench className="h-4 w-4" />
                                           </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent>View tools</TooltipContent>
+                                        <TooltipContent>View capabilities</TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
                                     <TooltipProvider>
@@ -310,9 +310,9 @@ export function ImportedGroupsSection({
                                           <Button
                                             variant="ghost"
                                             size="icon"
-                                            aria-label="Rediscover tools"
+                                            aria-label="Rediscover capabilities"
                                             onClick={() =>
-                                              onDiscoverTools(
+                                              onDiscoverCapabilities(
                                                 server.serverId,
                                                 group.defaultDockerImage ?? undefined,
                                               )
@@ -326,7 +326,7 @@ export function ImportedGroupsSection({
                                             )}
                                           </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent>Rediscover tools</TooltipContent>
+                                        <TooltipContent>Rediscover capabilities</TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
                                   </div>

@@ -35,6 +35,8 @@ export const queryKeys = {
   mcpServers: {
     all: () => ['mcpServers', getOrgScope()] as const,
     tools: () => ['mcpServers', getOrgScope(), 'tools'] as const,
+    capabilities: (serverId: string) =>
+      ['mcpServers', getOrgScope(), serverId, 'capabilities'] as const,
   },
   agentSkills: {
     all: (enabledOnly = false) =>

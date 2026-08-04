@@ -1,0 +1,2 @@
+ALTER TABLE "mcp_servers" ADD COLUMN "capability_catalog" jsonb DEFAULT 'null'::jsonb;--> statement-breakpoint
+ALTER TABLE "mcp_servers" ADD COLUMN "capability_catalog_discovered_at" timestamp with time zone;

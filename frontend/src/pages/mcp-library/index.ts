@@ -12,7 +12,7 @@ export { GroupTemplatesSection } from './GroupTemplatesSection';
 export { ImportedGroupsSection } from './ImportedGroupsSection';
 export { CustomServersTable } from './CustomServersTable';
 export { DeleteServerDialog } from './DeleteServerDialog';
-export { ToolsDialog } from './ToolsDialog';
+export { CapabilitiesDialog } from './CapabilitiesDialog';
 
 // Registry components
 export { RegistryCatalogTab } from './RegistryCatalogTab';

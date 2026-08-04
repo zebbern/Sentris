@@ -30,6 +30,7 @@ import {
   UpdateMcpServerSchema,
   McpServerResponse,
   McpToolResponse,
+  McpServerCapabilitiesResponse,
   TestConnectionResponse,
   TestEnabledServerResponse,
   HealthStatusResponse,
@@ -96,6 +97,16 @@ export class McpServersController {
     @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<McpToolResponse[]> {
     return this.mcpServersService.getServerTools(auth, id);
+  }
+
+  @Get(':id/capabilities')
+  @ApiOperation({ summary: 'Get the latest discovered capability catalog for a server' })
+  @ApiOkResponse({ type: McpServerCapabilitiesResponse })
+  async getServerCapabilities(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Promise<McpServerCapabilitiesResponse> {
+    return this.mcpServersService.getServerCapabilities(auth, id);
   }
 
   @Post()

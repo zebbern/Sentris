@@ -514,10 +514,12 @@ registry while its facade migration is pending. The gateway's outbound proxy rem
 explicit v1 client pool scoped by run and endpoint until the worker runtime manager and
 canonical outbound client are implemented.
 
-The remaining target includes resource/prompt browsing and result presentation beyond
-Operator and workflow Agents,
-Continue-As-New for unbounded agent turns, MCP Tasks, the bounded Studio migration, and
-compatibility cleanup. See
+Saved-server discovery persists its latest validated complete catalog separately from
+run/turn authority snapshots. The MCP Library reads that catalog to browse tools, exact
+resources, resource templates, and prompts without opening a live runtime. The remaining
+target includes direct resource/prompt content previews outside Operator and workflow
+Agents, Continue-As-New for unbounded agent turns, MCP Tasks, the bounded Studio migration,
+and compatibility cleanup. See
 [ADR: Stateless MCP Facade, Runtime Leases, and Durable Agents](./architecture/adr-stateless-mcp-runtime-and-temporal-agents.md).
 
 ---

@@ -120,6 +120,13 @@
       "when": 1785778707173,
       "tag": "0016_operator_candidate_version_promotion",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785834393788,
+      "tag": "0017_mcp_server_capability_catalog",
+      "breakpoints": true
     }
   ]
 }

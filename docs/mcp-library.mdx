@@ -10,6 +10,7 @@ The MCP Library component provides a centralized way to select and enable multip
 - **Automatic Tool Registration**: Tools from selected servers are automatically registered with the Tool Registry
 - **Seamless AI Agent Integration**: Works with existing AI Agent components without any modifications
 - **Dynamic Server Management**: Fetches server list from backend API with health status and tool counts
+- **Complete Capability Browsing**: Inspect saved tools, exact resources, resource templates, and prompts from the latest validated discovery
 - **Docker Container Management**: Automatically spawns and manages containers for stdio servers
 - **Docker Registry Catalog**: Browse, search, and import 300+ community MCP servers from Docker's official registry
 
@@ -26,6 +27,12 @@ The MCP Library component provides a centralized way to select and enable multip
 - `enabledServers` (string[], default: `[]`) - Array of server IDs to enable. Multi-select interface fetches available servers from `/api/v1/mcp-servers`.
 
 ## Usage Guide
+
+The **MCP Library** page stores the latest complete discovery catalog for each saved server.
+Use **View capabilities** to inspect its Tools, Resources, and Prompts. Resource templates
+are labeled separately from exact resource URIs, and prompt arguments identify required
+values with an asterisk. Rediscovery updates this catalog and the tool enablement rows in
+one database transaction; opening the dialog does not start a live MCP runtime.
 
 ### 1. Add MCP Library Node
 

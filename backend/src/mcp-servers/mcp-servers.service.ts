@@ -18,6 +18,7 @@ import type {
   UpdateMcpServerDto,
   McpServerResponse,
   McpToolResponse,
+  McpServerCapabilitiesResponse,
   TransportType,
   HealthStatus,
   TestEnabledServerResponse,
@@ -181,6 +182,18 @@ export class McpServersService {
     // Extract header keys for single server fetch (used in edit UI)
     const headerKeys = await this.extractHeaderKeys(server.headers);
     return this.mapServerToResponse(server, headerKeys);
+  }
+
+  async getServerCapabilities(
+    auth: AuthContext | null,
+    id: string,
+  ): Promise<McpServerCapabilitiesResponse> {
+    const organizationId = requireOrganizationId(auth);
+    const server = await this.repository.findById(id, { organizationId });
+    return {
+      catalog: server.capabilityCatalog,
+      discoveredAt: server.capabilityCatalogDiscoveredAt?.toISOString() ?? null,
+    };
   }
 
   async createServer(
@@ -668,18 +681,14 @@ export class McpServersService {
       this.logger.log(`Testing MCP server ${server.id} through a worker-owned runtime`);
 
       const catalog = await this.savedServerDiscovery.discover(runtimeKey);
-      const discoveredTools = catalog.tools.map((tool) => ({
-        name: tool.source.kind === 'mcp' ? tool.source.upstreamName : tool.canonicalName,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-      }));
-      await this.repository.upsertTools(id, this.mapDiscoveredTools(discoveredTools));
-
-      await this.repository.updateHealthStatus(id, 'healthy', { organizationId });
+      await this.repository.persistDiscovery(id, catalog);
       return {
         success: true,
-        message: `Connection successful (${discoveredTools.length} tools discovered)`,
-        toolCount: discoveredTools.length,
+        message:
+          `Connection successful (${catalog.tools.length} tools, ` +
+          `${catalog.resources.length} resources, ${catalog.resourceTemplates.length} templates, ` +
+          `${catalog.prompts.length} prompts discovered)`,
+        toolCount: catalog.tools.length,
       };
     } catch (error) {
       // Update health status to unhealthy (configuration is invalid or test failed)

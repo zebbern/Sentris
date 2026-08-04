@@ -39,6 +39,8 @@ function record(overrides: Partial<McpServerRecord> = {}): McpServerRecord {
     healthCheckUrl: null,
     lastHealthCheck: null,
     lastHealthStatus: null,
+    capabilityCatalog: null,
+    capabilityCatalogDiscoveredAt: null,
     groupId: null,
     registrySourceName: null,
     organizationId: 'org-1',

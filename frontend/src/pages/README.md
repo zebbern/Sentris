@@ -12,7 +12,7 @@ Top-level page components representing application routes. Every page uses `Reac
 | `ArtifactLibrary.tsx`       | Artifacts          | File and artifact browser for workflow outputs                                              |
 | `SettingsPage.tsx`          | Settings           | Tabbed settings: General, Appearance, Notifications, Keyboard Shortcuts, Audit Log (admin)  |
 | `TemplateLibraryPage.tsx`   | Template Library   | Official + Community tabs; browse/import templates (Community via published GitHub catalog) |
-| `McpLibraryPage.tsx`        | MCP Library        | Manage MCP server groups, enable servers, and browse available tools                        |
+| `McpLibraryPage.tsx`        | MCP Library        | Manage MCP servers and browse discovered tools, resources, templates, and prompts           |
 | `SchedulesPage.tsx`         | Schedules          | Cron-based workflow scheduling with create, edit, pause, and delete                         |
 | `WebhooksPage.tsx`          | Webhooks           | Webhook endpoint management for triggering workflows via HTTP                               |
 | `WebhookEditorPage.tsx`     | Webhook Editor     | Detailed webhook configuration with payload testing and delivery logs                       |

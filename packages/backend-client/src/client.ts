@@ -2056,6 +2056,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/mcp-servers/{id}/capabilities': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get the latest discovered capability catalog for a server */
+    get: operations['McpServersController_getServerCapabilities'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/mcp-servers/{id}/toggle': {
     parameters: {
       query?: never;
@@ -5061,6 +5078,132 @@ export interface components {
       /** Format: date-time */
       checkedAt: string | null;
     };
+    McpServerCapabilitiesResponseDto: {
+      catalog: {
+        /** @enum {string} */
+        protocolEra: 'modern' | 'legacy';
+        protocolVersion: string;
+        capabilityFingerprint: string;
+        tools: {
+          canonicalName: string;
+          displayName: string;
+          description?: string;
+          inputSchema: {
+            [key: string]: unknown;
+          };
+          outputSchema?: {
+            [key: string]: unknown;
+          };
+          source:
+            | {
+                /** @enum {string} */
+                kind: 'component';
+                sourceId: string;
+                nodeId: string;
+                componentId: string;
+                bindingFingerprint: string;
+              }
+            | {
+                /** @enum {string} */
+                kind: 'mcp';
+                sourceId: string;
+                serverId?: string;
+                nodeId?: string;
+                upstreamName: string;
+                bindingFingerprint: string;
+              };
+          title?: string;
+          icons?: {
+            src: string;
+            mimeType?: string;
+            sizes?: string[];
+            /** @enum {string} */
+            theme?: 'light' | 'dark';
+          }[];
+          annotations?: {
+            [key: string]: unknown;
+          };
+          meta?: {
+            [key: string]: unknown;
+          };
+          /** @enum {string} */
+          effects: 'read-only' | 'idempotent' | 'mutating' | 'unknown';
+          /** @enum {string} */
+          effectsSource: 'sentris-contract' | 'operator-policy' | 'mcp-annotation' | 'unknown';
+          /** @enum {string} */
+          retryPolicy: 'pre-dispatch-only' | 'reviewed-idempotent';
+        }[];
+        resources: {
+          sourceId: string;
+          title?: string;
+          description?: string;
+          icons?: {
+            src: string;
+            mimeType?: string;
+            sizes?: string[];
+            /** @enum {string} */
+            theme?: 'light' | 'dark';
+          }[];
+          annotations?: {
+            [key: string]: unknown;
+          };
+          meta?: {
+            [key: string]: unknown;
+          };
+          uri: string;
+          name: string;
+          mimeType?: string;
+          size?: number;
+        }[];
+        resourceTemplates: {
+          sourceId: string;
+          title?: string;
+          description?: string;
+          icons?: {
+            src: string;
+            mimeType?: string;
+            sizes?: string[];
+            /** @enum {string} */
+            theme?: 'light' | 'dark';
+          }[];
+          annotations?: {
+            [key: string]: unknown;
+          };
+          meta?: {
+            [key: string]: unknown;
+          };
+          uriTemplate: string;
+          name: string;
+          mimeType?: string;
+        }[];
+        prompts: {
+          sourceId: string;
+          title?: string;
+          description?: string;
+          icons?: {
+            src: string;
+            mimeType?: string;
+            sizes?: string[];
+            /** @enum {string} */
+            theme?: 'light' | 'dark';
+          }[];
+          annotations?: {
+            [key: string]: unknown;
+          };
+          meta?: {
+            [key: string]: unknown;
+          };
+          name: string;
+          arguments: {
+            name: string;
+            description?: string;
+            required?: boolean;
+          }[];
+        }[];
+      } | null;
+      /** Format: date-time */
+      discoveredAt: string | null;
+    };
     CreateMcpServerDto: {
       name: string;
       description?: string;
@@ -6178,6 +6321,7 @@ export interface components {
             commandName: 'get_run';
             arguments: {
               runId: string;
+              includeAgentIo?: boolean;
             };
           }
         | {
@@ -10177,6 +10321,27 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['McpToolResponseDto'][];
+        };
+      };
+    };
+  };
+  McpServersController_getServerCapabilities: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['McpServerCapabilitiesResponseDto'];
         };
       };
     };

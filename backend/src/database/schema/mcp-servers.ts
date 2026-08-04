@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   primaryKey,
 } from 'drizzle-orm/pg-core';
+import type { McpCatalog } from '@sentris/shared';
 
 /**
  * MCP Groups table.
@@ -89,6 +90,13 @@ export const mcpServers = pgTable(
     // Health tracking
     lastHealthCheck: timestamp('last_health_check', { withTimezone: true }),
     lastHealthStatus: varchar('last_health_status', { length: 32 }), // 'healthy' | 'unhealthy' | 'unknown'
+
+    // Latest validated discovery result for product browsing. Runtime authority remains
+    // immutable and run/turn-scoped in mcp_capability_snapshots.
+    capabilityCatalog: jsonb('capability_catalog').$type<McpCatalog | null>().default(null),
+    capabilityCatalogDiscoveredAt: timestamp('capability_catalog_discovered_at', {
+      withTimezone: true,
+    }),
 
     // Group association (nullable - servers can exist independently)
     groupId: uuid('group_id').references(() => mcpGroups.id, { onDelete: 'set null' }),

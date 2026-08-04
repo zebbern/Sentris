@@ -119,6 +119,13 @@
       "sqlSha256": "32108509cc97a1a5d475296961559e0710bf8adcdff156810b1c45f43da0eecc",
       "snapshotSha256": "9bd8f73e3b9716bf2db6801a1e6891d1e72ffcf6787b3b21a3e842342a505759",
       "contractSha256": "0aab326b34b5a7d419606006a1192189519655441391c01aea9fcad644b5c1f8"
+    },
+    {
+      "idx": 17,
+      "tag": "0017_mcp_server_capability_catalog",
+      "sqlSha256": "f82f26a156216a8bb5117e414871dcfa201a7596ad62d4c1d6d91fe5d40a97ed",
+      "snapshotSha256": "deadee6b8a5bf2e4fbb53398711bc2a4f921bbe26f8aa69166f3c7ae1519a55b",
+      "contractSha256": "4cecab885e0a3b295ff84d84c489efbbb3d7cfb762ddf7deb0d931dc8ddb1f97"
     }
   ]
 }
