@@ -3,12 +3,22 @@ import type {
   OperatorWorkflowDraftDetail,
   OperatorWorkflowDraftResult,
 } from '@sentris/shared';
-import { AlertCircle, ArrowRight, Check, ExternalLink, Play, Save, Workflow } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowRight,
+  Check,
+  ExternalLink,
+  Play,
+  Save,
+  WandSparkles,
+  Workflow,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { WorkflowPreview } from '@/features/templates/WorkflowPreview';
+import { createOperatorWorkflowDraftRevisionNavigationState } from './operatorHandoff';
 
 interface OperatorWorkflowDraftCardProps {
   sessionId: string;
@@ -124,6 +134,12 @@ export function OperatorWorkflowDraftCard({
 
   const diffDescriptions = describeDiff(result);
   const builderPath = buildDraftBuilderPath(result, sessionId);
+  const operatorPath = `/operator/${encodeURIComponent(sessionId)}`;
+  const revisionPath = `${operatorPath}?reviseDraftId=${encodeURIComponent(result.draftId)}`;
+  const revisionNavigationState = createOperatorWorkflowDraftRevisionNavigationState(
+    result.draftId,
+    operatorPath,
+  );
 
   return (
     <div className="space-y-2.5 rounded-md border border-primary/20 bg-primary/[0.03] p-2.5">
@@ -179,6 +195,21 @@ export function OperatorWorkflowDraftCard({
       )}
 
       <div className="flex flex-wrap items-center gap-1.5">
+        {!result.validation.valid ? (
+          disabled ? (
+            <Button type="button" size="sm" className="h-7 gap-1.5 px-2 text-[11px]" disabled>
+              <WandSparkles className="h-3 w-3" />
+              Revise with Operator
+            </Button>
+          ) : (
+            <Button asChild size="sm" className="h-7 gap-1.5 px-2 text-[11px]">
+              <Link to={revisionPath} state={revisionNavigationState}>
+                <WandSparkles className="h-3 w-3" />
+                Revise with Operator
+              </Link>
+            </Button>
+          )
+        ) : null}
         <Button asChild variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-[11px]">
           <Link to={builderPath}>
             <ExternalLink className="h-3 w-3" />

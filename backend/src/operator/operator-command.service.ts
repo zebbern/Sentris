@@ -323,6 +323,12 @@ export class OperatorCommandService {
         return this.getComponent(
           OPERATOR_COMMAND_DEFINITIONS.get_component.inputSchema.parse(input.arguments),
         );
+      case 'get_workflow_draft':
+        return this.getWorkflowDraft(
+          OPERATOR_COMMAND_DEFINITIONS.get_workflow_draft.inputSchema.parse(input.arguments),
+          input.auth,
+          input.sessionId,
+        );
       case 'propose_workflow_draft':
         return this.proposeWorkflowDraft(
           OPERATOR_COMMAND_DEFINITIONS.propose_workflow_draft.inputSchema.parse(input.arguments),
@@ -333,6 +339,13 @@ export class OperatorCommandService {
         return this.proposeWorkflowEdits(
           OPERATOR_COMMAND_DEFINITIONS.propose_workflow_edits.inputSchema.parse(input.arguments),
           input.auth,
+          input.actionId,
+        );
+      case 'revise_workflow_draft':
+        return this.reviseWorkflowDraft(
+          OPERATOR_COMMAND_DEFINITIONS.revise_workflow_draft.inputSchema.parse(input.arguments),
+          input.auth,
+          input.sessionId,
           input.actionId,
         );
       case 'apply_workflow_draft':
@@ -536,6 +549,20 @@ export class OperatorCommandService {
     return { result: toBoundedJson(this.operatorWorkflowAuthoringService.getComponent(input)) };
   }
 
+  private async getWorkflowDraft(
+    input: OperatorCommandInputMap['get_workflow_draft'],
+    auth: AuthContext,
+    sessionId: string,
+  ): Promise<{ result: unknown }> {
+    return {
+      result: await this.operatorWorkflowAuthoringService.getDraftDetail({
+        draftId: input.draftId,
+        sessionId,
+        auth,
+      }),
+    };
+  }
+
   private async proposeWorkflowDraft(
     input: OperatorCommandInputMap['propose_workflow_draft'],
     auth: AuthContext,
@@ -559,6 +586,22 @@ export class OperatorCommandService {
       result: await this.operatorWorkflowAuthoringService.proposeEdits({
         arguments: input,
         auth,
+        actionId,
+      }),
+    };
+  }
+
+  private async reviseWorkflowDraft(
+    input: OperatorCommandInputMap['revise_workflow_draft'],
+    auth: AuthContext,
+    sessionId: string,
+    actionId: string,
+  ): Promise<{ result: unknown }> {
+    return {
+      result: await this.operatorWorkflowAuthoringService.revise({
+        arguments: input,
+        auth,
+        sessionId,
         actionId,
       }),
     };

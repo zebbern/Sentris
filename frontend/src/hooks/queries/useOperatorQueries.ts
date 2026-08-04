@@ -81,11 +81,12 @@ export function operatorSessionHasActiveTurn(
 ): boolean {
   const latestTurn = session.turns[session.turns.length - 1];
   if (!latestTurn) return false;
+  if (!ACTIVE_TURN_STATUSES.has(latestTurn.status)) return false;
   const activityLatestTurn = activitySummary?.latestTurn;
   if (activityLatestTurn?.id === latestTurn.id) {
     return ACTIVE_TURN_STATUSES.has(activityLatestTurn.status);
   }
-  return ACTIVE_TURN_STATUSES.has(latestTurn.status);
+  return true;
 }
 
 export function getOperatorSessionLatestTurnError(session: OperatorSessionDetail): string | null {

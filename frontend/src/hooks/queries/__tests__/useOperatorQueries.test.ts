@@ -89,6 +89,24 @@ describe('operatorSessionHasActiveTurn', () => {
     ).toBe(false);
   });
 
+  it('does not let a stale active summary reopen a terminal session turn', () => {
+    expect(
+      operatorSessionHasActiveTurn(
+        { ...session, turns: [{ ...turn, status: 'completed', error: null }] },
+        {
+          ...session,
+          latestTurn: {
+            id: turn.id,
+            status: 'running',
+            error: null,
+            createdAt: turn.createdAt,
+            completedAt: null,
+          },
+        },
+      ),
+    ).toBe(false);
+  });
+
   it('does not let an older activity summary hide a newer active session turn', () => {
     const runningTurn = {
       ...turn,

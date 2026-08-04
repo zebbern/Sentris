@@ -66,6 +66,29 @@ describe('Operator run improvement handoff', () => {
     });
   });
 
+  it('carries an invalid draft into one idempotent revision turn', () => {
+    const state = createOperatorDirectCommandNavigationState(
+      'Revise this invalid workflow draft without saving or running it.',
+      {
+        commandName: 'get_workflow_draft',
+        arguments: { draftId: CLIENT_TURN_ID },
+      },
+      '/operator/session-1',
+      () => CLIENT_TURN_ID,
+    );
+
+    const handoff = readOperatorTurnHandoff(state);
+    expect(createOperatorTurnFromHandoff(handoff!)).toEqual({
+      clientTurnId: CLIENT_TURN_ID,
+      message: 'Revise this invalid workflow draft without saving or running it.',
+      context: { path: '/operator/session-1' },
+      directCommand: {
+        commandName: 'get_workflow_draft',
+        arguments: { draftId: CLIENT_TURN_ID },
+      },
+    });
+  });
+
   it('loads run evidence before asking Operator to investigate', () => {
     const state = createOperatorInvestigateRunNavigationState(
       {

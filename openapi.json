@@ -18884,6 +18884,11 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
+          "parentDraftId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "mode": {
             "type": "string",
             "enum": [
@@ -19822,6 +19827,36 @@
           },
           "directCommand": {
             "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "commandName": {
+                    "type": "string",
+                    "enum": [
+                      "get_workflow_draft"
+                    ]
+                  },
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "draftId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "required": [
+                      "draftId"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "commandName",
+                  "arguments"
+                ],
+                "additionalProperties": false
+              },
               {
                 "type": "object",
                 "properties": {

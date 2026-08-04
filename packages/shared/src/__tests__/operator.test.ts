@@ -392,8 +392,10 @@ describe('Operator workflow authoring commands', () => {
   it('keeps proposal automatic and applying a saved version consequential', () => {
     expect(OPERATOR_COMMAND_DEFINITIONS.list_components.effect).toBe('read');
     expect(OPERATOR_COMMAND_DEFINITIONS.get_component.effect).toBe('read');
+    expect(OPERATOR_COMMAND_DEFINITIONS.get_workflow_draft.effect).toBe('read');
     expect(OPERATOR_COMMAND_DEFINITIONS.propose_workflow_draft.effect).toBe('execute');
     expect(OPERATOR_COMMAND_DEFINITIONS.propose_workflow_edits.effect).toBe('execute');
+    expect(OPERATOR_COMMAND_DEFINITIONS.revise_workflow_draft.effect).toBe('execute');
     expect(OPERATOR_COMMAND_DEFINITIONS.apply_workflow_draft.effect).toBe('consequential');
   });
 

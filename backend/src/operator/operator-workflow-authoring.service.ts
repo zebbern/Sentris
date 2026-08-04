@@ -5,6 +5,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import {
   OperatorProposeWorkflowEditsInputSchema,
   OperatorProposeWorkflowDraftInputSchema,
+  OperatorReviseWorkflowDraftInputSchema,
   OperatorWorkflowDraftResultSchema,
   OperatorWorkflowGraphSchema,
   TERMINAL_STATUSES,
@@ -47,6 +48,12 @@ type StoredWorkflowProposal =
       kind: 'edits';
       action: OperatorActionRecord;
       arguments: OperatorCommandInputMap['propose_workflow_edits'];
+      result: OperatorWorkflowDraftResult;
+    }
+  | {
+      kind: 'revision';
+      action: OperatorActionRecord;
+      arguments: OperatorCommandInputMap['revise_workflow_draft'];
       result: OperatorWorkflowDraftResult;
     };
 
@@ -684,6 +691,7 @@ export class OperatorWorkflowAuthoringService {
 
   private buildProposalResult(input: {
     actionId: string;
+    parentDraftId?: string;
     workflowId: string | undefined;
     baseVersionId: string | undefined;
     sourceRunId: string | undefined;
@@ -711,6 +719,7 @@ export class OperatorWorkflowAuthoringService {
     return OperatorWorkflowDraftResultSchema.parse({
       kind: 'workflow-draft',
       draftId: input.actionId,
+      ...(input.parentDraftId ? { parentDraftId: input.parentDraftId } : {}),
       mode: input.workflowId ? 'update' : 'create',
       workflowId: input.workflowId ?? null,
       baseVersionId: input.baseVersionId ?? null,
@@ -787,6 +796,118 @@ export class OperatorWorkflowAuthoringService {
     });
   }
 
+  async getDraftDetail(input: {
+    draftId: string;
+    sessionId: string;
+    auth: AuthContext;
+  }): Promise<OperatorWorkflowDraftDetail> {
+    const context = await this.operatorRepository.getActionWithTurnSession(input.draftId);
+    if (
+      !context ||
+      context.session.id !== input.sessionId ||
+      context.session.organizationId !== input.auth.organizationId
+    ) {
+      throw new NotFoundException('Operator workflow draft not found');
+    }
+    const actions = await this.operatorRepository.listActions(input.sessionId);
+    const details = await this.listDraftDetails(actions, input.auth);
+    const detail = details.find((candidate) => candidate.draftId === input.draftId);
+    if (!detail) throw new NotFoundException('Operator workflow draft not found');
+    return detail;
+  }
+
+  async revise(input: {
+    arguments: OperatorCommandInputMap['revise_workflow_draft'];
+    auth: AuthContext;
+    sessionId: string;
+    actionId: string;
+  }): Promise<OperatorWorkflowDraftResult> {
+    const parsed = OperatorReviseWorkflowDraftInputSchema.parse(input.arguments);
+    const parent = await this.getDraftDetail({
+      draftId: parsed.draftId,
+      sessionId: input.sessionId,
+      auth: input.auth,
+    });
+    const baseRecord = parent.baseVersionId
+      ? await this.workflowVersionRepository.findById(parent.baseVersionId, {
+          organizationId: input.auth.organizationId,
+        })
+      : undefined;
+    if (parent.workflowId && (!baseRecord || baseRecord.workflowId !== parent.workflowId)) {
+      throw new NotFoundException(
+        `Workflow version ${parent.baseVersionId} not found for workflow ${parent.workflowId}`,
+      );
+    }
+
+    const materialized = materializeWorkflowEdits(parent.proposedGraph, parsed.operations);
+    if (!graphDiffHasChanges(buildGraphDiff(parent.proposedGraph, materialized.graph))) {
+      materialized.errors.push('Workflow draft revision does not change the draft');
+    }
+    return this.buildProposalResult({
+      actionId: input.actionId,
+      parentDraftId: parent.draftId,
+      workflowId: parent.workflowId ?? undefined,
+      baseVersionId: parent.baseVersionId ?? undefined,
+      sourceRunId: parent.sourceRunId,
+      proposedGraph: materialized.graph,
+      persistedBaseGraph: baseRecord?.graph,
+      initialErrors: materialized.errors,
+    });
+  }
+
+  private materializeStoredDraftGraph(
+    actions: OperatorActionRecord[],
+    draftId: string,
+    persistedBaseGraph: WorkflowGraph | undefined,
+    visited = new Set<string>(),
+  ): WorkflowGraph {
+    if (visited.has(draftId)) {
+      throw new ConflictException('Operator workflow draft revision lineage is cyclic');
+    }
+    visited.add(draftId);
+    const action = actions.find((candidate) => candidate.id === draftId);
+    if (!action || action.status !== 'succeeded') {
+      throw new NotFoundException('Operator workflow draft not found');
+    }
+
+    if (action.commandName === 'propose_workflow_draft') {
+      return OperatorProposeWorkflowDraftInputSchema.parse(action.arguments).graph;
+    }
+    if (action.commandName === 'propose_workflow_edits') {
+      if (!persistedBaseGraph) {
+        throw new NotFoundException('Operator workflow draft base version no longer exists');
+      }
+      const proposal = OperatorProposeWorkflowEditsInputSchema.parse(action.arguments);
+      const materialized = materializeWorkflowEdits(
+        this.projectGraph(persistedBaseGraph),
+        proposal.operations,
+      );
+      if (materialized.errors.length > 0) {
+        throw new ConflictException(
+          `Operator workflow edits no longer materialize cleanly: ${materialized.errors.join('; ')}`,
+        );
+      }
+      return materialized.graph;
+    }
+    if (action.commandName === 'revise_workflow_draft') {
+      const revision = OperatorReviseWorkflowDraftInputSchema.parse(action.arguments);
+      const parentGraph = this.materializeStoredDraftGraph(
+        actions,
+        revision.draftId,
+        persistedBaseGraph,
+        visited,
+      );
+      const materialized = materializeWorkflowEdits(parentGraph, revision.operations);
+      if (materialized.errors.length > 0) {
+        throw new ConflictException(
+          `Operator workflow draft revision no longer materializes cleanly: ${materialized.errors.join('; ')}`,
+        );
+      }
+      return materialized.graph;
+    }
+    throw new ConflictException('Operator workflow draft is not a completed proposal');
+  }
+
   async apply(input: {
     arguments: OperatorCommandInputMap['apply_workflow_draft'];
     auth: AuthContext;
@@ -799,19 +920,11 @@ export class OperatorWorkflowAuthoringService {
     if (context.action.status !== 'succeeded') {
       throw new ConflictException('Operator workflow draft is not a completed proposal');
     }
-    const proposal =
-      context.action.commandName === 'propose_workflow_draft'
-        ? {
-            kind: 'graph' as const,
-            input: OperatorProposeWorkflowDraftInputSchema.parse(context.action.arguments),
-          }
-        : context.action.commandName === 'propose_workflow_edits'
-          ? {
-              kind: 'edits' as const,
-              input: OperatorProposeWorkflowEditsInputSchema.parse(context.action.arguments),
-            }
-          : null;
-    if (!proposal) {
+    if (
+      context.action.commandName !== 'propose_workflow_draft' &&
+      context.action.commandName !== 'propose_workflow_edits' &&
+      context.action.commandName !== 'revise_workflow_draft'
+    ) {
       throw new ConflictException('Operator workflow draft is not a completed proposal');
     }
     const proposalResult = OperatorWorkflowDraftResultSchema.parse(context.action.result);
@@ -819,62 +932,45 @@ export class OperatorWorkflowAuthoringService {
       throw new ConflictException('Operator workflow draft must validate before it can be applied');
     }
 
-    const baseRecord = proposal.input.baseVersionId
-      ? await this.workflowVersionRepository.findById(proposal.input.baseVersionId, {
+    const proposal = await this.getDraftDetail({
+      draftId: input.arguments.draftId,
+      sessionId: input.sessionId,
+      auth: input.auth,
+    });
+    const baseRecord = proposal.baseVersionId
+      ? await this.workflowVersionRepository.findById(proposal.baseVersionId, {
           organizationId: input.auth.organizationId,
         })
       : undefined;
-    if (
-      proposal.input.workflowId &&
-      (!baseRecord || baseRecord.workflowId !== proposal.input.workflowId)
-    ) {
+    if (proposal.workflowId && (!baseRecord || baseRecord.workflowId !== proposal.workflowId)) {
       throw new NotFoundException('Operator workflow draft base version no longer exists');
     }
-    let proposedGraph: WorkflowGraph;
-    if (proposal.kind === 'graph') {
-      proposedGraph = proposal.input.graph;
-    } else {
-      if (!baseRecord) {
-        throw new NotFoundException('Operator workflow draft base version no longer exists');
-      }
-      const baseGraph = this.projectGraph(baseRecord.graph);
-      const materialized = materializeWorkflowEdits(baseGraph, proposal.input.operations);
-      const diff = buildGraphDiff(baseGraph, materialized.graph);
-      if (materialized.errors.length > 0 || !graphDiffHasChanges(diff)) {
-        throw new ConflictException(
-          `Operator workflow edits no longer materialize cleanly: ${[
-            ...materialized.errors,
-            ...(!graphDiffHasChanges(diff) ? ['proposal does not change the workflow'] : []),
-          ].join('; ')}`,
-        );
-      }
-      proposedGraph = materialized.graph;
-    }
+    const actions = await this.operatorRepository.listActions(input.sessionId);
+    const proposedGraph = this.materializeStoredDraftGraph(
+      actions,
+      proposal.draftId,
+      baseRecord?.graph,
+    );
     const effectiveGraph = restoreCredentialValues(proposedGraph, baseRecord?.graph);
     compileWorkflowGraph(effectiveGraph);
 
     const idempotencyKey = `operator-draft:${context.action.id}`;
-    const staged = Boolean(proposal.input.workflowId && proposal.input.sourceRunId);
-    const saved = proposal.input.workflowId
+    const staged = Boolean(proposal.workflowId && proposal.sourceRunId);
+    const saved = proposal.workflowId
       ? staged
         ? await this.workflowsService.stageVersion(
-            proposal.input.workflowId,
+            proposal.workflowId,
             effectiveGraph,
             input.auth,
             {
-              expectedVersionId: proposal.input.baseVersionId,
+              expectedVersionId: proposal.baseVersionId ?? undefined,
               idempotencyKey,
             },
           )
-        : await this.workflowsService.update(
-            proposal.input.workflowId,
-            effectiveGraph,
-            input.auth,
-            {
-              expectedVersionId: proposal.input.baseVersionId,
-              idempotencyKey,
-            },
-          )
+        : await this.workflowsService.update(proposal.workflowId, effectiveGraph, input.auth, {
+            expectedVersionId: proposal.baseVersionId ?? undefined,
+            idempotencyKey,
+          })
       : await this.workflowsService.create(effectiveGraph, input.auth, { idempotencyKey });
     const versionId = 'currentVersionId' in saved ? saved.currentVersionId : saved.id;
     const version = 'currentVersion' in saved ? saved.currentVersion : saved.version;
@@ -883,13 +979,13 @@ export class OperatorWorkflowAuthoringService {
     return {
       kind: 'workflow-applied',
       draftId: context.action.id,
-      workflowId: proposal.input.workflowId ?? saved.id,
+      workflowId: proposal.workflowId ?? saved.id,
       versionId,
       version,
-      created: !proposal.input.workflowId,
+      created: !proposal.workflowId,
       staged,
       name: saved.name,
-      ...(proposal.input.sourceRunId ? { sourceRunId: proposal.input.sourceRunId } : {}),
+      ...(proposal.sourceRunId ? { sourceRunId: proposal.sourceRunId } : {}),
     };
   }
 
@@ -900,7 +996,8 @@ export class OperatorWorkflowAuthoringService {
     const proposals = actions.filter(
       (action) =>
         (action.commandName === 'propose_workflow_draft' ||
-          action.commandName === 'propose_workflow_edits') &&
+          action.commandName === 'propose_workflow_edits' ||
+          action.commandName === 'revise_workflow_draft') &&
         action.status === 'succeeded',
     );
     const parsed: StoredWorkflowProposal[] = [];
@@ -919,18 +1016,30 @@ export class OperatorWorkflowAuthoringService {
         }
         continue;
       }
-      const argumentsResult = OperatorProposeWorkflowEditsInputSchema.safeParse(action.arguments);
-      if (argumentsResult.success) {
+      if (action.commandName === 'propose_workflow_edits') {
+        const argumentsResult = OperatorProposeWorkflowEditsInputSchema.safeParse(action.arguments);
+        if (argumentsResult.success) {
+          parsed.push({
+            kind: 'edits',
+            action,
+            arguments: argumentsResult.data,
+            result: result.data,
+          });
+        }
+        continue;
+      }
+      const argumentsResult = OperatorReviseWorkflowDraftInputSchema.safeParse(action.arguments);
+      if (argumentsResult.success && result.data.parentDraftId === argumentsResult.data.draftId) {
         parsed.push({
-          kind: 'edits',
+          kind: 'revision',
           action,
           arguments: argumentsResult.data,
           result: result.data,
         });
       }
     }
-    const baseVersionIds = parsed.flatMap(({ arguments: value }) =>
-      value.baseVersionId ? [value.baseVersionId] : [],
+    const baseVersionIds = parsed.flatMap(({ result }) =>
+      result.baseVersionId ? [result.baseVersionId] : [],
     );
     const baseVersions = await this.workflowVersionRepository.findByIds(baseVersionIds, {
       organizationId: auth.organizationId,
@@ -938,8 +1047,9 @@ export class OperatorWorkflowAuthoringService {
     const baseById = new Map(baseVersions.map((version) => [version.id, version]));
 
     const details: OperatorWorkflowDraftDetail[] = [];
+    const detailsByDraftId = new Map<string, OperatorWorkflowDraftDetail>();
     for (const { kind, action, arguments: value, result } of parsed) {
-      const baseVersion = value.baseVersionId ? baseById.get(value.baseVersionId) : undefined;
+      const baseVersion = result.baseVersionId ? baseById.get(result.baseVersionId) : undefined;
       if (kind === 'edits' && !baseVersion) continue;
       let proposedGraph: WorkflowGraph;
       if (kind === 'graph') {
@@ -953,7 +1063,7 @@ export class OperatorWorkflowAuthoringService {
           // prevents apply, so fall back to redacting the stored arguments.
           proposedGraph = this.projectGraph(value.graph, baseVersion?.graph);
         }
-      } else {
+      } else if (kind === 'edits') {
         if (!baseVersion) continue;
         const projectedBase = this.projectGraph(baseVersion.graph);
         const materialized = materializeWorkflowEdits(projectedBase, value.operations);
@@ -965,14 +1075,28 @@ export class OperatorWorkflowAuthoringService {
         } catch {
           proposedGraph = this.projectGraph(materialized.graph, baseVersion.graph);
         }
+      } else {
+        const parent = detailsByDraftId.get(value.draftId);
+        if (!parent) continue;
+        const materialized = materializeWorkflowEdits(parent.proposedGraph, value.operations);
+        try {
+          proposedGraph = this.projectGraph(
+            restoreCredentialValues(materialized.graph, baseVersion?.graph),
+            baseVersion?.graph,
+          );
+        } catch {
+          proposedGraph = this.projectGraph(materialized.graph, baseVersion?.graph);
+        }
       }
-      details.push({
+      const detail: OperatorWorkflowDraftDetail = {
         ...result,
         proposalActionId: action.id,
         sessionId: action.sessionId,
         proposedGraph,
         baseGraph: baseVersion ? this.projectGraph(baseVersion.graph) : null,
-      });
+      };
+      details.push(detail);
+      detailsByDraftId.set(detail.draftId, detail);
     }
     return details;
   }

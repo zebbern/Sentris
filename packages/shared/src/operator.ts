@@ -326,6 +326,31 @@ export const OperatorProposeWorkflowEditsInputSchema = z
     }
   });
 
+export const OperatorGetWorkflowDraftInputSchema = z
+  .object({ draftId: z.string().uuid() })
+  .strict();
+
+export const OperatorReviseWorkflowDraftInputSchema = z
+  .object({
+    draftId: z.string().uuid(),
+    summary: z.string().trim().min(1).max(2_000).optional(),
+    operations: z
+      .array(OperatorWorkflowEditOperationSchema)
+      .min(1)
+      .max(MAX_OPERATOR_WORKFLOW_EDIT_OPERATIONS),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const serialized = JSON.stringify(value);
+    if (new TextEncoder().encode(serialized).byteLength > MAX_OPERATOR_WORKFLOW_EDIT_BYTES) {
+      context.addIssue({
+        code: 'custom',
+        message: `Workflow draft revision exceeds ${MAX_OPERATOR_WORKFLOW_EDIT_BYTES} bytes`,
+        path: ['operations'],
+      });
+    }
+  });
+
 export const OperatorProposeWorkflowDraftInputSchema = z
   .object({
     workflowId: WorkflowIdSchema.optional(),
@@ -380,6 +405,7 @@ export const OperatorWorkflowDraftResultSchema = z
   .object({
     kind: z.literal('workflow-draft'),
     draftId: z.string().uuid(),
+    parentDraftId: z.string().uuid().optional(),
     mode: z.enum(['create', 'update']),
     workflowId: WorkflowIdSchema.nullable(),
     baseVersionId: z.string().uuid().nullable(),
@@ -1074,6 +1100,12 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
     effect: 'read',
     inputSchema: OperatorGetComponentInputSchema,
   },
+  get_workflow_draft: {
+    description:
+      'Inspect one durable workflow draft from this Operator session, including its exact credential-safe proposed graph and compile-validation errors. Use this before revising an invalid draft.',
+    effect: 'read',
+    inputSchema: OperatorGetWorkflowDraftInputSchema,
+  },
   propose_workflow_draft: {
     description:
       'Propose and compile-check a complete new workflow graph without saving it. Existing workflows should use propose_workflow_edits so unchanged graph data is not regenerated. A valid proposal can then be applied separately.',
@@ -1084,6 +1116,11 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
     description: `Propose and compile-check bounded ID-based changes to an existing immutable workflow version without saving it. Use the exact workflowId, baseVersionId, node IDs, and edge IDs returned by get_workflow. Allowed operation values are: ${OPERATOR_WORKFLOW_EDIT_OPERATIONS.join(', ')}. For node configuration use patch_node with setParameters and/or setInputOverrides; structured values are recursively merged so omitted nested fields remain unchanged. For example, setInputOverrides: { chatModel: { provider: 'gemini', modelId: 'gemini-3.6-flash' } }. The backend materializes the full graph and returns the normal draft diff for review.`,
     effect: 'execute',
     inputSchema: OperatorProposeWorkflowEditsInputSchema,
+  },
+  revise_workflow_draft: {
+    description: `Create a corrected reviewable draft by applying bounded ID-based operations to an earlier durable draft's proposed graph. Use the exact draftId, node IDs, edge IDs, and validation evidence returned by get_workflow_draft. Allowed operation values are: ${OPERATOR_WORKFLOW_EDIT_OPERATIONS.join(', ')}. This never saves or runs the workflow.`,
+    effect: 'execute',
+    inputSchema: OperatorReviseWorkflowDraftInputSchema,
   },
   apply_workflow_draft: {
     description:
@@ -1213,8 +1250,10 @@ export type OperatorCommandInputMap = {
   get_workflow: z.infer<typeof OperatorGetWorkflowInputSchema>;
   list_components: z.infer<typeof OperatorListComponentsInputSchema>;
   get_component: z.infer<typeof OperatorGetComponentInputSchema>;
+  get_workflow_draft: z.infer<typeof OperatorGetWorkflowDraftInputSchema>;
   propose_workflow_draft: z.infer<typeof OperatorProposeWorkflowDraftInputSchema>;
   propose_workflow_edits: z.infer<typeof OperatorProposeWorkflowEditsInputSchema>;
+  revise_workflow_draft: z.infer<typeof OperatorReviseWorkflowDraftInputSchema>;
   apply_workflow_draft: z.infer<typeof OperatorApplyWorkflowDraftInputSchema>;
   promote_workflow_version: z.infer<typeof OperatorPromoteWorkflowVersionInputSchema>;
   list_runs: z.infer<typeof OperatorListRunsInputSchema>;
@@ -1236,6 +1275,12 @@ export type OperatorCommandInputMap = {
 };
 
 export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
+  z
+    .object({
+      commandName: z.literal('get_workflow_draft'),
+      arguments: OperatorGetWorkflowDraftInputSchema,
+    })
+    .strict(),
   z
     .object({
       commandName: z.literal('apply_workflow_draft'),

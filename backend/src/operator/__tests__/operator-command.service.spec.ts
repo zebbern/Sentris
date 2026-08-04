@@ -81,9 +81,11 @@ describe('OperatorCommandService', () => {
     workflowAuthoring = {
       listComponents: vi.fn(),
       getComponent: vi.fn(),
+      getDraftDetail: vi.fn(),
       projectGraph: vi.fn((graph) => graph),
       propose: vi.fn(),
       proposeEdits: vi.fn(),
+      revise: vi.fn(),
       apply: vi.fn(),
     };
     trace = {
@@ -368,6 +370,55 @@ describe('OperatorCommandService', () => {
       actionId: ACTION_ID,
     });
     expect(result.result).toEqual(proposal);
+  });
+
+  it('dispatches draft inspection and bounded revision through the canonical authoring service', async () => {
+    const draftId = '55555555-5555-4555-8555-555555555555';
+    const detail = { kind: 'workflow-draft', draftId, validation: { valid: false } };
+    workflowAuthoring.getDraftDetail.mockResolvedValue(detail);
+
+    const inspected = await service.execute({
+      commandName: 'get_workflow_draft',
+      arguments: { draftId },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(workflowAuthoring.getDraftDetail).toHaveBeenCalledWith({
+      draftId,
+      sessionId: SESSION_ID,
+      auth,
+    });
+    expect(inspected.result).toBe(detail);
+
+    const argumentsValue = {
+      draftId,
+      operations: [{ operation: 'remove_edge' as const, edgeId: 'invalid-edge' }],
+    };
+    const revision = { ...detail, draftId: ACTION_ID, parentDraftId: draftId };
+    workflowAuthoring.revise.mockResolvedValue(revision);
+    const revised = await service.execute({
+      commandName: 'revise_workflow_draft',
+      arguments: argumentsValue,
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(workflowAuthoring.revise).toHaveBeenCalledWith({
+      arguments: argumentsValue,
+      auth,
+      sessionId: SESSION_ID,
+      actionId: ACTION_ID,
+    });
+    expect(revised.result).toBe(revision);
   });
 
   it('runs an improved version with the terminal source run inputs and scope', async () => {

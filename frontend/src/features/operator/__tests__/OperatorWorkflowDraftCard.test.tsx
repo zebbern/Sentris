@@ -118,6 +118,10 @@ describe('OperatorWorkflowDraftCard', () => {
     expect(screen.getByText('Agent model credential is required')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /save version/i })).toBeDisabled();
     expect(screen.getByRole('link', { name: /open in builder/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /revise with operator/i })).toHaveAttribute(
+      'href',
+      `/operator/${SESSION_ID}?reviseDraftId=${DRAFT_ID}`,
+    );
   });
 
   it('links an applied draft to its immutable saved workflow version', () => {

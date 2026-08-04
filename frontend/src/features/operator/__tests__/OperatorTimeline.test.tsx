@@ -192,6 +192,51 @@ describe('OperatorTimeline', () => {
     expect(screen.getByRole('button', { name: /save version/i })).toBeEnabled();
   });
 
+  it('routes an invalid draft through the durable revision handoff', () => {
+    const draftId = '11111111-1111-4111-8111-111111111111';
+    const proposalAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'invalid-proposal-action',
+      commandName: 'propose_workflow_draft',
+      status: 'succeeded',
+      approvalRequired: false,
+      result: {
+        kind: 'workflow-draft',
+        draftId,
+        mode: 'create',
+        workflowId: null,
+        baseVersionId: null,
+        name: 'Invalid workflow',
+        digest: 'invalid-digest',
+        validation: { valid: false, errors: ['entry.output cannot connect to scanner.input'] },
+        diff: {
+          metadataChanged: ['name'],
+          addedNodeIds: ['entry', 'scanner'],
+          removedNodeIds: [],
+          changedNodeIds: [],
+          addedEdgeIds: ['entry-scanner'],
+          removedEdgeIds: [],
+          changedEdgeIds: [],
+        },
+      },
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={[proposalAction]}
+        isActive={false}
+        onDecision={mock(() => {})}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getByRole('link', { name: /revise with operator/i })).toHaveAttribute(
+      'href',
+      `/operator/session-1?reviseDraftId=${draftId}`,
+    );
+  });
+
   it('starts the saved improved version with the original run inputs only after a click', () => {
     const onRunCommand = mock(() => {});
     const sourceRunId = 'sentris-run-source';

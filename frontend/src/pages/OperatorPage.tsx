@@ -54,6 +54,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useNotificationStore } from '@/store/notificationStore';
 import {
+  createOperatorWorkflowDraftRevisionNavigationState,
   createOperatorTurnFromHandoff,
   readOperatorTurnHandoff,
   type OperatorTurnHandoff,
@@ -350,7 +351,11 @@ function ActiveSession({
   const isActive = operatorSessionHasActiveTurn(session, activitySummary);
   const latestTurnError = getOperatorSessionLatestTurnError(session);
   const expectedWorkflowDraftCount = session.actions.filter(
-    (action) => action.commandName === 'propose_workflow_draft' && action.status === 'succeeded',
+    (action) =>
+      (action.commandName === 'propose_workflow_draft' ||
+        action.commandName === 'propose_workflow_edits' ||
+        action.commandName === 'revise_workflow_draft') &&
+      action.status === 'succeeded',
   ).length;
   const workflowDraftsQuery = useOperatorWorkflowDrafts(
     session.id,
@@ -550,7 +555,17 @@ export function OperatorPage() {
   const [searchParams] = useSearchParams();
   const notifications = useNotificationStore((state) => state.notifications);
   const markOperatorSessionRead = useNotificationStore((state) => state.markOperatorSessionRead);
-  const handoff = readOperatorTurnHandoff(location.state);
+  const revisionDraftId = searchParams.get('reviseDraftId');
+  const revisionHandoff = useMemo(() => {
+    if (!sessionId || !revisionDraftId) return null;
+    return readOperatorTurnHandoff(
+      createOperatorWorkflowDraftRevisionNavigationState(
+        revisionDraftId,
+        `/operator/${encodeURIComponent(sessionId)}`,
+      ),
+    );
+  }, [revisionDraftId, sessionId]);
+  const handoff = readOperatorTurnHandoff(location.state) ?? revisionHandoff;
   const sessionsQuery = useOperatorSessions();
   const sessionQuery = useOperatorSessionStream(sessionId);
   const latestSessionId = sessionsQuery.data?.[0]?.id;

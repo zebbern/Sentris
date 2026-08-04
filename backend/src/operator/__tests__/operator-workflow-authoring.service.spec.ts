@@ -16,6 +16,7 @@ const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_SESSION_ID = '22222222-2222-4222-8222-222222222222';
 const TURN_ID = '33333333-3333-4333-8333-333333333333';
 const PROPOSAL_ACTION_ID = '44444444-4444-4444-8444-444444444444';
+const REVISION_ACTION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const WORKFLOW_ID = '55555555-5555-4555-8555-555555555555';
 const BASE_VERSION_ID = '66666666-6666-4666-8666-666666666666';
 const SAVED_VERSION_ID = '77777777-7777-4777-8777-777777777777';
@@ -254,6 +255,7 @@ describe('OperatorWorkflowAuthoringService', () => {
   };
   let operatorRepository: {
     getActionWithTurnSession: ReturnType<typeof vi.fn>;
+    listActions: ReturnType<typeof vi.fn>;
   };
   let service: OperatorWorkflowAuthoringService;
 
@@ -268,8 +270,19 @@ describe('OperatorWorkflowAuthoringService', () => {
       findById: vi.fn(),
       findByIds: vi.fn(),
     };
+    versions.findByIds.mockImplementation(async (ids: string[]) => {
+      const records = await Promise.all(
+        ids.map((id) => versions.findById(id, { organizationId: ORGANIZATION_ID })),
+      );
+      return records.filter(Boolean);
+    });
     operatorRepository = {
       getActionWithTurnSession: vi.fn(),
+      listActions: vi.fn(async () => {
+        const context =
+          await operatorRepository.getActionWithTurnSession.mock.results.at(-1)?.value;
+        return context ? [context.action] : [];
+      }),
     };
     service = new OperatorWorkflowAuthoringService(
       workflows as unknown as WorkflowsService,
@@ -406,6 +419,62 @@ describe('OperatorWorkflowAuthoringService', () => {
       removedEdgeIds: [],
       changedEdgeIds: [],
     });
+  });
+
+  it('revises an invalid new-workflow draft with bounded operations and preserves its lineage', async () => {
+    const invalidGraph = makeGraph({ componentType: 'missing.operator.component' });
+    const invalidResult = await service.propose({
+      arguments: { graph: invalidGraph },
+      auth,
+      actionId: PROPOSAL_ACTION_ID,
+    });
+    const parentContext = proposalContext({ graph: invalidGraph, create: true });
+    parentContext.action.result = invalidResult as never;
+    operatorRepository.getActionWithTurnSession.mockResolvedValue(parentContext);
+    operatorRepository.listActions.mockResolvedValue([parentContext.action]);
+    versions.findByIds.mockResolvedValue([]);
+    const operations = [
+      {
+        operation: 'replace_node' as const,
+        nodeId: 'trigger',
+        node: makeGraph().nodes[0]!,
+      },
+    ];
+
+    const revised = await service.revise({
+      arguments: {
+        draftId: PROPOSAL_ACTION_ID,
+        summary: 'Use the registered workflow entrypoint',
+        operations,
+      },
+      auth,
+      sessionId: SESSION_ID,
+      actionId: REVISION_ACTION_ID,
+    });
+
+    expect(revised).toMatchObject({
+      draftId: REVISION_ACTION_ID,
+      parentDraftId: PROPOSAL_ACTION_ID,
+      mode: 'create',
+      validation: { valid: true, errors: [] },
+    });
+
+    const [parentDetail, revisionDetail] = await service.listDraftDetails(
+      [
+        parentContext.action,
+        {
+          ...parentContext.action,
+          id: REVISION_ACTION_ID,
+          commandName: 'revise_workflow_draft',
+          arguments: { draftId: PROPOSAL_ACTION_ID, operations },
+          result: revised,
+        },
+      ] as never,
+      auth,
+    );
+    expect(parentDetail?.validation.valid).toBe(false);
+    expect(revisionDetail?.parentDraftId).toBe(PROPOSAL_ACTION_ID);
+    expect(revisionDetail?.proposedGraph.nodes[0]?.type).toBe('core.workflow.entrypoint');
   });
 
   it('validates and preserves terminal source-run lineage on an update proposal', async () => {

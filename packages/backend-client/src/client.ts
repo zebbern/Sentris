@@ -5895,6 +5895,8 @@ export interface components {
       kind: 'workflow-draft';
       /** Format: uuid */
       draftId: string;
+      /** Format: uuid */
+      parentDraftId?: string;
       /** @enum {string} */
       mode: 'create' | 'update';
       /** Format: uuid */
@@ -6141,6 +6143,14 @@ export interface components {
         runId?: string;
       };
       directCommand?:
+        | {
+            /** @enum {string} */
+            commandName: 'get_workflow_draft';
+            arguments: {
+              /** Format: uuid */
+              draftId: string;
+            };
+          }
         | {
             /** @enum {string} */
             commandName: 'apply_workflow_draft';

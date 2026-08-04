@@ -68,6 +68,8 @@ const INVESTIGATE_RUN_MESSAGE =
   'Investigate this run. Review its status, stored output, recent and failed trace evidence, and findings. Explain what happened and recommend the most useful next step. Do not make changes unless I ask.';
 const INVESTIGATE_FINDING_MESSAGE =
   'Investigate this finding. Review its bounded raw evidence, source run and workflow context, and current triage state. Explain what it means, how credible it is, and recommend the most useful next step. Do not change triage or workflows unless I ask.';
+const REVISE_WORKFLOW_DRAFT_MESSAGE = (draftId: string) =>
+  `Revise workflow draft ${draftId}. Inspect its exact proposed graph and compile-validation errors, then create a corrected draft with only the smallest ID-based operations. Do not save or run the workflow.`;
 
 export function createOperatorImproveRunNavigationState(
   sourceRunId: string,
@@ -101,6 +103,18 @@ export function createOperatorDirectCommandNavigationState(
       sourcePath,
     },
   };
+}
+
+export function createOperatorWorkflowDraftRevisionNavigationState(
+  draftId: string,
+  sourcePath: string,
+): OperatorNavigationState {
+  return createOperatorDirectCommandNavigationState(
+    REVISE_WORKFLOW_DRAFT_MESSAGE(draftId),
+    { commandName: 'get_workflow_draft', arguments: { draftId } },
+    sourcePath,
+    () => draftId,
+  );
 }
 
 export function createOperatorInvestigateRunNavigationState(
