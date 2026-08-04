@@ -39,6 +39,7 @@ let earlyDecision:
   | { actionId: string; decision: 'approved' | 'rejected'; expectedVersion: number }
   | undefined;
 let detachedRunFollowing = true;
+let automaticDraftRepair = true;
 const allHandlersFinished = vi.fn(() => true);
 const condition = vi.fn(async (predicate: () => boolean, timeout?: string) => {
   if (predicate()) return true;
@@ -62,7 +63,9 @@ mock.module('@temporalio/workflow', () => ({
   currentUpdateInfo: vi.fn(() => undefined),
   defineUpdate: vi.fn((name: string) => name),
   isCancellation: vi.fn(() => false),
-  patched: vi.fn(() => detachedRunFollowing),
+  patched: vi.fn((patchId: string) =>
+    patchId === 'operator-automatic-draft-repair-v1' ? automaticDraftRepair : detachedRunFollowing,
+  ),
   proxyActivities: vi.fn(
     () =>
       new Proxy(
@@ -84,6 +87,51 @@ const input = {
   organizationId: '33333333-3333-4333-8333-333333333333',
 };
 
+function workflowDraft(draftId: string, valid: boolean, parentDraftId?: string) {
+  return {
+    kind: 'workflow-draft' as const,
+    draftId,
+    ...(parentDraftId ? { parentDraftId } : {}),
+    mode: 'create' as const,
+    workflowId: null,
+    baseVersionId: null,
+    name: 'Subdomain workflow',
+    digest: `digest-${draftId}`,
+    validation: {
+      valid,
+      errors: valid ? [] : ['[subfinder] inputMappings: text cannot connect to list<text>'],
+    },
+    diff: {
+      metadataChanged: [],
+      addedNodeIds: ['entry', 'subfinder'],
+      removedNodeIds: [],
+      changedNodeIds: [],
+      addedEdgeIds: ['entry-subfinder'],
+      removedEdgeIds: [],
+      changedEdgeIds: [],
+    },
+  };
+}
+
+function toolStep(...toolCalls: unknown[]) {
+  return { text: '', finishReason: 'tool-calls', toolCalls };
+}
+
+function mockSuccessfulActionResults(...results: unknown[]): void {
+  operatorPrepareActionActivity.mockResolvedValue({
+    actionId: '66666666-6666-4666-8666-666666666666',
+    actionVersion: 0,
+    disposition: 'execute',
+  });
+  for (const [index, result] of results.entries()) {
+    operatorExecuteActionActivity.mockResolvedValueOnce({
+      actionId: `action-${index}`,
+      actionStatus: 'succeeded',
+      result,
+    });
+  }
+}
+
 beforeAll(async () => {
   ({ operatorTurnWorkflow } = await import('../operator-turn-workflow'));
 });
@@ -94,6 +142,7 @@ beforeEach(() => {
   events.length = 0;
   earlyDecision = undefined;
   detachedRunFollowing = true;
+  automaticDraftRepair = true;
   operatorSetTurnStatusActivity.mockImplementation(async () => {
     events.push('status');
   });
@@ -167,6 +216,128 @@ describe('operatorTurnWorkflow', () => {
     expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
       ...input,
       message: 'Plan ready for review. Select Run plan or Revise.',
+    });
+  });
+
+  test('automatically inspects and revises one invalid workflow draft', async () => {
+    const draftId = '44444444-4444-4444-8444-444444444444';
+    const revisedDraftId = '55555555-5555-4555-8555-555555555555';
+    const proposalCall = {
+      toolCallId: `${input.turnId}:0:0`,
+      commandName: 'propose_workflow_draft' as const,
+      arguments: {},
+    };
+    const componentCall = {
+      toolCallId: `${input.turnId}:8:0`,
+      commandName: 'get_component' as const,
+      arguments: { componentId: 'core.array.pack' },
+    };
+    const reviseCall = {
+      toolCallId: `${input.turnId}:9:0`,
+      commandName: 'revise_workflow_draft' as const,
+      arguments: {
+        draftId,
+        operations: [{ operation: 'add_node', node: { id: 'pack' } }],
+      },
+    };
+    operatorModelStepActivity
+      .mockResolvedValueOnce(toolStep(proposalCall))
+      .mockResolvedValueOnce(toolStep(componentCall))
+      .mockResolvedValueOnce(toolStep(reviseCall));
+    mockSuccessfulActionResults(
+      workflowDraft(draftId, false),
+      { ...workflowDraft(draftId, false), proposedGraph: { nodes: [], edges: [] } },
+      { id: 'core.array.pack' },
+      workflowDraft(revisedDraftId, true, draftId),
+    );
+
+    await operatorTurnWorkflow(input);
+
+    expect(operatorPrepareActionActivity).toHaveBeenCalledWith({
+      ...input,
+      toolCallId: `${input.turnId}:auto-repair:inspect:${draftId}`,
+      commandName: 'get_workflow_draft',
+      arguments: { draftId },
+      userConfirmed: true,
+    });
+    expect(operatorModelStepActivity).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        ...input,
+        step: 8,
+        mode: 'workflow_draft_repair',
+        sourceDraftId: draftId,
+        toolCallHistory: [proposalCall],
+      }),
+    );
+    expect(operatorModelStepActivity).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        step: 9,
+        mode: 'workflow_draft_repair',
+        sourceDraftId: draftId,
+        toolCallHistory: [proposalCall, componentCall],
+      }),
+    );
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message: 'Workflow draft ready for review. Select Save version when it is ready.',
+    });
+  });
+
+  test('stops automatic repair after one invalid revision attempt', async () => {
+    const draftId = '44444444-4444-4444-8444-444444444444';
+    const revisedDraftId = '55555555-5555-4555-8555-555555555555';
+    operatorModelStepActivity
+      .mockResolvedValueOnce(
+        toolStep({
+          toolCallId: `${input.turnId}:0:0`,
+          commandName: 'propose_workflow_draft',
+          arguments: {},
+        }),
+      )
+      .mockResolvedValueOnce(
+        toolStep({
+          toolCallId: `${input.turnId}:8:0`,
+          commandName: 'revise_workflow_draft',
+          arguments: { draftId, operations: [] },
+        }),
+      );
+    mockSuccessfulActionResults(
+      workflowDraft(draftId, false),
+      { ...workflowDraft(draftId, false), proposedGraph: { nodes: [], edges: [] } },
+      workflowDraft(revisedDraftId, false, draftId),
+    );
+
+    await operatorTurnWorkflow(input);
+
+    expect(operatorModelStepActivity).toHaveBeenCalledTimes(2);
+    expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(3);
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message: 'Workflow draft needs revision. Review the validation errors shown in the card.',
+    });
+  });
+
+  test('keeps pre-patch invalid draft histories on their original completion path', async () => {
+    automaticDraftRepair = false;
+    const draftId = '44444444-4444-4444-8444-444444444444';
+    operatorModelStepActivity.mockResolvedValue(
+      toolStep({
+        toolCallId: `${input.turnId}:0:0`,
+        commandName: 'propose_workflow_draft',
+        arguments: {},
+      }),
+    );
+    mockSuccessfulActionResults(workflowDraft(draftId, false));
+
+    await operatorTurnWorkflow(input);
+
+    expect(operatorModelStepActivity).toHaveBeenCalledTimes(1);
+    expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(1);
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message: 'Workflow draft needs revision. Review the validation errors shown in the card.',
     });
   });
 

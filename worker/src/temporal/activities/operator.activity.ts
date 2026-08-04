@@ -174,11 +174,13 @@ export interface OperatorModelStepInput extends OperatorActivityInput {
   step: number;
   mode?:
     | 'standard'
+    | 'workflow_draft_repair'
     | 'improve_run_proposal'
     | 'improve_run_summary'
     | 'plan_summary'
     | 'run_follow_up_summary';
   sourceRunId?: string;
+  sourceDraftId?: string;
   planTitle?: string;
   observations?: OperatorRunObservation[];
   toolCallHistory?: OperatorModelToolCall[];
@@ -422,9 +424,16 @@ export async function operatorModelStepActivity(
     );
     const mode = input.mode ?? 'standard';
     const commandNames =
-      mode === 'improve_run_proposal'
-        ? (['get_workflow', 'list_components', 'get_component', 'propose_workflow_edits'] as const)
-        : OPERATOR_COMMAND_NAMES;
+      mode === 'workflow_draft_repair'
+        ? (['list_components', 'get_component', 'revise_workflow_draft'] as const)
+        : mode === 'improve_run_proposal'
+          ? ([
+              'get_workflow',
+              'list_components',
+              'get_component',
+              'propose_workflow_edits',
+            ] as const)
+          : OPERATOR_COMMAND_NAMES;
     const compactSummary = mode === 'plan_summary' || mode === 'run_follow_up_summary';
     const tools =
       mode === 'improve_run_summary' || compactSummary
@@ -436,6 +445,7 @@ export async function operatorModelStepActivity(
       mode,
       input.sourceRunId,
       input.planTitle,
+      input.sourceDraftId,
     );
     const messages = buildModelMessages(
       context.messages,
@@ -480,7 +490,9 @@ export async function operatorModelStepActivity(
       const recoverySuffix =
         mode === 'improve_run_proposal'
           ? '\n\nNo workflow draft was proposed or applied by this recovery response.'
-          : '';
+          : mode === 'workflow_draft_repair'
+            ? '\n\nNo workflow draft was revised, saved, or run by this recovery response.'
+            : '';
       return {
         text: `${recoveryText}${recoverySuffix}`.slice(0, MAX_MODEL_TEXT_LENGTH),
         finishReason: String(recovery.finishReason),
@@ -697,6 +709,7 @@ function buildSystemPrompt(
   mode: NonNullable<OperatorModelStepInput['mode']>,
   sourceRunId?: string,
   planTitle?: string,
+  sourceDraftId?: string,
 ): string {
   const route = context.turn.context
     ? `Current product route: ${JSON.stringify(context.turn.context)}`
@@ -713,40 +726,47 @@ function buildSystemPrompt(
     observations,
   }).slice(0, MAX_ACTION_LEDGER_LENGTH);
   const modeInstructions =
-    mode === 'improve_run_proposal'
+    mode === 'workflow_draft_repair'
       ? [
-          `The user explicitly started one complete improvement journey for source run ${sourceRunId ?? 'unknown'}.`,
-          'Inspect the saved workflow and exact component definitions, then propose only the smallest evidence-supported ID-based edit. Include the exact sourceRunId in propose_workflow_edits.',
-          'If the inspected workflow has no success criteria and its exact component contracts or run evidence justify a concrete output or finding-count check, include set_success_criteria in the reviewed proposal.',
-          'Success criteria must measure observable workflow outcomes; never invent a node output path or threshold. If no criterion is justified, leave the list empty and explain what evidence is missing.',
-          'Do not call apply_workflow_draft, run_workflow, or compare_runs; the durable journey performs those stages after a valid proposal and normal approval.',
-          'If neither the run evidence supports an execution change nor the exact contracts support a criterion, explain that and make no tool call.',
+          `Workflow draft ${sourceDraftId ?? 'unknown'} failed compile validation and its exact graph and errors are already recorded in the durable action evidence.`,
+          'Use list_components/get_component only when the recorded evidence does not already establish the exact correction, then call revise_workflow_draft exactly once with the smallest ID-based operations against that same draft ID.',
+          'After a component catalog read, wait for its result in the next model step before calling revise_workflow_draft.',
+          'Do not create a second full graph, revise another draft, save a workflow, or run a workflow. If the evidence is insufficient for one exact revision, explain that and make no tool call.',
         ]
-      : mode === 'improve_run_summary'
+      : mode === 'improve_run_proposal'
         ? [
-            `The durable improvement journey for source run ${sourceRunId ?? 'unknown'} has finished its action stages.`,
-            'Use the recorded comparison and success-criteria evidence to state whether the revision improved, regressed, remained unchanged, or was inconclusive.',
-            'Do not claim semantic quality beyond the declared criteria and recorded evidence. Briefly offer another revision when the result is not clearly improved.',
-            'This is a text-only summary; do not emit tool-call syntax.',
+            `The user explicitly started one complete improvement journey for source run ${sourceRunId ?? 'unknown'}.`,
+            'Inspect the saved workflow and exact component definitions, then propose only the smallest evidence-supported ID-based edit. Include the exact sourceRunId in propose_workflow_edits.',
+            'If the inspected workflow has no success criteria and its exact component contracts or run evidence justify a concrete output or finding-count check, include set_success_criteria in the reviewed proposal.',
+            'Success criteria must measure observable workflow outcomes; never invent a node output path or threshold. If no criterion is justified, leave the list empty and explain what evidence is missing.',
+            'Do not call apply_workflow_draft, run_workflow, or compare_runs; the durable journey performs those stages after a valid proposal and normal approval.',
+            'If neither the run evidence supports an execution change nor the exact contracts support a criterion, explain that and make no tool call.',
           ]
-        : mode === 'plan_summary'
+        : mode === 'improve_run_summary'
           ? [
-              `The durable Operator plan ${JSON.stringify(planTitle ?? 'Untitled plan')} has finished successfully.`,
-              'Summarize the useful outcome from the recorded successful plan actions, not merely that the steps completed.',
-              'Start with one concise outcome sentence, followed by at most five short bullets for important results or next actions. Omit empty or unimportant fields.',
-              'When the durable results contain exact identifiers, add relevant product-relative Markdown links using /workflows/{workflowId} or /workflows/{workflowId}/runs/{runId}. Never invent identifiers, labels, results, or URLs; omit a link if its required IDs are unavailable.',
-              'Keep the entire response under 2,000 characters. This is a text-only summary; do not emit tool-call syntax.',
+              `The durable improvement journey for source run ${sourceRunId ?? 'unknown'} has finished its action stages.`,
+              'Use the recorded comparison and success-criteria evidence to state whether the revision improved, regressed, remained unchanged, or was inconclusive.',
+              'Do not claim semantic quality beyond the declared criteria and recorded evidence. Briefly offer another revision when the result is not clearly improved.',
+              'This is a text-only summary; do not emit tool-call syntax.',
             ]
-          : mode === 'run_follow_up_summary'
+          : mode === 'plan_summary'
             ? [
-                `Workflow run ${sourceRunId ?? 'unknown'} has reached a terminal state and its bounded get_run inspection is recorded in the action evidence.`,
-                'State the actual terminal outcome first. Summarize the most important trace failures and findings, distinguishing unavailable evidence from zero results.',
-                'Use only recorded evidence; do not invent root causes or claim semantic success beyond the workflow result and declared criteria.',
-                'Add the exact product-relative workflow and run links when their IDs are present. Suggest at most three next actions using only recorded findings or artifacts and the existing run controls: Change inputs, Run again, or Improve with Operator.',
-                'Never invent an input ID, value, batch mode, workflow capability, artifact, or finding. Do not prescribe rerun arguments; direct the user to Change inputs instead.',
+                `The durable Operator plan ${JSON.stringify(planTitle ?? 'Untitled plan')} has finished successfully.`,
+                'Summarize the useful outcome from the recorded successful plan actions, not merely that the steps completed.',
+                'Start with one concise outcome sentence, followed by at most five short bullets for important results or next actions. Omit empty or unimportant fields.',
+                'When the durable results contain exact identifiers, add relevant product-relative Markdown links using /workflows/{workflowId} or /workflows/{workflowId}/runs/{runId}. Never invent identifiers, labels, results, or URLs; omit a link if its required IDs are unavailable.',
                 'Keep the entire response under 2,000 characters. This is a text-only summary; do not emit tool-call syntax.',
               ]
-            : [];
+            : mode === 'run_follow_up_summary'
+              ? [
+                  `Workflow run ${sourceRunId ?? 'unknown'} has reached a terminal state and its bounded get_run inspection is recorded in the action evidence.`,
+                  'State the actual terminal outcome first. Summarize the most important trace failures and findings, distinguishing unavailable evidence from zero results.',
+                  'Use only recorded evidence; do not invent root causes or claim semantic success beyond the workflow result and declared criteria.',
+                  'Add the exact product-relative workflow and run links when their IDs are present. Suggest at most three next actions using only recorded findings or artifacts and the existing run controls: Change inputs, Run again, or Improve with Operator.',
+                  'Never invent an input ID, value, batch mode, workflow capability, artifact, or finding. Do not prescribe rerun arguments; direct the user to Change inputs instead.',
+                  'Keep the entire response under 2,000 characters. This is a text-only summary; do not emit tool-call syntax.',
+                ]
+              : [];
   return [
     'You are the Sentris Operator. Help the user operate their existing security workflows and inspect results.',
     'Use only the provided typed commands. Never claim a command ran unless its action ledger shows success.',

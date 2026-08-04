@@ -21,6 +21,7 @@ import {
   type OperatorCommandName,
   type OperatorJourney,
   type OperatorRunObservation,
+  type OperatorWorkflowDraftResult,
 } from '@sentris/shared';
 
 import type {
@@ -42,7 +43,9 @@ import {
 } from './mcp-operation-workflow-executor';
 
 const MAX_OPERATOR_STEPS = 8;
+const MAX_AUTOMATIC_DRAFT_REPAIR_STEPS = 6;
 const MAX_IMPROVEMENT_PROPOSAL_STEPS = 6;
+const AUTOMATIC_DRAFT_REPAIR_PATCH_ID = 'operator-automatic-draft-repair-v1';
 const DEFAULT_COMPLETION = 'I could not produce a useful answer for this turn.';
 const APPROVAL_RECONCILE_INTERVAL = '5 seconds';
 const MAX_PLAN_FAILURE_DETAIL_LENGTH = 400;
@@ -404,6 +407,67 @@ async function prepareAndExecuteOperatorAction(input: {
   return { disposition: 'executed', executed };
 }
 
+const AUTOMATIC_DRAFT_REPAIR_COMMANDS = new Set<OperatorCommandName>([
+  'list_components',
+  'get_component',
+  'revise_workflow_draft',
+]);
+
+async function runAutomaticWorkflowDraftRepair(input: {
+  base: OperatorActivityInput;
+  draft: OperatorWorkflowDraftResult;
+  decisions: OperatorDecisionMap;
+  interpretActionStatus: boolean;
+  toolCallHistory: OperatorModelToolCall[];
+}): Promise<string | undefined> {
+  const inspection = await prepareAndExecuteOperatorAction({
+    base: input.base,
+    decisions: input.decisions,
+    interpretActionStatus: input.interpretActionStatus,
+    userConfirmed: true,
+    toolCall: {
+      toolCallId: `${input.base.turnId}:auto-repair:inspect:${input.draft.draftId}`,
+      commandName: 'get_workflow_draft',
+      arguments: { draftId: input.draft.draftId },
+    },
+  });
+  if (inspection.disposition === 'rejected') return undefined;
+
+  for (let repairStep = 0; repairStep < MAX_AUTOMATIC_DRAFT_REPAIR_STEPS; repairStep += 1) {
+    const modelStep = await operatorModelStepActivity({
+      ...input.base,
+      step: MAX_OPERATOR_STEPS + repairStep,
+      mode: 'workflow_draft_repair',
+      sourceDraftId: input.draft.draftId,
+      toolCallHistory: input.toolCallHistory.slice(),
+    });
+    if (modelStep.toolCalls.length === 0) return undefined;
+    input.toolCallHistory.push(...modelStep.toolCalls);
+
+    for (const toolCall of modelStep.toolCalls) {
+      if (!AUTOMATIC_DRAFT_REPAIR_COMMANDS.has(toolCall.commandName)) return undefined;
+      const isRevision = toolCall.commandName === 'revise_workflow_draft';
+      if (isRevision && toolCall.arguments.draftId !== input.draft.draftId) return undefined;
+
+      const outcome = await prepareAndExecuteOperatorAction({
+        base: input.base,
+        toolCall,
+        decisions: input.decisions,
+        interpretActionStatus: input.interpretActionStatus,
+      });
+      if (!isRevision) continue;
+      if (outcome.disposition === 'rejected') return undefined;
+
+      const result = outcome.disposition === 'executed' ? outcome.executed.result : outcome.result;
+      const revised = OperatorWorkflowDraftResultSchema.safeParse(result);
+      if (!revised.success || revised.data.parentDraftId !== input.draft.draftId) return undefined;
+      return getStructuredActionCompletionMessage(revised.data);
+    }
+  }
+
+  return undefined;
+}
+
 async function runImproveRunJourney(input: {
   base: OperatorActivityInput;
   journey: Extract<OperatorJourney, { kind: 'improve_run' }>;
@@ -761,6 +825,7 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
   const actionStatusOutcomes = patched('operator-action-status-outcome-v1');
   const compactStructuredCompletions = patched('operator-compact-structured-completions-v1');
   const compactControlCompletions = patched('operator-compact-control-completions-v1');
+  const automaticDraftRepair = patched(AUTOMATIC_DRAFT_REPAIR_PATCH_ID);
   const decisions = new Map<string, OperatorActionDecisionUpdate>();
 
   // Updates can arrive before the workflow reaches its approval wait. Retain the latest
@@ -848,6 +913,8 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
       let reusedCompletedAction = false;
       let structuredCompletionMessage: string | undefined;
       let controlCompletionMessage: string | undefined;
+      let invalidDraftToRepair: OperatorWorkflowDraftResult | undefined;
+      let validDraftProduced = false;
       for (const toolCall of modelStep.toolCalls) {
         const outcome = await prepareAndExecuteOperatorAction({
           base,
@@ -859,6 +926,11 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
         if (outcome.disposition === 'already_completed') {
           reusedCompletedAction = true;
           structuredCompletionMessage ??= getStructuredActionCompletionMessage(outcome.result);
+          const draft = OperatorWorkflowDraftResultSchema.safeParse(outcome.result);
+          if (draft.success) {
+            if (draft.data.validation.valid) validDraftProduced = true;
+            else invalidDraftToRepair ??= draft.data;
+          }
           controlCompletionMessage ??= getControlActionCompletionMessage({
             commandName: toolCall.commandName,
             result: outcome.result,
@@ -870,6 +942,11 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
         const executed = outcome.executed;
         executedAction = true;
         structuredCompletionMessage ??= getStructuredActionCompletionMessage(executed.result);
+        const draft = OperatorWorkflowDraftResultSchema.safeParse(executed.result);
+        if (draft.success) {
+          if (draft.data.validation.valid) validDraftProduced = true;
+          else invalidDraftToRepair ??= draft.data;
+        }
         controlCompletionMessage ??= getControlActionCompletionMessage({
           commandName: toolCall.commandName,
           result: executed.result,
@@ -901,6 +978,24 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
             );
           }
         }
+      }
+
+      if (automaticDraftRepair && invalidDraftToRepair && !validDraftProduced) {
+        const repairCompletion = await runAutomaticWorkflowDraftRepair({
+          base,
+          draft: invalidDraftToRepair,
+          decisions,
+          interpretActionStatus: actionStatusOutcomes,
+          toolCallHistory,
+        });
+        await shortActivities.operatorCompleteTurnActivity({
+          ...base,
+          message:
+            repairCompletion ??
+            'Workflow draft needs revision. Review the validation errors shown in the card.',
+        });
+        await condition(allHandlersFinished);
+        return;
       }
 
       const compactCompletionMessage =

@@ -367,7 +367,11 @@ registry-backed, new-workflow proposals use credential-safe bounded graphs, and 
 proposals use bounded operations keyed by stable node and edge IDs. The backend materializes
 those operations against the exact immutable base; both paths share compile validation and a
 graph diff, and apply is a separate consequential action using proposal-ID idempotency plus an
-exact base-version fence. The Builder may hydrate a proposal only as an unsaved draft and restores
+exact base-version fence. A compile-invalid proposal in a new turn may use one patch-gated repair
+pass through the same action ledger: exact failed-draft inspection, component reads, and at most
+one ID-based revision. It never saves or runs automatically; unresolved repairs keep the manual
+revision fallback and pre-patch histories keep their original path. The Builder may hydrate a
+proposal only as an unsaved draft and restores
 credential placeholders from the freshly fetched persisted graph. Turn records snapshot the
 initiating actor roles so delayed authoring keeps the user's workflow authority. Provider-native
 tool-call continuation metadata lives in the Temporal turn history; Postgres action rows remain

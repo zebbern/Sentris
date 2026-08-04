@@ -237,6 +237,55 @@ describe('Operator activities', () => {
     );
   });
 
+  test('restricts automatic draft repair to component reads and one revision command', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        session: {
+          id: SESSION_ID,
+          title: 'Session',
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+          approvalMode: 'ask',
+          status: 'active',
+          model: {
+            provider: 'openai',
+            modelId: 'gpt-test',
+            apiKeySecretId: SECRET_ID,
+            baseUrl: null,
+          },
+          createdAt: '2026-08-02T00:00:00.000Z',
+          updatedAt: '2026-08-02T00:00:00.000Z',
+        },
+        turn: {
+          id: TURN_ID,
+          sessionId: SESSION_ID,
+          status: 'running',
+          context: { path: '/operator' },
+        },
+        messages: [{ role: 'user', content: 'Create a subdomain workflow' }],
+        actions: [],
+      }),
+    );
+    generateTextImpl.mockResolvedValue({ text: '', finishReason: 'stop', toolCalls: [] });
+
+    await activities.operatorModelStepActivity({
+      ...base,
+      step: 8,
+      mode: 'workflow_draft_repair',
+      sourceDraftId: ACTION_ID,
+    });
+
+    const request = generateTextImpl.mock.calls[0]?.[0];
+    expect(Object.keys(request?.tools ?? {}).sort()).toEqual([
+      'get_component',
+      'list_components',
+      'revise_workflow_draft',
+    ]);
+    expect(String(request?.system)).toContain(`Workflow draft ${ACTION_ID} failed`);
+    expect(String(request?.system)).toContain('call revise_workflow_draft exactly once');
+    expect(String(request?.system)).toContain('Do not create a second full graph');
+  });
+
   test('recovers a provider-declared tool generation error with a text-only diagnosis', async () => {
     fetchImpl.mockResolvedValueOnce(
       jsonResponse({

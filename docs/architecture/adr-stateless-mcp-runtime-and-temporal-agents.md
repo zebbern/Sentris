@@ -198,8 +198,13 @@ semantics. Both proposal forms use
 the same credential restoration, compilation, validation, and graph-diff path without
 mutating a workflow. Applying either is a separate consequential action: the proposal action
 ID is the workflow-mutation idempotency key, updates fence on the exact immutable base
-version, and the canonical create/update transaction returns the saved version. Durable
-turns snapshot the initiating actor roles so delayed execution keeps the user's workflow
+version, and the canonical create/update transaction returns the saved version. New-history
+turns that produce a compile-invalid draft make one patch-gated repair pass through this same
+ledger: they durably inspect the exact failed draft, allow only component-catalog reads, and
+execute at most one ID-based `revise_workflow_draft`. The pass never saves or runs a workflow;
+an invalid or unavailable repair retains the normal manual revision fallback, and pre-patch
+histories keep their original completion path. Durable turns snapshot the initiating actor roles
+so delayed execution keeps the user's workflow
 authority. The frontend can apply the materialized proposal directly or hydrate it into the
 Builder as an unsaved draft; update placeholders are materialized only from the freshly
 fetched persisted base graph.
