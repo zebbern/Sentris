@@ -83,10 +83,14 @@ export function operatorSessionHasActiveTurn(
   if (!latestTurn) return false;
   if (!ACTIVE_TURN_STATUSES.has(latestTurn.status)) return false;
   const activityLatestTurn = activitySummary?.latestTurn;
-  if (activityLatestTurn?.id === latestTurn.id) {
-    return ACTIVE_TURN_STATUSES.has(activityLatestTurn.status);
+  if (activitySummary && activityLatestTurn?.id === latestTurn.id) {
+    return operatorSessionSummaryHasActiveTurn(activitySummary);
   }
   return true;
+}
+
+export function operatorSessionSummaryHasActiveTurn(session: OperatorSessionSummary): boolean {
+  return Boolean(session.latestTurn && ACTIVE_TURN_STATUSES.has(session.latestTurn.status));
 }
 
 export function getOperatorSessionLatestTurnError(session: OperatorSessionDetail): string | null {
@@ -557,6 +561,19 @@ export function useUpdateOperatorSession() {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.operator.session(variables.sessionId),
       });
+    },
+  });
+}
+
+export function useDeleteOperatorSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sessionId: string) => api.operator.deleteSession(sessionId),
+    meta: { suppressGlobalError: true },
+    onSuccess: (_result, sessionId) => {
+      queryClient.removeQueries({ queryKey: queryKeys.operator.session(sessionId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.operator.sessions() });
     },
   });
 }

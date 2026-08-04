@@ -140,6 +140,25 @@ describe('notificationStore', () => {
     expect(useNotificationStore.getState().notifications).toHaveLength(1);
   });
 
+  it('dismissOperatorSession() removes only notifications for the deleted chat', () => {
+    useNotificationStore.getState().push({
+      title: 'Deleted chat',
+      variant: 'success',
+      sessionId: 'session-1',
+    });
+    useNotificationStore.getState().push({
+      title: 'Other chat',
+      variant: 'success',
+      sessionId: 'session-2',
+    });
+
+    useNotificationStore.getState().dismissOperatorSession('session-1');
+
+    expect(useNotificationStore.getState().notifications.map((item) => item.sessionId)).toEqual([
+      'session-2',
+    ]);
+  });
+
   // --- clearAll() ---
 
   it('clearAll() resets notifications to an empty array', () => {

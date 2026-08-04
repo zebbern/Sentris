@@ -194,6 +194,16 @@ export class OperatorService {
     return this.toSessionSummary(updated, latestTurn ?? null, latestTurnActions);
   }
 
+  async deleteSession(auth: AuthContext | null, sessionId: string): Promise<void> {
+    const user = this.requireUserAuth(auth);
+    const deleted = await this.repository.deleteSession({
+      sessionId,
+      owner: { organizationId: user.organizationId, userId: user.userId },
+      auth: user,
+    });
+    if (!deleted) throw new NotFoundException('Operator session not found');
+  }
+
   async createTurn(
     auth: AuthContext | null,
     sessionId: string,

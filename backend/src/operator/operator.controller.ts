@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -9,7 +10,7 @@ import {
   Post,
   Res,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { ZodValidationPipe } from 'nestjs-zod';
 
@@ -132,6 +133,17 @@ export class OperatorController {
     @Body(new ZodValidationPipe(OperatorUpdateSessionSchema)) body: UpdateOperatorSessionDto,
   ): Promise<OperatorSessionSummary> {
     return this.operatorService.updateSession(auth, params.id, body);
+  }
+
+  @Delete('sessions/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete an Operator session owned by the current user' })
+  @ApiNoContentResponse({ description: 'Operator session deleted successfully' })
+  async deleteSession(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param(new ZodValidationPipe(OperatorIdParamSchema)) params: OperatorIdParamDto,
+  ): Promise<void> {
+    await this.operatorService.deleteSession(auth, params.id);
   }
 
   @Post('sessions/:id/turns')

@@ -13,7 +13,7 @@ import type {
   OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
 
-import { API_V1_URL, getAuthHeaders, httpGet, httpPatch, httpPost } from './client';
+import { API_V1_URL, getAuthHeaders, httpDel, httpGet, httpPatch, httpPost } from './client';
 
 const sessionPath = (sessionId: string) => `/operator/sessions/${encodeURIComponent(sessionId)}`;
 
@@ -53,6 +53,8 @@ export const operatorApi = {
 
   updateSession: (sessionId: string, input: OperatorUpdateSession) =>
     httpPatch<OperatorSessionSummary>(sessionPath(sessionId), input),
+
+  deleteSession: (sessionId: string) => httpDel(sessionPath(sessionId)),
 
   createTurn: (sessionId: string, input: OperatorCreateTurn) =>
     httpPost<OperatorTurnAccepted>(`${sessionPath(sessionId)}/turns`, input),

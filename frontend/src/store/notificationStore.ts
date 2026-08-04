@@ -21,6 +21,7 @@ interface NotificationStoreState {
   push: (item: Omit<NotificationItem, 'id' | 'timestamp' | 'read'>) => void;
   markRead: (id: string) => void;
   markOperatorSessionRead: (sessionId: string) => void;
+  dismissOperatorSession: (sessionId: string) => void;
   markAllRead: () => void;
   dismiss: (id: string) => void;
   clearAll: () => void;
@@ -54,6 +55,13 @@ export const useNotificationStore = create<NotificationStoreState>()(
             notification.sessionId === sessionId && !notification.read
               ? { ...notification, read: true }
               : notification,
+          ),
+        })),
+
+      dismissOperatorSession: (sessionId) =>
+        set((state) => ({
+          notifications: state.notifications.filter(
+            (notification) => notification.sessionId !== sessionId,
           ),
         })),
 

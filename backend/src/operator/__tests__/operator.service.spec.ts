@@ -105,6 +105,7 @@ describe('OperatorService', () => {
   beforeEach(() => {
     repository = {
       createSession: vi.fn().mockResolvedValue(sessionRecord()),
+      deleteSession: vi.fn().mockResolvedValue(sessionRecord()),
       findSession: vi.fn().mockResolvedValue(sessionRecord()),
       createTurn: vi
         .fn()
@@ -293,6 +294,16 @@ describe('OperatorService', () => {
         auth,
       }),
     );
+  });
+
+  it('deletes only within the authenticated user owner scope', async () => {
+    await service.deleteSession(auth, SESSION_ID);
+
+    expect(repository.deleteSession).toHaveBeenCalledWith({
+      sessionId: SESSION_ID,
+      owner: { organizationId: 'operator-org', userId: 'operator-user' },
+      auth,
+    });
   });
 
   it('keeps legacy route-only turn rows readable in the public session projection', async () => {

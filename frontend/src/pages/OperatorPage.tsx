@@ -18,11 +18,13 @@ import {
   Send,
   Settings2,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,13 +45,16 @@ import {
   type OperatorModelDraft,
 } from '@/features/operator/operatorModelDraft';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import {
   getOperatorSessionLatestTurnError,
   operatorSessionHasActiveTurn,
+  operatorSessionSummaryHasActiveTurn,
   useCreateOperatorSession,
   useCreateOperatorTurn,
   useCancelOperatorTurn,
   useDecideOperatorAction,
+  useDeleteOperatorSession,
   useOperatorSessionStream,
   useOperatorSessions,
   useOperatorWorkflowDrafts,
@@ -79,16 +84,60 @@ function formatUpdatedAt(value: string): string {
   }
 }
 
+function DeleteSessionButton({
+  session,
+  deletingSessionId,
+  onDeleteSession,
+  className,
+  iconClassName,
+}: {
+  session: OperatorSessionSummary;
+  deletingSessionId: string | null;
+  onDeleteSession: (session: OperatorSessionSummary) => void;
+  className: string;
+  iconClassName: string;
+}) {
+  const hasActiveTurn = operatorSessionSummaryHasActiveTurn(session);
+  const isDeleting = deletingSessionId === session.id;
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className={className}
+      aria-label={`Delete chat: ${session.title}`}
+      title={
+        hasActiveTurn
+          ? 'Stop or wait for the active turn before deleting this chat'
+          : `Delete ${session.title}`
+      }
+      disabled={deletingSessionId !== null}
+      onClick={() => onDeleteSession(session)}
+    >
+      {isDeleting ? (
+        <Loader2 className={cn(iconClassName, 'animate-spin')} />
+      ) : (
+        <Trash2 className={iconClassName} />
+      )}
+    </Button>
+  );
+}
+
 function SessionRail({
   sessionId,
   sessions,
   isLoading,
   unreadSessionIds,
+  deletingSessionId,
+  onDeleteSession,
 }: {
   sessionId?: string;
   sessions: ReturnType<typeof useOperatorSessions>['data'];
   isLoading: boolean;
   unreadSessionIds: ReadonlySet<string>;
+  deletingSessionId: string | null;
+  onDeleteSession: (session: OperatorSessionSummary) => void;
 }) {
   return (
     <aside className="hidden w-56 shrink-0 flex-col border-r border-border/70 bg-app-chrome/35 md:flex lg:w-64">
@@ -111,30 +160,42 @@ function SessionRail({
             Your Operator conversations will appear here.
           </p>
         ) : null}
-        {sessions?.map((session) => (
-          <Link
-            key={session.id}
-            to={`/operator/${session.id}`}
-            aria-current={session.id === sessionId ? 'page' : undefined}
-            aria-label={`${session.title}${unreadSessionIds.has(session.id) ? ', unread activity' : ''}`}
-            className={cn(
-              'block rounded-md border border-transparent px-2.5 py-2 transition-colors',
-              session.id === sessionId
-                ? 'border-primary/25 bg-primary/10 text-foreground'
-                : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-            )}
-          >
-            <span className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-xs font-medium">{session.title}</span>
-              {unreadSessionIds.has(session.id) ? (
-                <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
-              ) : null}
-            </span>
-            <span className="mt-1 block text-[10px] text-muted-foreground">
-              {formatUpdatedAt(session.updatedAt)}
-            </span>
-          </Link>
-        ))}
+        {sessions?.map((session) => {
+          return (
+            <div key={session.id} className="group relative">
+              <Link
+                to={`/operator/${session.id}`}
+                aria-current={session.id === sessionId ? 'page' : undefined}
+                aria-label={`${session.title}${unreadSessionIds.has(session.id) ? ', unread activity' : ''}`}
+                className={cn(
+                  'block rounded-md border border-transparent px-2.5 py-2 pr-9 transition-colors',
+                  session.id === sessionId
+                    ? 'border-primary/25 bg-primary/10 text-foreground'
+                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                    {session.title}
+                  </span>
+                  {unreadSessionIds.has(session.id) ? (
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                  ) : null}
+                </span>
+                <span className="mt-1 block text-[10px] text-muted-foreground">
+                  {formatUpdatedAt(session.updatedAt)}
+                </span>
+              </Link>
+              <DeleteSessionButton
+                session={session}
+                deletingSessionId={deletingSessionId}
+                onDeleteSession={onDeleteSession}
+                className="absolute right-1.5 top-1.5 h-6 w-6 text-muted-foreground opacity-0 hover:text-destructive group-hover:opacity-100 group-focus-within:opacity-100"
+                iconClassName="h-3.5 w-3.5"
+              />
+            </div>
+          );
+        })}
       </nav>
     </aside>
   );
@@ -144,16 +205,21 @@ function MobileSessionPicker({
   sessionId,
   sessions,
   unreadSessionIds,
+  deletingSessionId,
+  onDeleteSession,
 }: {
   sessionId?: string;
   sessions: ReturnType<typeof useOperatorSessions>['data'];
   unreadSessionIds: ReadonlySet<string>;
+  deletingSessionId: string | null;
+  onDeleteSession: (session: OperatorSessionSummary) => void;
 }) {
   const navigate = useNavigate();
+  const selectedSession = sessions?.find((session) => session.id === sessionId);
 
   return (
-    <div className="border-b border-border/60 p-2 md:hidden">
-      <label className="relative block">
+    <div className="flex gap-1.5 border-b border-border/60 p-2 md:hidden">
+      <label className="relative min-w-0 flex-1">
         <span className="sr-only">Operator session</span>
         <select
           className="h-9 w-full appearance-none rounded-md border border-input bg-background px-3 pr-8 text-xs outline-none focus:ring-2 focus:ring-ring"
@@ -173,6 +239,15 @@ function MobileSessionPicker({
         </select>
         <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       </label>
+      {selectedSession ? (
+        <DeleteSessionButton
+          session={selectedSession}
+          deletingSessionId={deletingSessionId}
+          onDeleteSession={onDeleteSession}
+          className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+          iconClassName="h-4 w-4"
+        />
+      ) : null}
     </div>
   );
 }
@@ -578,8 +653,12 @@ export function OperatorPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  const { confirm, dialogProps } = useConfirmDialog();
+  const deleteSession = useDeleteOperatorSession();
   const notifications = useNotificationStore((state) => state.notifications);
   const markOperatorSessionRead = useNotificationStore((state) => state.markOperatorSessionRead);
+  const dismissOperatorSession = useNotificationStore((state) => state.dismissOperatorSession);
   const revisionDraftId = searchParams.get('reviseDraftId');
   const revisionHandoff = useMemo(() => {
     if (!sessionId || !revisionDraftId) return null;
@@ -608,6 +687,55 @@ export function OperatorPage() {
       ),
     [notifications],
   );
+  const deletingSessionId = deleteSession.isPending ? (deleteSession.variables ?? null) : null;
+
+  const handleDeleteSession = useCallback(
+    (session: OperatorSessionSummary) => {
+      if (deleteSession.isPending) return;
+      if (operatorSessionSummaryHasActiveTurn(session)) {
+        toast({
+          title: 'This chat still has an active turn',
+          description: 'Stop it or wait for it to finish, then delete the chat.',
+        });
+        return;
+      }
+      void (async () => {
+        const confirmed = await confirm({
+          title: 'Delete chat?',
+          description: `Delete “${session.title}” and its Operator messages permanently? Workflow runs and other resources created from this chat will be kept.`,
+          confirmLabel: 'Delete chat',
+        });
+        if (!confirmed) return;
+
+        try {
+          await deleteSession.mutateAsync(session.id);
+          dismissOperatorSession(session.id);
+          if (session.id === sessionId) {
+            const nextSession = sessionsQuery.data?.find(
+              (candidate) => candidate.id !== session.id,
+            );
+            navigate(nextSession ? `/operator/${nextSession.id}` : '/operator', { replace: true });
+          }
+          toast({ title: 'Chat deleted' });
+        } catch (error) {
+          toast({
+            title: 'Could not delete chat',
+            description: error instanceof Error ? error.message : 'Unknown error',
+            variant: 'destructive',
+          });
+        }
+      })();
+    },
+    [
+      confirm,
+      deleteSession,
+      dismissOperatorSession,
+      navigate,
+      sessionId,
+      sessionsQuery.data,
+      toast,
+    ],
+  );
 
   useEffect(() => {
     if (sessionId) markOperatorSessionRead(sessionId);
@@ -632,6 +760,8 @@ export function OperatorPage() {
         sessions={sessionsQuery.data}
         isLoading={sessionsQuery.isLoading}
         unreadSessionIds={unreadSessionIds}
+        deletingSessionId={deletingSessionId}
+        onDeleteSession={handleDeleteSession}
       />
 
       <section className="flex min-w-0 flex-1 flex-col" aria-busy={sessionQuery.isFetching}>
@@ -639,6 +769,8 @@ export function OperatorPage() {
           sessionId={sessionId}
           sessions={sessionsQuery.data}
           unreadSessionIds={unreadSessionIds}
+          deletingSessionId={deletingSessionId}
+          onDeleteSession={handleDeleteSession}
         />
 
         {!sessionId && !isResolvingHandoff ? <NewOperatorSession handoff={handoff} /> : null}
@@ -681,6 +813,7 @@ export function OperatorPage() {
           />
         ) : null}
       </section>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

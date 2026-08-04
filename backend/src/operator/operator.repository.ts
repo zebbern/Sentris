@@ -251,6 +251,56 @@ export class OperatorRepository {
     });
   }
 
+  async deleteSession(input: {
+    sessionId: string;
+    owner: { organizationId: string; userId: string };
+    auth: AuthContext;
+  }): Promise<OperatorSessionRecord | undefined> {
+    return this.db.transaction(async (tx) => {
+      const [session] = await tx
+        .select()
+        .from(operatorSessionsTable)
+        .where(
+          and(
+            eq(operatorSessionsTable.id, input.sessionId),
+            eq(operatorSessionsTable.organizationId, input.owner.organizationId),
+            eq(operatorSessionsTable.userId, input.owner.userId),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (!session) return undefined;
+
+      const [activeTurn] = await tx
+        .select({ id: operatorTurnsTable.id })
+        .from(operatorTurnsTable)
+        .where(
+          and(
+            eq(operatorTurnsTable.sessionId, session.id),
+            inArray(operatorTurnsTable.status, [...ACTIVE_OPERATOR_TURN_STATUSES]),
+          ),
+        )
+        .limit(1);
+      if (activeTurn) {
+        throw new ConflictException('Stop or wait for the active Operator turn before deleting');
+      }
+
+      const [deleted] = await tx
+        .delete(operatorSessionsTable)
+        .where(eq(operatorSessionsTable.id, session.id))
+        .returning();
+      if (!deleted) return undefined;
+
+      await this.auditLogService.recordDurableWithExecutor(tx, input.auth, {
+        action: 'operator.session.delete',
+        resourceType: 'operator_session',
+        resourceId: deleted.id,
+        resourceName: deleted.title,
+      });
+      return deleted;
+    });
+  }
+
   async listTurns(sessionId: string): Promise<OperatorTurnRecord[]> {
     return this.db
       .select()

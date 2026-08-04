@@ -78,10 +78,15 @@ function chainable(rows: unknown[], calls: QueryCall[], query: number) {
   return self;
 }
 
-function repositoryWithSelects(selectResults: unknown[][], insertResults: unknown[][] = []) {
+function repositoryWithSelects(
+  selectResults: unknown[][],
+  insertResults: unknown[][] = [],
+  deleteResults: unknown[][] = [],
+) {
   const calls: QueryCall[] = [];
   let query = 0;
   let insert = 0;
+  let deletion = 0;
   const tx = {
     select: mock(() => {
       const current = query++;
@@ -89,6 +94,7 @@ function repositoryWithSelects(selectResults: unknown[][], insertResults: unknow
     }),
     insert: mock(() => chainable(insertResults[insert++] ?? [], calls, query++)),
     update: mock(() => chainable([], calls, query++)),
+    delete: mock(() => chainable(deleteResults[deletion++] ?? [], calls, query++)),
   };
   const db = {
     transaction: mock(async (handler: (executor: typeof tx) => Promise<unknown>) => handler(tx)),
@@ -98,6 +104,7 @@ function repositoryWithSelects(selectResults: unknown[][], insertResults: unknow
     repository: new OperatorRepository(db as never, audit as unknown as AuditLogService),
     tx,
     calls,
+    audit,
   };
 }
 
@@ -150,6 +157,61 @@ function createActionInput(argumentsValue: Record<string, unknown>) {
     auth,
   };
 }
+
+describe('OperatorRepository.deleteSession', () => {
+  it('locks and deletes an owned session with no active turn', async () => {
+    const { repository, tx, calls, audit } = repositoryWithSelects(
+      [[session], []],
+      [],
+      [[session]],
+    );
+
+    await expect(
+      repository.deleteSession({
+        sessionId: SESSION_ID,
+        owner: { organizationId: auth.organizationId!, userId: auth.userId! },
+        auth,
+      }),
+    ).resolves.toEqual(session);
+
+    expect(calls.find((call) => call.query === 0 && call.method === 'for')?.args).toEqual([
+      'update',
+    ]);
+    expect(tx.delete).toHaveBeenCalledTimes(1);
+    expect(audit.recordDurableWithExecutor).toHaveBeenCalledWith(tx, auth, {
+      action: 'operator.session.delete',
+      resourceType: 'operator_session',
+      resourceId: SESSION_ID,
+      resourceName: 'Session',
+    });
+  });
+
+  it('rejects deletion while a durable turn is active', async () => {
+    const { repository, tx } = repositoryWithSelects([[session], [{ id: ACTIVE_TURN_ID }]]);
+
+    await expect(
+      repository.deleteSession({
+        sessionId: SESSION_ID,
+        owner: { organizationId: auth.organizationId!, userId: auth.userId! },
+        auth,
+      }),
+    ).rejects.toThrow('Stop or wait for the active Operator turn before deleting');
+    expect(tx.delete).not.toHaveBeenCalled();
+  });
+
+  it('does not delete a session outside the requested owner scope', async () => {
+    const { repository, tx } = repositoryWithSelects([[]]);
+
+    await expect(
+      repository.deleteSession({
+        sessionId: SESSION_ID,
+        owner: { organizationId: 'another-org', userId: 'another-user' },
+        auth,
+      }),
+    ).resolves.toBeUndefined();
+    expect(tx.delete).not.toHaveBeenCalled();
+  });
+});
 
 describe('OperatorRepository.createTurn', () => {
   it('locks the session before rejecting a distinct active turn', async () => {

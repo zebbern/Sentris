@@ -3242,7 +3242,8 @@ export interface paths {
     get: operations['OperatorController_getSession'];
     put?: never;
     post?: never;
-    delete?: never;
+    /** Delete an Operator session owned by the current user */
+    delete: operations['OperatorController_deleteSession'];
     options?: never;
     head?: never;
     /** Update an Operator session mode or model */
@@ -12235,6 +12236,26 @@ export interface operations {
     requestBody?: never;
     responses: {
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  OperatorController_deleteSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operator session deleted successfully */
+      204: {
         headers: {
           [name: string]: unknown;
         };
