@@ -4,6 +4,7 @@ import { BarChart3 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useFindingsStatsQuery } from '@/hooks/queries/useFindingsQueries';
+import { getSeverityColor } from '@/lib/severityStyles';
 import type { FindingsStatsParams } from '@/services/api/findings';
 import { buildSeverityChartData } from './severityChartData';
 
@@ -12,19 +13,6 @@ import { buildSeverityChartData } from './severityChartData';
 // ---------------------------------------------------------------------------
 
 type SeverityChartProps = FindingsStatsParams;
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: '#ef4444',
-  high: '#f97316',
-  medium: '#eab308',
-  low: '#3b82f6',
-  info: '#6b7280',
-  none: '#94a3b8',
-};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -85,7 +73,7 @@ export function SeverityChart(props: SeverityChartProps) {
           />
           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
             {chartData.map((entry) => (
-              <Cell key={entry.key} fill={SEVERITY_COLORS[entry.key] ?? '#6b7280'} />
+              <Cell key={entry.key} fill={getSeverityColor(entry.key)} />
             ))}
           </Bar>
         </BarChart>

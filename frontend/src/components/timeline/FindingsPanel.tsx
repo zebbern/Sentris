@@ -3,6 +3,7 @@ import { Loader2, Download, FileSpreadsheet, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useExecutionNodeIO } from '@/hooks/queries/useExecutionQueries';
+import { getSeverityBadgeClass } from '@/lib/severityStyles';
 import { cn } from '@/lib/utils';
 import {
   normalizeAllFindings,
@@ -17,22 +18,6 @@ import {
 // ---------------------------------------------------------------------------
 
 const SEVERITY_LABELS: FindingSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
-
-const SEVERITY_BADGE_CLASSES: Record<FindingSeverity, string> = {
-  critical: 'bg-red-700 text-white',
-  high: 'bg-orange-700 text-white',
-  medium: 'bg-yellow-500 text-black',
-  low: 'bg-blue-700 text-white',
-  info: 'bg-gray-600 text-white',
-};
-
-const SEVERITY_EMOJI: Record<FindingSeverity, string> = {
-  critical: '🔴',
-  high: '🟠',
-  medium: '🟡',
-  low: '🔵',
-  info: '⚪',
-};
 
 /** Maximum number of rows rendered in the findings table to prevent jank. */
 const FINDINGS_DISPLAY_LIMIT = 500;
@@ -301,10 +286,10 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
                   <span
                     className={cn(
                       'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold capitalize',
-                      SEVERITY_BADGE_CLASSES[f.severity],
+                      getSeverityBadgeClass(f.severity),
                     )}
                   >
-                    {SEVERITY_EMOJI[f.severity]} {f.severity}
+                    {f.severity}
                   </span>
                 </td>
                 <td className="px-3 py-1.5 text-muted-foreground capitalize">{f.type}</td>

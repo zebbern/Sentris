@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { SeverityBadge } from '@/features/findings/SeverityBadge';
+import { getSeverityBackgroundClass, SEVERITY_ORDER } from '@/lib/severityStyles';
 import { formatStartTime } from '@/utils/timeFormat';
 import { formatStatusText, getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
 import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
@@ -21,17 +22,6 @@ import type { FindingItem } from '@/services/api/findings';
 import type { HumanInputRequest } from '@/components/workflow/HumanInputResolutionView';
 import type { WorkflowSchedule } from '@sentris/shared';
 import type { DashboardSectionLoading } from '@/hooks/queries/useDashboardQueries';
-
-const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'] as const;
-
-const SEVERITY_BAR_COLORS: Record<string, string> = {
-  critical: 'bg-red-500',
-  high: 'bg-orange-500',
-  medium: 'bg-yellow-500',
-  low: 'bg-blue-500',
-  info: 'bg-muted-foreground/40',
-  none: 'bg-muted-foreground/30',
-};
 
 function formatUpcomingAt(iso: string): string {
   const diff = new Date(iso).getTime() - Date.now();
@@ -271,7 +261,7 @@ export function FindingsSnapshotCard({
                   </span>
                   <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
-                      className={`h-full rounded-full ${SEVERITY_BAR_COLORS[severity] ?? 'bg-muted-foreground/40'}`}
+                      className={`h-full rounded-full ${getSeverityBackgroundClass(severity)}`}
                       style={{ width: count === 0 ? '0%' : width }}
                     />
                   </div>

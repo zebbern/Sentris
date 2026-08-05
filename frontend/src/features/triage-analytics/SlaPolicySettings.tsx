@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { useSlaPolicies, useUpsertSlaPolicies } from '@/hooks/queries/useTriageAnalyticsQueries';
-import { SEVERITY_COLORS, SEVERITY_ORDER, capitalizeFirst } from './constants';
+import { getSeverityColor, SEVERITY_ORDER, capitalizeFirst } from './constants';
 
 const MIN_HOURS = 1;
 const MAX_HOURS = 8760; // 1 year
@@ -119,7 +119,7 @@ export function SlaPolicySettings() {
             <div className="flex items-center gap-2 w-24 flex-shrink-0">
               <span
                 className="inline-block w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: SEVERITY_COLORS[policy.severity] }}
+                style={{ backgroundColor: getSeverityColor(policy.severity) }}
                 aria-hidden="true"
               />
               <label htmlFor={`sla-${policy.severity}`} className="text-sm font-medium">

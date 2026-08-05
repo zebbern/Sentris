@@ -1,18 +1,17 @@
 import { Badge } from '@/components/ui/badge';
+import { getSeverityBadgeClass } from '@/lib/severityStyles';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type BadgeVariant = 'destructive' | 'warning' | 'default' | 'secondary' | 'outline';
-
-const SEVERITY_BADGE_MAP: Record<string, { variant: BadgeVariant; label: string }> = {
-  critical: { variant: 'destructive', label: 'Critical' },
-  high: { variant: 'destructive', label: 'High' },
-  medium: { variant: 'warning', label: 'Medium' },
-  low: { variant: 'default', label: 'Low' },
-  info: { variant: 'secondary', label: 'Info' },
-  none: { variant: 'outline', label: 'None' },
+const SEVERITY_LABELS: Record<string, string> = {
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  info: 'Info',
+  none: 'None',
 };
 
 // ---------------------------------------------------------------------------
@@ -21,9 +20,9 @@ const SEVERITY_BADGE_MAP: Record<string, { variant: BadgeVariant; label: string 
 
 export function SeverityBadge({ severity }: { severity?: string }) {
   const normalised = severity?.toLowerCase() ?? 'unknown';
-  const config = SEVERITY_BADGE_MAP[normalised] ?? {
-    variant: 'outline' as BadgeVariant,
-    label: severity ?? 'Unknown',
-  };
-  return <Badge variant={config.variant}>{config.label}</Badge>;
+  return (
+    <Badge variant="outline" className={getSeverityBadgeClass(normalised)}>
+      {SEVERITY_LABELS[normalised] ?? severity ?? 'Unknown'}
+    </Badge>
+  );
 }

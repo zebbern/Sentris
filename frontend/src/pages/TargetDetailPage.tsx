@@ -22,6 +22,7 @@ import {
   buildTargetWorkflowSelectionPath,
 } from '@/lib/targetNavigation';
 import { humanizeProjectionReason } from '@/features/findings/findingDataQuality';
+import { SeverityBadge } from '@/features/findings/SeverityBadge';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { useTargetDetail } from './target-detail';
@@ -544,7 +545,7 @@ export function TargetDetailPage() {
                                 </Link>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline">{finding.severity ?? 'unknown'}</Badge>
+                                <SeverityBadge severity={finding.severity} />
                               </TableCell>
                               <TableCell>{finding.asset_key ?? '—'}</TableCell>
                               <TableCell>{finding.triage?.status ?? 'new'}</TableCell>

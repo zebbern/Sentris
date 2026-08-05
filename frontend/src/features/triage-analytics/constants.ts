@@ -1,11 +1,6 @@
-/** Severity color palette — consistent with SeverityChart.tsx */
-export const SEVERITY_COLORS: Record<string, string> = {
-  critical: '#ef4444',
-  high: '#f97316',
-  medium: '#ca8a04',
-  low: '#3b82f6',
-  info: '#6b7280',
-};
+import { getSeverityColor, SEVERITY_COLORS, SEVERITY_ORDER } from '@/lib/severityStyles';
+
+export { getSeverityColor, SEVERITY_COLORS, SEVERITY_ORDER };
 
 /** Convert #RRGGBB to rgba for low-opacity severity tints */
 export function hexToRgba(hex: string, alpha: number): string {
@@ -21,14 +16,12 @@ export function getSeverityCardTintStyle(severity: string): {
   backgroundColor: string;
   borderColor: string;
 } {
-  const color = SEVERITY_COLORS[severity] ?? SEVERITY_COLORS.info;
+  const color = getSeverityColor(severity);
   return {
     backgroundColor: hexToRgba(color, 0.1),
     borderColor: hexToRgba(color, 0.2),
   };
 }
-
-export const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'] as const;
 
 /** Triage status colors — matches app theme */
 export const STATUS_COLORS: Record<string, string> = {
