@@ -1,4 +1,5 @@
 const { spawn, spawnSync } = require('node:child_process');
+const { existsSync } = require('node:fs');
 const path = require('node:path');
 
 const DEFAULT_COMMAND_TIMEOUT_MS = 10 * 60_000;
@@ -40,9 +41,28 @@ function resolveCommandExecutable(command, options = {}) {
       : process.execPath;
   if (bunExecutable) return bunExecutable;
 
-  const packageExecutable = (options.env ?? process.env).npm_execpath;
+  const env = options.env ?? process.env;
+  const packageExecutable = env.npm_execpath;
   if (packageExecutable && /^bun(?:\.exe)?$/i.test(path.basename(packageExecutable))) {
     return packageExecutable;
+  }
+
+  const platform = options.platform ?? process.platform;
+  if (platform === 'win32') {
+    const fileExists = options.fileExists ?? existsSync;
+    const pathEntries = (env.Path ?? env.PATH ?? '').split(';');
+
+    for (const entry of pathEntries) {
+      const directory = entry.trim().replace(/^"|"$/g, '');
+      if (!directory) continue;
+
+      for (const candidate of [
+        path.join(directory, 'node_modules', 'bun', 'bin', 'bun.exe'),
+        path.join(directory, 'bun.exe'),
+      ]) {
+        if (fileExists(candidate)) return candidate;
+      }
+    }
   }
 
   return command;

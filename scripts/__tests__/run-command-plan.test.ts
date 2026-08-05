@@ -10,7 +10,12 @@ const { resolveCommandExecutable, runCommandStep } =
   commandPlanModule as typeof commandPlanModule & {
     resolveCommandExecutable: (
       command: string,
-      options?: { bunExecutable?: string | null; env?: NodeJS.ProcessEnv },
+      options?: {
+        bunExecutable?: string | null;
+        env?: NodeJS.ProcessEnv;
+        fileExists?: (path: string) => boolean;
+        platform?: NodeJS.Platform;
+      },
     ) => string;
     runCommandStep: (step: {
       command: string;
@@ -65,6 +70,22 @@ describe('command plan lifecycle', () => {
         env: { npm_execpath: packageBun },
       }),
     ).toBe('node');
+  });
+
+  it('resolves the npm Bun shim target before a later standalone Bun on Windows', () => {
+    const npmDirectory = 'C:\\tools\\npm';
+    const standaloneDirectory = 'C:\\tools\\standalone-bun';
+    const npmBun = join(npmDirectory, 'node_modules', 'bun', 'bin', 'bun.exe');
+    const standaloneBun = join(standaloneDirectory, 'bun.exe');
+
+    expect(
+      resolveCommandExecutable('bun', {
+        bunExecutable: null,
+        env: { Path: `${npmDirectory};${standaloneDirectory}` },
+        fileExists: (candidate) => candidate === npmBun || candidate === standaloneBun,
+        platform: 'win32',
+      }),
+    ).toBe(npmBun);
   });
 
   it('times out a command and terminates its descendant process tree', async () => {
