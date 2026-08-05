@@ -8,7 +8,7 @@
     "start": "bun run migration:run && bun run build && bun run build/main.js",
     "start:prod": "bun run migration:run && bun run build/main.js",
     "build": "bun scripts/build-app.ts",
-    "test": "bun test",
+    "test": "node ../scripts/test-backend.js",
     "lint": "eslint . --cache --cache-location ../.cache/eslint/backend/ --cache-strategy content",
     "typecheck": "tsc --build",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",

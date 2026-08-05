@@ -513,12 +513,21 @@ describe('dev script instance runtime', () => {
     expect(createRootTestPlan({ instance: 4 })).toEqual({
       cleanupPaths: ['worker/dist'],
       commands: [
-        { command: 'bun', args: ['test', 'scripts/__tests__'] },
-        { command: 'bun', args: ['test', 'packages'] },
-        { command: 'bun', args: ['test'], cwd: 'backend' },
-        { command: 'bun', args: ['scripts/test-worker.js'] },
-        { command: 'bun', args: ['test', 'e2e-tests'] },
-        { command: 'bun', args: ['run', 'test'], cwd: 'frontend' },
+        {
+          command: 'bun',
+          args: ['test', 'scripts/__tests__'],
+          timeoutMs: 300_000,
+        },
+        { command: 'bun', args: ['test', 'packages'], timeoutMs: 300_000 },
+        {
+          command: 'bun',
+          args: ['run', 'test'],
+          cwd: 'backend',
+          timeoutMs: 600_000,
+        },
+        { command: 'bun', args: ['scripts/test-worker.js'], timeoutMs: 600_000 },
+        { command: 'bun', args: ['test', 'e2e-tests'], timeoutMs: 300_000 },
+        { command: 'bun', args: ['run', 'test'], cwd: 'frontend', timeoutMs: 300_000 },
       ],
     });
   });

@@ -535,6 +535,7 @@ describe('AgentsController', () => {
     it('continues streaming after the completed POST request closes', async () => {
       const firstPoll = deferred<AgentTracePartEntry[]>();
       (agentTraceService.list as ReturnType<typeof jest.fn>)
+        .mockResolvedValueOnce([])
         .mockImplementationOnce(() => firstPoll.promise)
         .mockResolvedValueOnce([
           makeEvent({
@@ -551,13 +552,14 @@ describe('AgentsController', () => {
       ]);
       await http.ended;
 
-      expect(agentTraceService.list).toHaveBeenCalledTimes(2);
+      expect(agentTraceService.list).toHaveBeenCalledTimes(3);
       expect(http.body()).toContain('"type":"finish"');
     });
 
     it('stops streaming when the response closes', async () => {
       const firstPoll = deferred<AgentTracePartEntry[]>();
       (agentTraceService.list as ReturnType<typeof jest.fn>)
+        .mockResolvedValueOnce([])
         .mockImplementationOnce(() => firstPoll.promise)
         .mockResolvedValueOnce([
           makeEvent({
@@ -574,7 +576,7 @@ describe('AgentsController', () => {
       ]);
       await http.ended;
 
-      expect(agentTraceService.list).toHaveBeenCalledTimes(1);
+      expect(agentTraceService.list).toHaveBeenCalledTimes(2);
     });
   });
 });

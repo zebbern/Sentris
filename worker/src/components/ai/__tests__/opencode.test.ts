@@ -159,7 +159,7 @@ describe('core.ai.opencode', () => {
       }
     ).mock.results[0].value;
     expect(volume.initialize.mock.calls[0][0]['prompt.txt']).toContain(
-      'Connected MCP tools are unavailable for this run: gateway unavailable.',
+      'Connected MCP capabilities are unavailable for this run: gateway unavailable.',
     );
   });
 

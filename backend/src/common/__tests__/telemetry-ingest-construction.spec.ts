@@ -47,7 +47,13 @@ function construct(
     case 'events':
       return new EventIngestService({} as any, config as any, outbox, healthRegistry as any);
     case 'agent-trace':
-      return new AgentTraceIngestService({} as any, config as any, outbox, healthRegistry as any);
+      return new AgentTraceIngestService(
+        {} as any,
+        {} as any,
+        config as any,
+        outbox,
+        healthRegistry as any,
+      );
     case 'node-io':
       return new NodeIOIngestService({} as any, config as any, outbox, healthRegistry as any);
     case 'logs':

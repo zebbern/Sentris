@@ -545,17 +545,21 @@ function createRootTestPlan(options = {}) {
   return {
     cleanupPaths: ['worker/dist'],
     commands: [
-      { command: 'bun', args: ['test', 'scripts/__tests__'] },
-      { command: 'bun', args: ['test', 'packages'] },
-      // Nest DI resolves @nestjs/* from the package cwd. Running `bun test backend`
-      // from the repo root can load duplicate ConfigService identities and break
-      // controller construction in HTTP contract specs.
-      { command: 'bun', args: ['test'], cwd: 'backend' },
+      { command: 'bun', args: ['test', 'scripts/__tests__'], timeoutMs: 300_000 },
+      { command: 'bun', args: ['test', 'packages'], timeoutMs: 300_000 },
+      // Backend tests use package-cwd resolution plus isolated file processes so Bun
+      // module mocks and Nest metadata cannot contaminate unrelated test files.
+      {
+        command: 'bun',
+        args: ['run', 'test'],
+        cwd: 'backend',
+        timeoutMs: 600_000,
+      },
       // Bun module mocks and imported registries are process-global. Keep worker test
       // files in isolated processes while the runner applies bounded concurrency.
-      { command: 'bun', args: ['scripts/test-worker.js'] },
-      { command: 'bun', args: ['test', 'e2e-tests'] },
-      { command: 'bun', args: ['run', 'test'], cwd: 'frontend' },
+      { command: 'bun', args: ['scripts/test-worker.js'], timeoutMs: 600_000 },
+      { command: 'bun', args: ['test', 'e2e-tests'], timeoutMs: 300_000 },
+      { command: 'bun', args: ['run', 'test'], cwd: 'frontend', timeoutMs: 300_000 },
     ],
   };
 }

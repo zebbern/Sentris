@@ -1,49 +1,21 @@
 #!/usr/bin/env node
 
-const { spawn } = require('node:child_process');
 const path = require('node:path');
 
 const { parseRunnerArgs } = require('./lib/run-command-plan');
+const { runTestFilePlan } = require('./lib/test-file-runner');
 const { collectWorkerTestFiles, createWorkerTestRuns } = require('./lib/worker-test-plan');
 
 const TEST_FILE_CONCURRENCY = 3;
 
-function runWorkerTest(run, repositoryDirectory) {
+function createWorkerTestStep(run) {
   const bunExecutable = typeof Bun === 'undefined' ? 'bun' : process.execPath;
   const testFiles = run.files.map((file) => path.posix.join('worker', file));
-  console.log(`$ bun test ${testFiles.join(' ')} (${run.label})`);
-  return new Promise((resolve) => {
-    const child = spawn(bunExecutable, ['test', ...testFiles], {
-      cwd: repositoryDirectory,
-      env: process.env,
-      stdio: 'inherit',
-      shell: false,
-    });
-    child.once('error', (error) => {
-      console.error(`${run.label}: ${error.message}`);
-      resolve(1);
-    });
-    child.once('exit', (code) => resolve(code ?? 1));
-  });
-}
-
-async function runConcurrentTestFiles(runs, repositoryDirectory) {
-  let nextRunIndex = 0;
-  let failed = false;
-  async function runTestFileWorker() {
-    while (!failed && nextRunIndex < runs.length) {
-      const run = runs[nextRunIndex];
-      nextRunIndex += 1;
-      if ((await runWorkerTest(run, repositoryDirectory)) !== 0) {
-        failed = true;
-      }
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(TEST_FILE_CONCURRENCY, runs.length) }, runTestFileWorker),
-  );
-  return failed ? 1 : 0;
+  return {
+    command: bunExecutable,
+    args: ['test', ...testFiles],
+    timeoutMs: 180_000,
+  };
 }
 
 async function main() {
@@ -63,16 +35,12 @@ async function main() {
     return 0;
   }
 
-  const concurrentRuns = runs.filter((run) => !run.serial);
-  const serialRuns = runs.filter((run) => run.serial);
-  const concurrentResult = await runConcurrentTestFiles(concurrentRuns, repositoryDirectory);
-  if (concurrentResult !== 0) return concurrentResult;
-
-  for (const run of serialRuns) {
-    const result = await runWorkerTest(run, repositoryDirectory);
-    if (result !== 0) return result;
-  }
-  return 0;
+  return runTestFilePlan({
+    runs,
+    concurrency: TEST_FILE_CONCURRENCY,
+    root: repositoryDirectory,
+    createStep: createWorkerTestStep,
+  });
 }
 
 main().then((code) => process.exit(code));

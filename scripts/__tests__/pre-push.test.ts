@@ -1,8 +1,33 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 
 import * as prePushModule from '../pre-push';
 
-const { createPrePushPlan, isTestFile, parseArgs } = prePushModule as typeof prePushModule & {
+const {
+  acquirePrePushVerification,
+  completePrePushVerification,
+  createPrePushPlan,
+  isTestFile,
+  parseArgs,
+  releasePrePushVerification,
+} = prePushModule as typeof prePushModule & {
+  acquirePrePushVerification: (options: {
+    cacheDirectory: string;
+    key: string;
+    processId?: number;
+  }) =>
+    | { status: 'acquired'; key: string; token: string; lockPath: string; receiptPath: string }
+    | { status: 'busy'; processId: number }
+    | { status: 'cached' };
+  completePrePushVerification: (guard: {
+    key: string;
+    token: string;
+    lockPath: string;
+    receiptPath: string;
+  }) => void;
+  releasePrePushVerification: (guard: { token: string; lockPath: string }) => void;
   createPrePushPlan: (files: string[]) => {
     changedFiles: string[];
     affectedDirectories: string[];
@@ -34,7 +59,11 @@ describe('pre-push planner', () => {
 
     expect(plan.affectedDirectories).toEqual(['frontend']);
     expect(plan.commands).toEqual([
-      { command: 'bun', args: ['x', 'tsc', '--build', 'frontend'] },
+      {
+        command: 'bun',
+        args: ['x', 'tsc', '--build', 'frontend'],
+        timeoutMs: 300_000,
+      },
       {
         command: 'bun',
         args: [
@@ -42,6 +71,7 @@ describe('pre-push planner', () => {
           'src/features/operator/__tests__/OperatorTimeline.test.tsx',
         ],
         cwd: 'frontend',
+        timeoutMs: 300_000,
       },
     ]);
   });
@@ -68,8 +98,12 @@ describe('pre-push planner', () => {
     ]);
 
     expect(plan.commands).toEqual([
-      { command: 'bun', args: ['run', 'typecheck:e2e'] },
-      { command: 'bun', args: ['test', 'scripts/__tests__/pre-push.test.ts'] },
+      { command: 'bun', args: ['run', 'typecheck:e2e'], timeoutMs: 300_000 },
+      {
+        command: 'bun',
+        args: ['test', 'scripts/__tests__/pre-push.test.ts'],
+        timeoutMs: 300_000,
+      },
     ]);
     expect(isTestFile('worker/src/example/__tests__/example.test.ts')).toBe(true);
     expect(isTestFile('frontend/src/example.tsx')).toBe(false);
@@ -88,5 +122,40 @@ describe('pre-push planner', () => {
     expect(plan.affectedDirectories).toContain('worker');
     expect(plan.commands).toHaveLength(1);
     expect(plan.commands[0]?.args.slice(0, 3)).toEqual(['x', 'tsc', '--build']);
+  });
+
+  it('prevents duplicate verification and reuses a completed result for the same commit', () => {
+    const cacheDirectory = mkdtempSync(join(tmpdir(), 'sentris-pre-push-'));
+
+    try {
+      const first = acquirePrePushVerification({
+        cacheDirectory,
+        key: 'commit-a',
+        processId: process.pid,
+      });
+      expect(first.status).toBe('acquired');
+      if (first.status !== 'acquired') throw new Error('Expected the first guard to be acquired');
+
+      expect(
+        acquirePrePushVerification({
+          cacheDirectory,
+          key: 'commit-a',
+          processId: process.pid,
+        }),
+      ).toEqual({ status: 'busy', processId: process.pid });
+
+      completePrePushVerification(first);
+      releasePrePushVerification(first);
+
+      expect(
+        acquirePrePushVerification({
+          cacheDirectory,
+          key: 'commit-a',
+          processId: process.pid,
+        }),
+      ).toEqual({ status: 'cached' });
+    } finally {
+      rmSync(cacheDirectory, { recursive: true, force: true });
+    }
   });
 });

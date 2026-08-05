@@ -3,11 +3,85 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { createHash, randomUUID } = require('node:crypto');
 
 const { runCommandPlan } = require('./lib/run-command-plan');
 
 const ROOT = path.resolve(__dirname, '..');
 const EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+const PRE_PUSH_STEP_TIMEOUT_MS = 300_000;
+
+function readJsonFile(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return undefined;
+  }
+}
+
+function processIsAlive(processId) {
+  try {
+    process.kill(processId, 0);
+    return true;
+  } catch (error) {
+    return error?.code === 'EPERM';
+  }
+}
+
+function acquirePrePushVerification(options) {
+  const cacheDirectory = options.cacheDirectory;
+  const processId = options.processId ?? process.pid;
+  const lockPath = path.join(cacheDirectory, 'verification.lock.json');
+  const receiptPath = path.join(cacheDirectory, 'last-success.json');
+  fs.mkdirSync(cacheDirectory, { recursive: true });
+
+  const receipt = readJsonFile(receiptPath);
+  if (receipt?.key === options.key) return { status: 'cached' };
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const token = `${processId}-${randomUUID()}`;
+    try {
+      const descriptor = fs.openSync(lockPath, 'wx');
+      try {
+        fs.writeFileSync(
+          descriptor,
+          JSON.stringify({
+            key: options.key,
+            processId,
+            token,
+            startedAt: new Date().toISOString(),
+          }),
+        );
+      } finally {
+        fs.closeSync(descriptor);
+      }
+      return { status: 'acquired', key: options.key, token, lockPath, receiptPath };
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+      const owner = readJsonFile(lockPath);
+      if (Number.isInteger(owner?.processId) && processIsAlive(owner.processId)) {
+        return { status: 'busy', processId: owner.processId };
+      }
+      fs.rmSync(lockPath, { force: true });
+    }
+  }
+
+  throw new Error('Unable to acquire the pre-push verification lock');
+}
+
+function completePrePushVerification(guard) {
+  const temporaryPath = `${guard.receiptPath}.${guard.token}.tmp`;
+  fs.writeFileSync(
+    temporaryPath,
+    JSON.stringify({ key: guard.key, completedAt: new Date().toISOString() }),
+  );
+  fs.renameSync(temporaryPath, guard.receiptPath);
+}
+
+function releasePrePushVerification(guard) {
+  const owner = readJsonFile(guard.lockPath);
+  if (owner?.token === guard.token) fs.rmSync(guard.lockPath, { force: true });
+}
 
 function toPortablePath(value) {
   return String(value).replace(/\\/g, '/').replace(/^\.\//, '');
@@ -99,11 +173,16 @@ function createPrePushPlan(changedFiles, options = {}) {
     commands.push({
       command: 'bun',
       args: ['x', 'tsc', '--build', ...affectedDirectories],
+      timeoutMs: PRE_PUSH_STEP_TIMEOUT_MS,
     });
   }
 
   if (files.some((file) => file.startsWith('e2e-tests/'))) {
-    commands.push({ command: 'bun', args: ['run', 'typecheck:e2e'] });
+    commands.push({
+      command: 'bun',
+      args: ['run', 'typecheck:e2e'],
+      timeoutMs: PRE_PUSH_STEP_TIMEOUT_MS,
+    });
   }
 
   const changedTests = files.filter(
@@ -123,23 +202,41 @@ function createPrePushPlan(changedFiles, options = {}) {
   }
 
   if (scriptTests.length > 0) {
-    commands.push({ command: 'bun', args: ['test', ...scriptTests] });
+    commands.push({
+      command: 'bun',
+      args: ['test', ...scriptTests],
+      timeoutMs: PRE_PUSH_STEP_TIMEOUT_MS,
+    });
   }
   if (frontendTests.length > 0) {
     commands.push({
       command: 'bun',
       args: ['src/test/run-tests-serial.ts', ...frontendTests],
       cwd: 'frontend',
+      timeoutMs: PRE_PUSH_STEP_TIMEOUT_MS,
     });
   }
   if (backendTests.length > 0) {
-    commands.push({ command: 'bun', args: ['test', ...backendTests], cwd: 'backend' });
+    commands.push({
+      command: 'bun',
+      args: ['test', '--force-exit', ...backendTests],
+      cwd: 'backend',
+      timeoutMs: PRE_PUSH_STEP_TIMEOUT_MS,
+    });
   }
   for (const file of workerTests) {
-    commands.push({ command: 'bun', args: ['test', file] });
+    commands.push({
+      command: 'bun',
+      args: ['test', '--force-exit', file],
+      timeoutMs: PRE_PUSH_STEP_TIMEOUT_MS,
+    });
   }
   if (packageTests.length > 0) {
-    commands.push({ command: 'bun', args: ['test', ...packageTests] });
+    commands.push({
+      command: 'bun',
+      args: ['test', '--force-exit', ...packageTests],
+      timeoutMs: PRE_PUSH_STEP_TIMEOUT_MS,
+    });
   }
 
   return { changedFiles: files, affectedDirectories, commands };
@@ -222,7 +319,7 @@ function parseArgs(argv) {
   return options;
 }
 
-function main() {
+async function main() {
   const options = parseArgs(process.argv.slice(2));
   let changedFiles;
   if (options.base && options.head) {
@@ -246,22 +343,51 @@ function main() {
   console.log(
     `[pre-push] Checking ${plan.affectedDirectories.length} affected TypeScript project(s) and changed tests only. The full suite remains a CI gate.`,
   );
-  return runCommandPlan(plan);
-}
+  const verificationHead = runGit(['rev-parse', options.head ?? 'HEAD'], { root: ROOT });
+  const verificationKey = createHash('sha256')
+    .update(JSON.stringify({ head: verificationHead, plan }))
+    .digest('hex');
+  const guard = acquirePrePushVerification({
+    cacheDirectory: path.join(ROOT, '.cache', 'pre-push'),
+    key: verificationKey,
+  });
+  if (guard.status === 'cached') {
+    console.log(`[pre-push] Reusing successful verification for ${verificationHead.slice(0, 12)}.`);
+    return 0;
+  }
+  if (guard.status === 'busy') {
+    console.error(
+      `[pre-push] Verification is already running in PID ${guard.processId}. Wait for that push to finish before retrying.`,
+    );
+    return 2;
+  }
 
-if (require.main === module) {
   try {
-    process.exit(main());
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    const result = await runCommandPlan(plan);
+    if (result === 0) completePrePushVerification(guard);
+    return result;
+  } finally {
+    releasePrePushVerification(guard);
   }
 }
 
+if (require.main === module) {
+  main().then(
+    (code) => process.exit(code),
+    (error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    },
+  );
+}
+
 module.exports = {
+  acquirePrePushVerification,
+  completePrePushVerification,
   createPrePushPlan,
   changedFilesFromPushInput,
   isTestFile,
   loadWorkspaces,
   parseArgs,
+  releasePrePushVerification,
 };

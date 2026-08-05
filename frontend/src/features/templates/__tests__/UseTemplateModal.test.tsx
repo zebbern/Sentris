@@ -366,7 +366,7 @@ describe('UseTemplateModal', () => {
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('blocks direct submission when required MCP tools are unavailable', async () => {
+  it('blocks direct submission when required MCP capabilities are unavailable', async () => {
     renderModal({ graph: mcpGraph('required') });
 
     fireEvent.submit(screen.getByRole('button', { name: 'Create & Run' }).closest('form')!);
@@ -528,7 +528,7 @@ describe('UseTemplateModal', () => {
       const readiness = screen.getByLabelText('Configuration readiness').textContent ?? '';
       expect(readiness).toContain('OpenAI · gpt-5');
       expect(readiness).toContain('Gemini · gemini-3.5-flash');
-      expect(readiness.match(/MCP tools/g)).toHaveLength(2);
+      expect(readiness.match(/MCP capabilities/g)).toHaveLength(2);
       expect(
         consoleError.mock.calls.some((call) => String(call[0]).includes('same key')),
       ).toBeFalse();
@@ -557,7 +557,7 @@ describe('UseTemplateModal', () => {
     renderModal({ graph: mcpGraph('best-effort') });
 
     expect(screen.getByLabelText('Configuration readiness').textContent).toContain(
-      'MCP tools (optional)',
+      'MCP capabilities (optional)',
     );
     expect(screen.getByText('No enabled servers.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Create & Run' })).not.toBeDisabled();
@@ -611,7 +611,7 @@ describe('UseTemplateModal', () => {
     renderModal({ graph: modelGraph() });
 
     expect(mockUseMcpServers).toHaveBeenCalledWith({ enabled: false });
-    expect(screen.queryByText('MCP tools')).toBeNull();
+    expect(screen.queryByText('MCP capabilities')).toBeNull();
   });
 
   it('shows model readiness unavailable when component metadata cannot load', () => {

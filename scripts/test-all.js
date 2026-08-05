@@ -10,7 +10,7 @@ function parseArgs(argv) {
   return parseRunnerArgs(argv, 'root test runner');
 }
 
-function main() {
+async function main() {
   let options;
   try {
     options = parseArgs(process.argv.slice(2));
@@ -31,7 +31,13 @@ function main() {
     fs.rmSync(path.join(process.cwd(), relativePath), { recursive: true, force: true });
   }
 
-  return runCommandPlan(plan);
+  return await runCommandPlan(plan);
 }
 
-process.exit(main());
+main().then(
+  (code) => process.exit(code),
+  (error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  },
+);

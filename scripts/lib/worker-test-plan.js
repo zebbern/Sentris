@@ -1,7 +1,7 @@
-const { readdirSync } = require('node:fs');
 const path = require('node:path');
 
-const TEST_FILE_PATTERN = /\.(test|spec)\.[jt]sx?$/;
+const { collectTestFiles } = require('./test-file-runner');
+
 const SERIAL_WORKER_TEST_FILES = [
   'src/mcp-runtime/__tests__/mcp-client-conformance.spec.ts',
   'src/mcp-runtime/__tests__/mcp-runtime-drivers.spec.ts',
@@ -9,26 +9,8 @@ const SERIAL_WORKER_TEST_FILES = [
   'src/temporal/workflows/__tests__/mcp-operation-update-replay.test.ts',
 ];
 
-function collectTestFiles(directory) {
-  const entries = readdirSync(directory, { withFileTypes: true }).sort((left, right) =>
-    left.name.localeCompare(right.name),
-  );
-  const files = [];
-
-  for (const entry of entries) {
-    const fullPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...collectTestFiles(fullPath));
-    } else if (entry.isFile() && TEST_FILE_PATTERN.test(entry.name)) {
-      files.push(fullPath);
-    }
-  }
-
-  return files;
-}
-
 function collectWorkerTestFiles(workerDirectory) {
-  return collectTestFiles(path.join(workerDirectory, 'src')).map((file) =>
+  return collectTestFiles([path.join(workerDirectory, 'src')]).map((file) =>
     path.relative(workerDirectory, file).split(path.sep).join(path.posix.sep),
   );
 }

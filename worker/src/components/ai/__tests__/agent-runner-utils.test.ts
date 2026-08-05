@@ -211,7 +211,7 @@ describe('agent-runner-utils', () => {
 
     expect(prompt).toContain('# Tool Availability');
     expect(prompt).toContain(
-      'Connected MCP tools are unavailable for this run: gateway unavailable.',
+      'Connected MCP capabilities are unavailable for this run: gateway unavailable.',
     );
     expect(prompt).toContain(
       'Continue with built-in capabilities and state this limitation in the final result.',

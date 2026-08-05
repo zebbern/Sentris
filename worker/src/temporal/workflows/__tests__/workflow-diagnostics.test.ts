@@ -94,6 +94,7 @@ class MockApplicationFailure extends Error {
 }
 
 class MockCancelledFailure extends Error {}
+class MockContinueAsNew extends Error {}
 const nonCancellable = vi.fn(async (callback: () => Promise<void>) => callback());
 const withTimeout = vi.fn(async (_timeout: number, callback: () => Promise<unknown>) => callback());
 const patched = vi.fn((_patchId: string) => true);
@@ -119,6 +120,7 @@ vi.mock('@temporalio/workflow', () => ({
     WAIT_CANCELLATION_COMPLETED: 'WAIT_CANCELLATION_COMPLETED',
   },
   CancellationScope: { nonCancellable, withTimeout },
+  ContinueAsNew: MockContinueAsNew,
   allHandlersFinished,
   condition,
   currentUpdateInfo: vi.fn(() =>
@@ -127,9 +129,13 @@ vi.mock('@temporalio/workflow', () => ({
   defineQuery: vi.fn((name: string) => name),
   defineSignal: vi.fn((name: string) => name),
   defineUpdate: vi.fn((name: string) => name),
+  continueAsNew: vi.fn(async (): Promise<never> => {
+    throw new MockContinueAsNew();
+  }),
   executeChild,
   getExternalWorkflowHandle: vi.fn(() => ({ cancel: vi.fn(async () => {}) })),
   isCancellation: vi.fn((error: unknown) => error instanceof MockCancelledFailure),
+  log: { info: vi.fn() },
   patched,
   ParentClosePolicy: { TERMINATE: 'TERMINATE' },
   proxyActivities,
