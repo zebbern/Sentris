@@ -738,22 +738,70 @@ interface ActionSegmentProps extends Omit<ActionEventProps, 'action' | 'embedded
   collapseCompleted: boolean;
 }
 
+function partitionRecoveredArgumentFailures(events: Extract<TimelineEvent, { kind: 'action' }>[]): {
+  primary: Extract<TimelineEvent, { kind: 'action' }>[];
+  recovered: Extract<TimelineEvent, { kind: 'action' }>[];
+} {
+  const primary: Extract<TimelineEvent, { kind: 'action' }>[] = [];
+  const recovered: Extract<TimelineEvent, { kind: 'action' }>[] = [];
+  for (const [index, event] of events.entries()) {
+    const action = event.value;
+    const validationFailure =
+      action.status === 'failed' &&
+      action.error?.startsWith(`Invalid arguments for ${action.commandName}:`);
+    const laterSuccess = events
+      .slice(index + 1)
+      .some(
+        ({ value }) => value.commandName === action.commandName && value.status === 'succeeded',
+      );
+    (validationFailure && laterSuccess ? recovered : primary).push(event);
+  }
+  return { primary, recovered };
+}
+
 function ActionSegment({ events, collapseCompleted, ...actionProps }: ActionSegmentProps) {
+  const [recoveredExpanded, setRecoveredExpanded] = useState(false);
+  const { primary, recovered } = partitionRecoveredArgumentFailures(events);
   const canCollapse =
     collapseCompleted &&
     events.every(({ value }) => value.status === 'succeeded') &&
     events.every(({ value }) => !value.runId) &&
     events.every(({ value }) => !OperatorPlanProposalResultSchema.safeParse(value.result).success);
   const actionCountLabel = `${events.length} recorded ${events.length === 1 ? 'action' : 'actions'}`;
+  const recoveredAttemptLabel = `${recovered.length} recovered ${recovered.length === 1 ? 'attempt' : 'attempts'}`;
   const content = (
-    <div
-      className="overflow-hidden rounded-2xl border border-border/70 bg-background/75 shadow-[0_10px_32px_rgba(0,0,0,0.2)]"
-      aria-label={actionCountLabel}
-    >
-      {events.map(({ value }) => (
-        <ActionEvent key={value.id} action={value} embedded {...actionProps} />
-      ))}
-    </div>
+    <>
+      <div
+        className="overflow-hidden rounded-2xl border border-border/70 bg-background/75 shadow-[0_10px_32px_rgba(0,0,0,0.2)]"
+        aria-label={actionCountLabel}
+      >
+        {primary.map(({ value }) => (
+          <ActionEvent key={value.id} action={value} embedded {...actionProps} />
+        ))}
+      </div>
+      {recovered.length > 0 ? (
+        <details className="group mt-2">
+          <summary
+            className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-border/60 bg-background/55 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/25 hover:text-foreground"
+            onClick={() => setRecoveredExpanded((expanded) => !expanded)}
+          >
+            <span className="font-medium">{recoveredAttemptLabel}</span>
+            <span className="ml-auto text-[10px]">Show attempts</span>
+            <ChevronDown
+              className="h-3.5 w-3.5 transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          {recoveredExpanded ? (
+            <div className="mt-2 overflow-hidden rounded-2xl border border-border/70 bg-background/75 shadow-[0_10px_32px_rgba(0,0,0,0.2)]">
+              {recovered.map(({ value }) => (
+                <ActionEvent key={value.id} action={value} embedded {...actionProps} />
+              ))}
+            </div>
+          ) : null}
+        </details>
+      ) : null}
+    </>
   );
 
   if (!canCollapse) return content;

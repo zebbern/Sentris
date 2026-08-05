@@ -1032,4 +1032,140 @@ describe('OperatorTimeline', () => {
       },
     });
   });
+
+  it('collapses recovered input-change argument failures behind the reviewed proposal', () => {
+    const onRunCommand = mock(() => {});
+    const sourceRunId = 'sentris-run-source';
+    const workflowId = '22222222-2222-4222-8222-222222222222';
+    const versionId = '33333333-3333-4333-8333-333333333333';
+    const inputChanges = {
+      set: [{ inputId: 'target', value: 'new.example.com' }],
+      unset: [],
+    };
+    const actions: OperatorActionView[] = [
+      {
+        ...pendingAction,
+        id: 'get-run-action',
+        commandName: 'get_run',
+        effect: 'read',
+        approvalRequired: false,
+        status: 'succeeded',
+        result: { run: { id: sourceRunId, workflowId, status: 'COMPLETED' } },
+        error: null,
+        runId: null,
+      },
+      {
+        ...pendingAction,
+        id: 'recovered-input-change-number',
+        commandName: 'propose_run_input_changes',
+        effect: 'execute',
+        approvalRequired: false,
+        status: 'failed',
+        result: null,
+        error: 'Invalid arguments for propose_run_input_changes: expected object, received number',
+        runId: null,
+      },
+      {
+        ...pendingAction,
+        id: 'recovered-input-change-enum',
+        commandName: 'propose_run_input_changes',
+        effect: 'execute',
+        approvalRequired: false,
+        status: 'failed',
+        result: null,
+        error: 'Invalid arguments for propose_run_input_changes: invalid enum value for operation',
+        runId: null,
+      },
+      {
+        ...pendingAction,
+        id: 'reviewed-input-change',
+        commandName: 'propose_run_input_changes',
+        effect: 'execute',
+        approvalRequired: false,
+        status: 'succeeded',
+        result: {
+          kind: 'run-input-proposal',
+          sourceRunId,
+          workflowId,
+          versionId,
+          sourceScopePreserved: true,
+          changes: [
+            {
+              operation: 'set',
+              inputId: 'target',
+              label: 'Target',
+              type: 'text',
+              before: 'old.example.com',
+              after: 'new.example.com',
+            },
+          ],
+          inputChanges,
+        },
+        error: null,
+        runId: null,
+      },
+    ];
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={actions}
+        isActive={false}
+        onDecision={mock(() => {})}
+        onRunCommand={onRunCommand}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getByText('Reviewed input changes')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run with changes' })).toBeInTheDocument();
+    expect(screen.getByText('2 recovered attempts')).toBeInTheDocument();
+    expect(screen.queryByText(/expected object, received number/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('2 recovered attempts'));
+    expect(screen.getByText(/expected object, received number/i)).toBeInTheDocument();
+    expect(screen.getByText(/invalid enum value/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run with changes' }));
+    expect(onRunCommand).toHaveBeenCalledWith({
+      message: `Run workflow version ${versionId} with the reviewed input changes from source run ${sourceRunId}`,
+      directCommand: {
+        commandName: 'run_workflow',
+        arguments: {
+          workflowId,
+          versionId,
+          inputs: {},
+          sourceRunId,
+          inputChanges,
+        },
+      },
+    });
+  });
+
+  it('keeps unrecovered input-change argument failures visible', () => {
+    const unrecoveredFailure: OperatorActionView = {
+      ...pendingAction,
+      id: 'unrecovered-input-change',
+      commandName: 'propose_run_input_changes',
+      effect: 'execute',
+      approvalRequired: false,
+      status: 'failed',
+      result: null,
+      error: 'Invalid arguments for propose_run_input_changes: expected object, received number',
+      runId: null,
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={[unrecoveredFailure]}
+        isActive={false}
+        onDecision={mock(() => {})}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getByText(/expected object, received number/i)).toBeInTheDocument();
+    expect(screen.queryByText(/recovered attempt/i)).not.toBeInTheDocument();
+  });
 });
