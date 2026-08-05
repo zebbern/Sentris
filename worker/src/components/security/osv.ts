@@ -566,6 +566,11 @@ const definition = defineComponent({
       cves: finding.cves,
       title: finding.summary ?? undefined,
       malicious_package_record: finding.isMaliciousPackageRecord,
+      evidence: {
+        published: finding.published,
+        modified: finding.modified,
+        references: finding.references,
+      },
     }));
 
     context.logger.info(`[OSV] Found ${findings.length} advisory finding(s)`);

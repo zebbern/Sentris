@@ -204,6 +204,16 @@ describe('OSV dependency query component', () => {
       package_name: 'lodash',
       installed_version: '4.17.20',
       fixed_versions: ['4.17.21'],
+      evidence: {
+        published: '2025-12-01T00:00:00Z',
+        modified: '2026-01-01T00:00:00Z',
+        references: [
+          {
+            type: 'ADVISORY',
+            url: 'https://nvd.nist.gov/vuln/detail/CVE-2026-12345',
+          },
+        ],
+      },
     });
   });
 
