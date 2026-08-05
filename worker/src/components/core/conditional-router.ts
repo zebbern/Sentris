@@ -15,7 +15,7 @@ const inputSchema = inputs({
     description: 'Value to evaluate',
     allowAny: true,
     reason: 'Router accepts any value type for flexible conditional branching.',
-    connectionType: { kind: 'primitive', name: 'json' },
+    connectionType: { kind: 'any' },
   }),
 });
 
@@ -25,7 +25,7 @@ const outputSchema = outputs({
     description: 'Output when condition matches',
     allowAny: true,
     reason: 'Passes through the original value unchanged.',
-    connectionType: { kind: 'primitive', name: 'json' },
+    connectionType: { kind: 'any' },
     isBranching: true,
     branchColor: 'green',
   }),
@@ -34,7 +34,7 @@ const outputSchema = outputs({
     description: 'Output when condition does not match',
     allowAny: true,
     reason: 'Passes through the original value unchanged.',
-    connectionType: { kind: 'primitive', name: 'json' },
+    connectionType: { kind: 'any' },
     isBranching: true,
     branchColor: 'red',
   }),

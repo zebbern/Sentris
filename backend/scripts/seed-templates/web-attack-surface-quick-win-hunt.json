@@ -15,8 +15,8 @@
     "category": "bug-bounty",
     "tags": ["bug-bounty", "web", "nuclei", "katana", "tls", "quick-wins"],
     "entryPoint": "trigger_1",
-    "nodeCount": 10,
-    "edgeCount": 15
+    "nodeCount": 13,
+    "edgeCount": 19
   },
   "graph": {
     "name": "Web Attack Surface Quick Win Hunt",
@@ -212,11 +212,29 @@
         }
       },
       {
-        "id": "select_tls_target",
-        "type": "core.logic.script",
+        "id": "route_tls_targets",
+        "type": "sentris.conditional-router.run",
         "position": {
           "x": 1060,
           "y": 500
+        },
+        "data": {
+          "label": "Route TLS Target Availability",
+          "config": {
+            "params": {
+              "conditionType": "is_not_empty",
+              "jsonPath": ""
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "select_tls_target",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1320,
+          "y": 420
         },
         "data": {
           "label": "Select TLS Target",
@@ -234,7 +252,36 @@
                   "type": "string"
                 }
               ],
-              "code": "export function script(input) {\n  const targets = Array.isArray(input.tlsTargets) ? input.tlsTargets : [];\n  return { tlsTarget: targets[0] || 'no-https-target-provided.invalid:443' };\n}"
+              "code": "export function script(input) {\n  const targets = Array.isArray(input.tlsTargets) ? input.tlsTargets : [];\n  if (targets.length === 0) throw new Error('TLS target route produced no target');\n  return { tlsTarget: targets[0] };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "empty_tls_findings",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1320,
+          "y": 620
+        },
+        "data": {
+          "label": "Skip TLS Review",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "tlsTargets",
+                  "type": "list-text"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "tlsFindings",
+                  "type": "list-json"
+                }
+              ],
+              "code": "export function script() { return { tlsFindings: [] }; }"
             },
             "inputOverrides": {}
           }
@@ -244,8 +291,8 @@
         "id": "testssl_review",
         "type": "sentris.testssl.run",
         "position": {
-          "x": 1380,
-          "y": 500
+          "x": 1580,
+          "y": 420
         },
         "data": {
           "label": "Review TLS Posture",
@@ -261,10 +308,46 @@
         }
       },
       {
+        "id": "merge_tls_findings",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1840,
+          "y": 500
+        },
+        "data": {
+          "label": "Finalize TLS Findings",
+          "config": {
+            "joinStrategy": "any",
+            "params": {
+              "variables": [
+                {
+                  "name": "tlsFindingsFromScan",
+                  "type": "list-json",
+                  "required": false
+                },
+                {
+                  "name": "tlsFindingsFromSkip",
+                  "type": "list-json",
+                  "required": false
+                }
+              ],
+              "returns": [
+                {
+                  "name": "tlsFindings",
+                  "type": "list-json"
+                }
+              ],
+              "code": "export function script(input) { if (Array.isArray(input.tlsFindingsFromScan)) return { tlsFindings: input.tlsFindingsFromScan }; if (Array.isArray(input.tlsFindingsFromSkip)) return { tlsFindings: input.tlsFindingsFromSkip }; throw new Error('No TLS branch produced findings'); }"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
         "id": "rank_quick_wins",
         "type": "core.logic.script",
         "position": {
-          "x": 1700,
+          "x": 2100,
           "y": 300
         },
         "data": {
@@ -309,7 +392,7 @@
         "id": "artifact_report",
         "type": "core.artifact.writer",
         "position": {
-          "x": 2020,
+          "x": 2420,
           "y": 300
         },
         "data": {
@@ -344,10 +427,24 @@
         "targetHandle": "httpResponses"
       },
       {
-        "id": "extract_live_urls-select_tls_target-tlsTargets",
+        "id": "extract_live_urls-route_tls_targets-tlsTargets",
         "source": "extract_live_urls",
-        "target": "select_tls_target",
+        "target": "route_tls_targets",
         "sourceHandle": "tlsTargets",
+        "targetHandle": "value"
+      },
+      {
+        "id": "route_tls_targets-matched-select_tls_target-tlsTargets",
+        "source": "route_tls_targets",
+        "target": "select_tls_target",
+        "sourceHandle": "matched",
+        "targetHandle": "tlsTargets"
+      },
+      {
+        "id": "route_tls_targets-unmatched-empty_tls_findings-tlsTargets",
+        "source": "route_tls_targets",
+        "target": "empty_tls_findings",
+        "sourceHandle": "unmatched",
         "targetHandle": "tlsTargets"
       },
       {
@@ -379,10 +476,24 @@
         "targetHandle": "nucleiFindings"
       },
       {
-        "id": "testssl_review-rank_quick_wins-findings",
+        "id": "testssl_review-merge_tls_findings-findings",
         "source": "testssl_review",
-        "target": "rank_quick_wins",
+        "target": "merge_tls_findings",
         "sourceHandle": "findings",
+        "targetHandle": "tlsFindingsFromScan"
+      },
+      {
+        "id": "empty_tls_findings-merge_tls_findings-findings",
+        "source": "empty_tls_findings",
+        "target": "merge_tls_findings",
+        "sourceHandle": "tlsFindings",
+        "targetHandle": "tlsFindingsFromSkip"
+      },
+      {
+        "id": "merge_tls_findings-rank_quick_wins-findings",
+        "source": "merge_tls_findings",
+        "target": "rank_quick_wins",
+        "sourceHandle": "tlsFindings",
         "targetHandle": "tlsFindings"
       },
       {

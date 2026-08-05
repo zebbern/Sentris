@@ -2571,6 +2571,64 @@ describe('new seed templates', () => {
     expect(edges).not.toContain('extract_live_urls:liveUrls->nuclei_quick_checks:targets');
   });
 
+  it('web-attack-surface-quick-win-hunt skips TLS cleanly when no HTTPS target exists', () => {
+    const template = readSeed('web-attack-surface-quick-win-hunt.json');
+    const routeNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'route_tls_targets',
+    );
+    const selectNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'select_tls_target',
+    );
+    const emptyNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'empty_tls_findings',
+    );
+    const mergeNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'merge_tls_findings',
+    );
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+
+    expect(routeNode?.type).toBe('sentris.conditional-router.run');
+    expect(routeNode.data.config.params).toMatchObject({ conditionType: 'is_not_empty' });
+    expect(selectNode.data.config.params.code).not.toContain(
+      'no-https-target-provided.invalid:443',
+    );
+    expect(() => runTemplateScript(selectNode.data.config.params.code, { tlsTargets: [] })).toThrow(
+      'TLS target route produced no target',
+    );
+    expect(
+      runTemplateScript<{ tlsFindings: object[] }>(emptyNode.data.config.params.code, {
+        tlsTargets: [],
+      }),
+    ).toEqual({
+      tlsFindings: [],
+    });
+    expect(mergeNode.data.config.joinStrategy).toBe('any');
+    expect(
+      runTemplateScript<{ tlsFindings: object[] }>(mergeNode.data.config.params.code, {
+        tlsFindingsFromSkip: [],
+      }),
+    ).toEqual({ tlsFindings: [] });
+    expect(
+      runTemplateScript<{ tlsFindings: object[] }>(mergeNode.data.config.params.code, {
+        tlsFindingsFromScan: [{ id: 'tls-1' }],
+      }),
+    ).toEqual({ tlsFindings: [{ id: 'tls-1' }] });
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'extract_live_urls:tlsTargets->route_tls_targets:value',
+        'route_tls_targets:matched->select_tls_target:tlsTargets',
+        'route_tls_targets:unmatched->empty_tls_findings:tlsTargets',
+        'testssl_review:findings->merge_tls_findings:tlsFindingsFromScan',
+        'empty_tls_findings:tlsFindings->merge_tls_findings:tlsFindingsFromSkip',
+        'merge_tls_findings:tlsFindings->rank_quick_wins:tlsFindings',
+      ]),
+    );
+    expect(edges).not.toContain('testssl_review:findings->rank_quick_wins:tlsFindings');
+  });
+
   it('web-attack-surface-quick-win-hunt filters excluded paths and caps safe-mode fanout', () => {
     const filePath = join(seedTemplatesDir, 'web-attack-surface-quick-win-hunt.json');
     const template = JSON.parse(readFileSync(filePath, 'utf8'));
