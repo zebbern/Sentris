@@ -52,6 +52,28 @@ function makeTemplate(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeRuntimeInputTemplate(
+  runtimeInputs: Record<string, unknown>[],
+  overrides: Record<string, unknown> = {},
+) {
+  return makeTemplate({
+    graph: makeValidGraph({
+      nodes: [
+        {
+          id: 'entry',
+          type: 'core.workflow.entrypoint',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Target input',
+            config: { params: { runtimeInputs }, inputOverrides: {} },
+          },
+        },
+      ],
+    }),
+    ...overrides,
+  });
+}
+
 const seedTemplateDir = join(import.meta.dir, '../../../scripts/seed-templates');
 const securityTemplateFiles = [
   'attack-surface-recon-analytics.json',
@@ -597,6 +619,186 @@ describe('TemplateService', () => {
   });
 
   // ── useTemplate ───────────────────────────────────────────────────
+
+  describe('materializeTemplateGraph', () => {
+    it('lists bounded materializable templates with exact runtime-input contracts', async () => {
+      templatesRepository.findAll.mockResolvedValue([
+        makeRuntimeInputTemplate(
+          [
+            {
+              id: 'liveUrls',
+              label: 'Live URLs',
+              type: 'array',
+              required: true,
+            },
+          ],
+          {
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            isOfficial: true,
+            isVerified: true,
+          },
+        ),
+      ]);
+
+      const result = await service.listTemplateCatalog({ search: 'website', limit: 5 });
+
+      expect(templatesRepository.findAll).toHaveBeenCalledWith({ search: 'website' });
+      expect(result).toEqual([
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          name: 'Sample Template',
+          description: 'A sample template',
+          category: 'automation',
+          tags: ['test'],
+          isOfficial: true,
+          isVerified: true,
+          nodeCount: 1,
+          edgeCount: 0,
+          componentIds: ['core.workflow.entrypoint'],
+          runtimeInputs: [
+            {
+              id: 'liveUrls',
+              label: 'Live URLs',
+              type: 'array',
+              required: true,
+              hasDefaultValue: false,
+            },
+          ],
+          requiredSecrets: [],
+        },
+      ]);
+    });
+
+    it('filters templates by exact graph components before applying the result limit', async () => {
+      templatesRepository.findAll.mockResolvedValue([
+        makeTemplate({
+          id: 'recon-template',
+          name: 'Bug Bounty Recon Triage',
+          graph: makeValidGraph({
+            nodes: [
+              {
+                id: 'entry',
+                type: 'core.workflow.entrypoint',
+                position: { x: 0, y: 0 },
+                data: { label: 'Entry', config: { params: {}, inputOverrides: {} } },
+              },
+              {
+                id: 'httpx',
+                type: 'sentris.httpx.scan',
+                position: { x: 200, y: 0 },
+                data: { label: 'HTTPX', config: { params: {}, inputOverrides: {} } },
+              },
+            ],
+          }),
+        }),
+        makeTemplate({
+          id: 'vulnerability-template',
+          name: 'Web Attack Surface Quick Win Hunt',
+          graph: makeValidGraph({
+            nodes: [
+              {
+                id: 'entry',
+                type: 'core.workflow.entrypoint',
+                position: { x: 0, y: 0 },
+                data: { label: 'Entry', config: { params: {}, inputOverrides: {} } },
+              },
+              {
+                id: 'nuclei-primary',
+                type: 'sentris.nuclei.scan',
+                position: { x: 200, y: 0 },
+                data: { label: 'Nuclei', config: { params: {}, inputOverrides: {} } },
+              },
+              {
+                id: 'nuclei-secondary',
+                type: 'sentris.nuclei.scan',
+                position: { x: 400, y: 0 },
+                data: { label: 'Nuclei follow-up', config: { params: {}, inputOverrides: {} } },
+              },
+            ],
+          }),
+        }),
+      ]);
+
+      const result = await service.listTemplateCatalog({
+        requiredComponentIds: ['sentris.nuclei.scan'],
+        limit: 1,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('vulnerability-template');
+      expect(result[0]?.componentIds).toEqual(['core.workflow.entrypoint', 'sentris.nuclei.scan']);
+    });
+
+    it('builds an unsaved graph with an exact runtime-input default', async () => {
+      templatesRepository.findById.mockResolvedValue(
+        makeRuntimeInputTemplate([
+          {
+            id: 'liveUrls',
+            label: 'Live URLs',
+            type: 'array',
+            required: true,
+          },
+        ]),
+      );
+
+      const result = await service.materializeTemplateGraph('tpl-1', {
+        workflowName: 'livespec.io security scan',
+        runtimeInputDefaults: { liveUrls: ['https://livespec.io'] },
+      });
+
+      expect(result.graph.name).toBe('livespec.io security scan');
+      expect(result.graph.nodes[0]?.data.config.params.runtimeInputs).toEqual([
+        {
+          id: 'liveUrls',
+          label: 'Live URLs',
+          type: 'array',
+          required: true,
+          defaultValue: ['https://livespec.io'],
+        },
+      ]);
+      expect(workflowsService.create).not.toHaveBeenCalled();
+      expect(templatesRepository.incrementPopularity).not.toHaveBeenCalled();
+    });
+
+    it('rejects unknown or mistyped runtime-input defaults', async () => {
+      templatesRepository.findById.mockResolvedValue(
+        makeRuntimeInputTemplate([
+          { id: 'liveUrls', label: 'Live URLs', type: 'array', required: true },
+        ]),
+      );
+
+      await expect(
+        service.materializeTemplateGraph('tpl-1', {
+          runtimeInputDefaults: { target: ['https://livespec.io'] },
+        }),
+      ).rejects.toThrow('Unknown template runtime input "target"');
+      await expect(
+        service.materializeTemplateGraph('tpl-1', {
+          runtimeInputDefaults: { liveUrls: 'https://livespec.io' },
+        }),
+      ).rejects.toThrow('must be array');
+    });
+
+    it('never accepts a secret runtime input as a stored template default', async () => {
+      templatesRepository.findById.mockResolvedValue(
+        makeRuntimeInputTemplate([
+          { id: 'apiKey', label: 'API key', type: 'secret', required: true },
+        ]),
+      );
+
+      await expect(
+        service.materializeTemplateGraph('tpl-1', {
+          runtimeInputDefaults: { apiKey: 'secret-value' },
+        }),
+      ).rejects.toThrow('cannot be stored as a template default');
+    });
+
+    it('does not materialize an inactive template', async () => {
+      templatesRepository.findById.mockResolvedValue(makeTemplate({ isActive: false }));
+
+      await expect(service.materializeTemplateGraph('tpl-1')).rejects.toThrow(NotFoundException);
+    });
+  });
 
   describe('useTemplate', () => {
     it('creates a workflow, increments popularity, and returns result', async () => {

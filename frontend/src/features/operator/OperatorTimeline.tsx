@@ -25,7 +25,6 @@ import {
   Bot,
   Check,
   ChevronDown,
-  ChevronRight,
   CircleDot,
   Clock3,
   ListChecks,
@@ -73,6 +72,15 @@ type TimelineEvent =
   | { kind: 'message'; at: string; sequence: number; value: OperatorMessageView }
   | { kind: 'action'; at: string; sequence: number; value: OperatorActionView };
 
+interface TimelineTurnGroup {
+  turnId: string;
+  events: TimelineEvent[];
+}
+
+type TimelineSegment =
+  | { kind: 'message'; event: Extract<TimelineEvent, { kind: 'message' }> }
+  | { kind: 'actions'; events: Extract<TimelineEvent, { kind: 'action' }>[] };
+
 function toTimelineEvents(
   messages: OperatorMessageView[],
   actions: OperatorActionView[],
@@ -98,6 +106,32 @@ function toTimelineEvents(
     const timeDelta = new Date(left.at).getTime() - new Date(right.at).getTime();
     return timeDelta || left.sequence - right.sequence;
   });
+}
+
+function groupEventsByTurn(events: TimelineEvent[]): TimelineTurnGroup[] {
+  const groups = new Map<string, TimelineTurnGroup>();
+  for (const event of events) {
+    const turnId = event.value.turnId;
+    const existing = groups.get(turnId);
+    if (existing) existing.events.push(event);
+    else groups.set(turnId, { turnId, events: [event] });
+  }
+  return [...groups.values()];
+}
+
+function segmentTurnEvents(events: TimelineEvent[]): TimelineSegment[] {
+  const segments: TimelineSegment[] = [];
+  for (const event of events) {
+    if (event.kind === 'message') {
+      segments.push({ kind: 'message', event });
+      continue;
+    }
+
+    const previous = segments[segments.length - 1];
+    if (previous?.kind === 'actions') previous.events.push(event);
+    else segments.push({ kind: 'actions', events: [event] });
+  }
+  return segments;
 }
 
 function formatPreview(value: unknown): string | null {
@@ -312,6 +346,8 @@ interface ActionEventProps {
   turns?: OperatorTurnView[];
   pendingCancelTurnId?: string;
   onCancelTurn: (turnId: string) => void;
+  elevatedDecisionActionId?: string;
+  embedded?: boolean;
 }
 
 function ActionEvent({
@@ -329,6 +365,8 @@ function ActionEvent({
   turns = [],
   pendingCancelTurnId,
   onCancelTurn,
+  elevatedDecisionActionId,
+  embedded = false,
 }: ActionEventProps) {
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const isUserInput = action.commandName === 'request_user_input';
@@ -362,6 +400,8 @@ function ActionEvent({
         disabled={runCommandDisabled}
         pendingDecisionActionId={pendingDecisionActionId}
         pendingCancelTurnId={pendingCancelTurnId}
+        elevatedDecisionActionId={elevatedDecisionActionId}
+        embedded={embedded}
         onCommand={onRunCommand}
         onDecision={onDecision}
         onCancelTurn={onCancelTurn}
@@ -378,6 +418,7 @@ function ActionEvent({
           allowSourceComparison={
             runWorkflowInput?.success ? !runWorkflowInput.data.inputChanges : true
           }
+          embedded={embedded}
           disabled={runCommandDisabled}
           onCommand={onRunCommand}
         />
@@ -417,6 +458,8 @@ function ActionEvent({
     : undefined;
   const collapsibleResultPreview = action.status === 'failed' ? null : resultPreview;
   const hasTechnicalDetails = Boolean(argumentsPreview || collapsibleResultPreview);
+  const decisionElevated =
+    action.status === 'pending_approval' && action.id === elevatedDecisionActionId;
   const hasStructuredContent = Boolean(
     workflowAuthoringResult ||
     listedWorkflows?.success ||
@@ -427,6 +470,12 @@ function ActionEvent({
     action.status === 'pending_approval' ||
     userInputResult.success,
   );
+  const hasCollapsibleStructuredResult = Boolean(
+    listedWorkflows?.success || inspectedWorkflow?.success,
+  );
+  const detailsExpandable = hasTechnicalDetails || hasCollapsibleStructuredResult;
+  const showStructuredContent =
+    hasStructuredContent && (!hasCollapsibleStructuredResult || detailsExpanded);
   const headerContent = (
     <>
       {isActive ? (
@@ -454,7 +503,7 @@ function ActionEvent({
           ? 'Needs input'
           : ACTION_STATUS_LABELS[action.status]}
       </Badge>
-      {hasTechnicalDetails ? (
+      {detailsExpandable ? (
         <ChevronDown
           className={cn(
             'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform',
@@ -470,19 +519,24 @@ function ActionEvent({
     <article
       data-operator-turn-id={action.turnId}
       className={cn(
-        'max-w-full overflow-hidden rounded-2xl border border-border/70 bg-background/75 shadow-[0_10px_32px_rgba(0,0,0,0.2)]',
+        'max-w-full overflow-hidden bg-background/75',
+        embedded
+          ? 'border-b border-border/45 last:border-b-0'
+          : 'rounded-2xl border border-border/70 shadow-[0_10px_32px_rgba(0,0,0,0.2)]',
         action.status === 'pending_approval' &&
           (isUserInput
             ? 'border-blue-500/35 bg-blue-500/[0.035]'
             : 'border-amber-500/40 bg-amber-500/[0.04]'),
       )}
     >
-      {hasTechnicalDetails ? (
+      {detailsExpandable ? (
         <button
           type="button"
           className={cn(
             'flex min-h-11 w-full flex-wrap items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-muted/25',
-            (detailsExpanded || hasStructuredContent || resultPreview) &&
+            (detailsExpanded ||
+              (hasStructuredContent && !hasCollapsibleStructuredResult) ||
+              resultPreview) &&
               'border-b border-border/50',
           )}
           aria-expanded={detailsExpanded}
@@ -533,7 +587,7 @@ function ActionEvent({
         </pre>
       ) : null}
 
-      {hasStructuredContent ? (
+      {showStructuredContent ? (
         <div className="space-y-2.5 px-4 py-3">
           {workflowAuthoringResult ? (
             <OperatorWorkflowDraftCard
@@ -615,7 +669,13 @@ function ActionEvent({
             />
           ) : null}
 
-          {action.status === 'pending_approval' || userInputResult.success ? (
+          {decisionElevated ? (
+            <p className="text-xs text-muted-foreground">
+              {isUserInput
+                ? 'Answer in the pinned question below to continue.'
+                : 'Review the pinned approval below to continue.'}
+            </p>
+          ) : action.status === 'pending_approval' || userInputResult.success ? (
             <OperatorDecisionCard
               action={action}
               pending={pendingDecision}
@@ -625,6 +685,47 @@ function ActionEvent({
         </div>
       ) : null}
     </article>
+  );
+}
+
+interface ActionSegmentProps extends Omit<ActionEventProps, 'action' | 'embedded'> {
+  events: Extract<TimelineEvent, { kind: 'action' }>[];
+  collapseCompleted: boolean;
+}
+
+function ActionSegment({ events, collapseCompleted, ...actionProps }: ActionSegmentProps) {
+  const canCollapse =
+    collapseCompleted &&
+    events.every(({ value }) => value.status === 'succeeded') &&
+    events.every(({ value }) => !value.runId) &&
+    events.every(({ value }) => !OperatorPlanProposalResultSchema.safeParse(value.result).success);
+  const actionCountLabel = `${events.length} recorded ${events.length === 1 ? 'action' : 'actions'}`;
+  const content = (
+    <div
+      className="overflow-hidden rounded-2xl border border-border/70 bg-background/75 shadow-[0_10px_32px_rgba(0,0,0,0.2)]"
+      aria-label={actionCountLabel}
+    >
+      {events.map(({ value }) => (
+        <ActionEvent key={value.id} action={value} embedded {...actionProps} />
+      ))}
+    </div>
+  );
+
+  if (!canCollapse) return content;
+
+  return (
+    <details className="group">
+      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-border/60 bg-background/55 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/25 hover:text-foreground">
+        <Check className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+        <span className="font-medium">{actionCountLabel}</span>
+        <span className="ml-auto text-[10px]">Show activity</span>
+        <ChevronDown
+          className="h-3.5 w-3.5 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
+      <div className="mt-2">{content}</div>
+    </details>
   );
 }
 
@@ -645,6 +746,7 @@ interface OperatorTimelineProps {
   onRunSavedWorkflow?: (workflow: OperatorWorkflowRunSelection) => void;
   pendingCancelTurnId?: string;
   onCancelTurn?: (turnId: string) => void;
+  elevatedDecisionActionId?: string;
 }
 
 export function OperatorTimeline({
@@ -660,6 +762,7 @@ export function OperatorTimeline({
   onRunSavedWorkflow = () => {},
   pendingCancelTurnId,
   onCancelTurn = () => {},
+  elevatedDecisionActionId,
 }: OperatorTimelineProps) {
   const planIds = actions.flatMap((action) => {
     const plan = OperatorPlanProposalResultSchema.safeParse(action.result);
@@ -676,6 +779,9 @@ export function OperatorTimeline({
       !planStepActionIds.has(event.value.id) ||
       (event.value.commandName === 'run_workflow' && Boolean(event.value.runId)),
   );
+  const turnGroups = groupEventsByTurn(events);
+  const turnsById = new Map(turns.map((turn) => [turn.id, turn]));
+  const latestTurnId = turnGroups[turnGroups.length - 1]?.turnId;
   const latestInvestigationAction = [...actions]
     .reverse()
     .find(
@@ -713,34 +819,52 @@ export function OperatorTimeline({
   }
 
   return (
-    <div className="space-y-3.5">
-      {events.map((event) =>
-        event.kind === 'message' ? (
-          <MessageEvent
-            key={`message-${event.value.id}`}
-            message={event.value}
-            workflowListCount={workflowListCountsByTurn.get(event.value.turnId)}
-          />
-        ) : (
-          <ActionEvent
-            key={`action-${event.value.id}`}
-            action={event.value}
-            actions={actions}
-            pendingDecision={pendingDecisionActionId === event.value.id}
-            pendingDecisionActionId={pendingDecisionActionId}
-            runCommandDisabled={runCommandDisabled}
-            onDecision={onDecision}
-            onRunCommand={onRunCommand}
-            onRunSavedWorkflow={onRunSavedWorkflow}
-            workflowDrafts={workflowDrafts}
-            appliedDraftIds={appliedDraftIds}
-            keptVersionIds={keptVersionIds}
-            turns={turns}
-            pendingCancelTurnId={pendingCancelTurnId}
-            onCancelTurn={onCancelTurn}
-          />
-        ),
-      )}
+    <div className="space-y-7">
+      {turnGroups.map((group) => {
+        const turn = turnsById.get(group.turnId);
+        const collapseCompleted = group.turnId !== latestTurnId && turn?.status === 'completed';
+
+        return (
+          <section
+            key={group.turnId}
+            data-operator-turn-group={group.turnId}
+            aria-label="Operator turn"
+            className="space-y-3"
+          >
+            {segmentTurnEvents(group.events).map((segment, index) =>
+              segment.kind === 'message' ? (
+                <MessageEvent
+                  key={`message-${segment.event.value.id}`}
+                  message={segment.event.value}
+                  workflowListCount={workflowListCountsByTurn.get(segment.event.value.turnId)}
+                />
+              ) : (
+                <ActionSegment
+                  key={`actions-${group.turnId}-${index}`}
+                  events={segment.events}
+                  collapseCompleted={collapseCompleted}
+                  actions={actions}
+                  pendingDecision={segment.events.some(
+                    ({ value }) => pendingDecisionActionId === value.id,
+                  )}
+                  pendingDecisionActionId={pendingDecisionActionId}
+                  runCommandDisabled={runCommandDisabled}
+                  onDecision={onDecision}
+                  onRunCommand={onRunCommand}
+                  onRunSavedWorkflow={onRunSavedWorkflow}
+                  workflowDrafts={workflowDrafts}
+                  appliedDraftIds={appliedDraftIds}
+                  keptVersionIds={keptVersionIds}
+                  turns={turns}
+                  pendingCancelTurnId={pendingCancelTurnId}
+                  onCancelTurn={onCancelTurn}
+                  elevatedDecisionActionId={elevatedDecisionActionId}
+                />
+              ),
+            )}
+          </section>
+        );
+      })}
 
       {latestInvestigationAction && investigationAnswered ? (
         <InvestigationFollowUps
@@ -751,15 +875,7 @@ export function OperatorTimeline({
         />
       ) : null}
 
-      {isActive ? (
-        <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/60 px-3 py-2.5 text-xs text-muted-foreground shadow-sm">
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-          Operator is working
-          <ChevronRight className="h-3 w-3 animate-pulse" />
-        </div>
-      ) : null}
-
-      {events.length === 0 ? (
+      {events.length === 0 && !isActive ? (
         <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-center text-muted-foreground">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-card">
             <Clock3 className="h-5 w-5" />

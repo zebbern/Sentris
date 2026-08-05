@@ -13,6 +13,7 @@ import {
   OperatorGetMcpPromptInputSchema,
   OperatorInvokeMcpToolInputSchema,
   OperatorListFindingsInputSchema,
+  OperatorListWorkflowTemplatesResultSchema,
   OperatorPersistedTurnPayloadSchema,
   OperatorPersistedTurnPayloadV1Schema,
   OperatorActionDecisionSchema,
@@ -442,6 +443,72 @@ describe('Operator workflow authoring commands', () => {
     expect(OPERATOR_COMMAND_DEFINITIONS.propose_workflow_edits.effect).toBe('execute');
     expect(OPERATOR_COMMAND_DEFINITIONS.revise_workflow_draft.effect).toBe('execute');
     expect(OPERATOR_COMMAND_DEFINITIONS.apply_workflow_draft.effect).toBe('consequential');
+  });
+
+  it('exposes bounded template discovery and unsaved template-backed proposals', () => {
+    const definitions = OPERATOR_COMMAND_DEFINITIONS as Record<
+      string,
+      { effect: string; inputSchema: z.ZodType }
+    >;
+
+    expect(definitions.list_workflow_templates?.effect).toBe('read');
+    expect(
+      definitions.list_workflow_templates?.inputSchema.parse({
+        search: 'website security',
+        requiredComponentIds: ['sentris.nuclei.scan'],
+        limit: 5,
+      }),
+    ).toEqual({
+      search: 'website security',
+      requiredComponentIds: ['sentris.nuclei.scan'],
+      limit: 5,
+    });
+    expect(
+      definitions.list_workflow_templates?.inputSchema.safeParse({
+        requiredComponentIds: Array.from(
+          { length: 21 },
+          (_, index) => `sentris.component.${index}`,
+        ),
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorListWorkflowTemplatesResultSchema.parse([
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          name: 'Web Attack Surface Quick Win Hunt',
+          description: 'Run active checks against an authorized website.',
+          category: 'bug-bounty',
+          tags: ['web', 'nuclei'],
+          isOfficial: true,
+          isVerified: true,
+          nodeCount: 2,
+          edgeCount: 1,
+          componentIds: ['core.workflow.entrypoint', 'sentris.nuclei.scan'],
+          runtimeInputs: [],
+          requiredSecrets: [],
+        },
+      ])[0]?.componentIds,
+    ).toEqual(['core.workflow.entrypoint', 'sentris.nuclei.scan']);
+    expect(definitions.propose_workflow_from_template?.effect).toBe('execute');
+    expect(
+      definitions.propose_workflow_from_template?.inputSchema.parse({
+        templateId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        name: 'livespec.io security scan',
+        runtimeInputDefaults: { liveUrls: ['https://livespec.io'] },
+      }),
+    ).toEqual({
+      templateId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'livespec.io security scan',
+      runtimeInputDefaults: { liveUrls: ['https://livespec.io'] },
+    });
+    expect(
+      definitions.propose_workflow_from_template?.inputSchema.safeParse({
+        templateId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        runtimeInputDefaults: Object.fromEntries(
+          Array.from({ length: 26 }, (_, index) => [`input-${index}`, index]),
+        ),
+      }).success,
+    ).toBe(false);
   });
 
   it('requires update proposals to pin both workflow and immutable base version', () => {

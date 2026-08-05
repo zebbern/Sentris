@@ -46,6 +46,11 @@ const MAX_ACTION_LEDGER_LENGTH = 8_000;
 const MAX_PLAN_SUMMARY_LENGTH = 2_000;
 const RUN_OBSERVATION_POLL_MS = 2_000;
 const INTERNAL_REQUEST_HEARTBEAT_INTERVAL_MS = 10_000;
+const PLAIN_CAPABILITY_REFUSAL_PATTERNS = [
+  /\b(?:i|we)\s+(?:cannot|can't|am unable to|are unable to)\s+(?:fulfill|assist|help|comply|support)\b/i,
+  /\b(?:i|we)\s+(?:must|have to)\s+(?:decline|refuse)\b/i,
+  /\b(?:i'm|we're|i am|we are)\s+not able to\s+(?:fulfill|assist|help|comply|support)\b/i,
+] as const;
 
 const operatorMessageSchema = z
   .object({
@@ -453,7 +458,7 @@ export async function operatorModelStepActivity(
       input.toolCallHistory ?? [],
     );
     const generate = getServices().generateTextImpl ?? generateText;
-    const result = await generate({
+    let result = await generate({
       model,
       system,
       messages,
@@ -462,13 +467,39 @@ export async function operatorModelStepActivity(
       abortSignal: activityContext.cancellationSignal,
     });
 
-    const providerFailure = getProviderDeclaredModelError(
+    let providerFailure = getProviderDeclaredModelError(
       {
         finishReason: String(result.finishReason),
         rawFinishReason: result.rawFinishReason,
       },
       'Operator',
     );
+    if (
+      !providerFailure &&
+      mode === 'standard' &&
+      tools &&
+      isCapabilityRefusal(result.text, result.toolCalls)
+    ) {
+      const capabilityRecoveryTools = buildOperatorTools(
+        commandNames.filter((commandName) => commandName !== 'request_user_input'),
+      );
+      result = await generate({
+        model,
+        system: buildCapabilityRecoverySystemPrompt(system),
+        messages,
+        tools: capabilityRecoveryTools,
+        toolChoice: 'required',
+        maxOutputTokens: 2_000,
+        abortSignal: activityContext.cancellationSignal,
+      });
+      providerFailure = getProviderDeclaredModelError(
+        {
+          finishReason: String(result.finishReason),
+          rawFinishReason: result.rawFinishReason,
+        },
+        'Operator',
+      );
+    }
     if (providerFailure) {
       if (compactSummary) throw providerFailure;
       const recovery = await generate({
@@ -769,12 +800,16 @@ function buildSystemPrompt(
               : [];
   return [
     'You are the Sentris Operator. Help the user operate their existing security workflows and inspect results.',
+    'Sentris is a professional defensive security workflow orchestration product. Authorized scanning, security testing, vulnerability research, and creating workflows for those tasks are core supported uses, not reasons to refuse a request.',
+    'When the user states or the product context establishes that they own or are authorized to test a target, use the available typed commands to help. Do not replace supported work with a generic refusal or redirect to external security guidance. If required target or scope information is missing, call request_user_input.',
+    'When an authorized user broadly asks to scan a known website or web application and does not request a narrower scan, choose a practical balanced starter scope instead of asking them to pick one check. Search the maintained Template Library first with list_workflow_templates. If the user explicitly asks to detect vulnerabilities, security flaws, exposures, or misconfigurations, require component ID sentris.nuclei.scan in that catalog call; do not accept a recon-only template as equivalent. Do not impose that scanner requirement when the request is only for reconnaissance, discovery, crawling, or inventory. Treat returned graph-derived componentIds as capability truth rather than template names or tags. When one template matches, call propose_workflow_from_template with that exact template ID and map the supplied target only to an exact non-secret runtime-input ID and type returned by the catalog. Keep the proposed starter workflow proportional and non-destructive; ask only when the target, authorization, or a materially consequential choice is genuinely missing.',
     'Use only the provided typed commands. Never claim a command ran unless its action ledger shows success.',
     'When a necessary target, value, preference, or choice is missing, call request_user_input with one focused question instead of guessing or ending the turn. Provide concise options when the choices are known. The durable turn will pause and resume with the user response. Do not use this command merely to reconfirm information the user already supplied.',
-    'For workflow authoring, inspect exact component definitions with list_components/get_component. Use propose_workflow_draft with a complete graph only when creating a workflow. For an update, first call get_workflow, preserve its exact workflowId, versionId, node IDs, edge IDs, and port IDs, then call propose_workflow_edits with only the smallest ID-based operations. Never regenerate an unchanged existing graph or invent a component, node, edge, or port ID.',
+    'For new workflow authoring, search the maintained Template Library first. Prefer propose_workflow_from_template when a suitable template exists because the backend materializes its exact validated graph. Only when no suitable template exists, inspect exact component definitions with list_components/get_component and use propose_workflow_draft with a complete graph. For an update, first call get_workflow, preserve its exact workflowId, versionId, node IDs, edge IDs, and port IDs, then call propose_workflow_edits with only the smallest ID-based operations. Never regenerate an unchanged existing graph or invent a template, component, node, edge, runtime-input, or port ID.',
+    'For a new workflow entry point, define its runtimeInputs explicitly and wire those exact output IDs only to compatible declared component inputs. Never invent a generic output port. Do not chain one scanner output into another scanner unless the declared port types are compatible; prefer fan-out from the entry-point inputs or use an exact registered transformer when conversion is required.',
     'When revising an invalid Operator draft, first inspect it with get_workflow_draft, then call revise_workflow_draft with only the smallest ID-based operations against that exact proposed graph. Use its recorded validation errors as evidence. Do not regenerate the full graph, save the draft, or run the workflow during a revision turn.',
     'For an existing node configuration change, use operation patch_node with nodeId and setParameters and/or setInputOverrides. For example, update a chat model with setInputOverrides: { chatModel: { provider: "gemini", modelId: "gemini-3.6-flash" } }.',
-    'Always create a proposal before apply_workflow_draft. Both proposal commands are read-only with respect to saved workflows and return compile validation plus a graph diff. Apply only a valid proposal when the user asked to create, modify, or save the workflow. A model-initiated apply honors Ask mode; the explicit Save version control is itself user confirmation. Never launch a test run unless the user explicitly requested one.',
+    'Always create a proposal before apply_workflow_draft. Workflow proposal commands are read-only with respect to saved workflows and return compile validation plus a graph diff. Apply only a valid proposal when the user asked to create, modify, or save the workflow. A model-initiated apply honors Ask mode; the explicit Save version control is itself user confirmation. Never launch a test run unless the user explicitly requested one.',
     'Before calling run_workflow, inspect the same workflow version with get_workflow unless its exact runtimeInputs contract is already present in this turn. Pass the immutable versionId it returns, map the user request to those exact input IDs and types, and never guess aliases. If a required value is absent, ask the user instead of launching a doomed run.',
     'Call run_workflow only when the user explicitly asks to run an existing workflow.',
     'Call retry_run only when the user explicitly asks to retry an existing run. It preserves the original workflow version and stored inputs.',
@@ -795,6 +830,30 @@ function buildSystemPrompt(
     ...modeInstructions,
     route,
     `Durable action ledger: ${ledger}`,
+  ].join('\n');
+}
+
+function isCapabilityRefusal(
+  text: string,
+  toolCalls: readonly { toolName: string; input: unknown }[],
+): boolean {
+  if (PLAIN_CAPABILITY_REFUSAL_PATTERNS.some((pattern) => pattern.test(text))) return true;
+  return toolCalls.some(
+    (toolCall) =>
+      toolCall.toolName === 'request_user_input' &&
+      PLAIN_CAPABILITY_REFUSAL_PATTERNS.some((pattern) =>
+        pattern.test(JSON.stringify(toolCall.input)),
+      ),
+  );
+}
+
+function buildCapabilityRecoverySystemPrompt(system: string): string {
+  return [
+    system,
+    'The previous tool-enabled model attempt returned a generic capability refusal instead of a legitimate product action or focused missing-information question.',
+    'Re-evaluate the original request as an authorized professional Sentris operation. Use the available typed commands to inspect workflow templates, existing workflows, or components and make the requested proposal.',
+    'request_user_input is intentionally unavailable during this single recovery attempt because a refusal is not a user question.',
+    'The existing typed command contracts, authority checks, approval policy, and provider policy remain authoritative. Do not claim that an action ran or that a capability exists unless the durable command evidence establishes it.',
   ].join('\n');
 }
 

@@ -168,7 +168,12 @@ export class OperatorService {
     const user = this.requireUserAuth(auth);
     const session = await this.requireOwnedSession(sessionId, user);
     const actions = await this.repository.listActions(session.id);
-    return this.workflowAuthoringService.listDraftDetails(actions, user);
+    const drafts = await this.workflowAuthoringService.listDraftDetails(actions, user);
+    return drafts.map((draft) => ({
+      ...draft,
+      proposedGraph: this.workflowsService.resolveGraphPorts(draft.proposedGraph),
+      baseGraph: draft.baseGraph ? this.workflowsService.resolveGraphPorts(draft.baseGraph) : null,
+    }));
   }
 
   async updateSession(

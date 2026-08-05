@@ -42,6 +42,7 @@ interface OperatorRunActivityProps {
   sourceRunId?: string;
   allowSourceComparison?: boolean;
   label?: string;
+  embedded?: boolean;
   disabled: boolean;
   onCommand: (request: OperatorRunCommandRequest) => void;
 }
@@ -65,6 +66,7 @@ export function OperatorRunActivity({
   sourceRunId,
   allowSourceComparison = true,
   label = 'Workflow run',
+  embedded = false,
   disabled,
   onCommand,
 }: OperatorRunActivityProps) {
@@ -98,7 +100,14 @@ export function OperatorRunActivity({
   const remainingSteps = progress ? Math.max(0, progress.totalActions - runSteps.length) : 0;
 
   return (
-    <section className="max-w-full overflow-hidden rounded-2xl border border-border/70 bg-background/75 shadow-[0_10px_32px_rgba(0,0,0,0.2)]">
+    <section
+      className={cn(
+        'max-w-full overflow-hidden bg-background/75',
+        embedded
+          ? 'border-b border-border/45 last:border-b-0'
+          : 'rounded-2xl border border-border/70 shadow-[0_10px_32px_rgba(0,0,0,0.2)]',
+      )}
+    >
       <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-border/50 px-4 py-2.5">
         <Link
           to={`/runs/${encodeURIComponent(runId)}`}

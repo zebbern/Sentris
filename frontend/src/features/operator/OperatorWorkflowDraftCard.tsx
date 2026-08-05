@@ -162,6 +162,18 @@ export function OperatorWorkflowDraftCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-semibold">{result.name}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">{result.digest}</p>
+          {result.templateSnapshot ? (
+            <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
+              <Workflow className="h-3 w-3 shrink-0 text-primary" />
+              <span className="shrink-0">Based on template</span>
+              <span
+                className="truncate font-medium text-foreground"
+                title={result.templateSnapshot.templateName}
+              >
+                {result.templateSnapshot.templateName}
+              </span>
+            </div>
+          ) : null}
         </div>
         <Badge
           variant="outline"

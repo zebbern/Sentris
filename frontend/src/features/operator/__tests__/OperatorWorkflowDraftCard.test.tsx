@@ -18,6 +18,7 @@ const DRAFT_ID = '11111111-1111-4111-8111-111111111111';
 const WORKFLOW_ID = '22222222-2222-4222-8222-222222222222';
 const VERSION_ID = '33333333-3333-4333-8333-333333333333';
 const ACTION_ID = '44444444-4444-4444-8444-444444444444';
+const TEMPLATE_ID = '55555555-5555-4555-8555-555555555555';
 const SOURCE_RUN_ID = 'sentris-run-source';
 
 function graph(name: string, nodeLabel: string): WorkflowGraph {
@@ -77,6 +78,29 @@ function detail(result = proposal()): OperatorWorkflowDraftDetail {
 }
 
 describe('OperatorWorkflowDraftCard', () => {
+  it('identifies the maintained template behind a template-backed draft', () => {
+    const result: OperatorWorkflowDraftResult = {
+      ...proposal(),
+      templateSnapshot: {
+        templateId: TEMPLATE_ID,
+        templateName: 'Bug Bounty Recon Triage',
+        graph: graph('Bug Bounty Recon Triage', 'Authorized scope'),
+      },
+    };
+
+    renderWithProviders(
+      <OperatorWorkflowDraftCard
+        sessionId={SESSION_ID}
+        result={result}
+        detail={detail(result)}
+        onApply={mock(() => {})}
+      />,
+    );
+
+    expect(screen.getByText('Based on template')).toBeInTheDocument();
+    expect(screen.getByText('Bug Bounty Recon Triage')).toBeInTheDocument();
+  });
+
   it('shows the durable graph comparison and dispatches Save version', () => {
     const result = proposal();
     const onApply = mock(() => {});

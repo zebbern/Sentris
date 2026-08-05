@@ -773,7 +773,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
    * This ensures Entry Point nodes and other components with resolvePorts
    * have their dynamicInputs/dynamicOutputs populated correctly.
    */
-  private resolveGraphPorts(graph: WorkflowGraph): WorkflowGraph {
+  resolveGraphPorts(graph: WorkflowGraph): WorkflowGraph {
     if (!graph || !Array.isArray(graph.nodes)) {
       return graph;
     }

@@ -3,11 +3,13 @@ import type { OperatorCommandName } from '@sentris/shared';
 export const OPERATOR_COMMAND_LABELS: Record<OperatorCommandName, string> = {
   request_user_input: 'Operator needs your input',
   list_workflows: 'List workflows',
+  list_workflow_templates: 'List workflow templates',
   get_workflow: 'Inspect workflow',
   list_components: 'List components',
   get_component: 'Inspect component',
   get_workflow_draft: 'Inspect workflow draft',
   propose_workflow_draft: 'Draft workflow',
+  propose_workflow_from_template: 'Draft workflow from template',
   propose_workflow_edits: 'Draft workflow edits',
   revise_workflow_draft: 'Revise workflow draft',
   apply_workflow_draft: 'Save workflow draft',

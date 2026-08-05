@@ -97,6 +97,8 @@ export function OperatorPlanCard({
   disabled,
   pendingDecisionActionId,
   pendingCancelTurnId,
+  elevatedDecisionActionId,
+  embedded = false,
   onCommand,
   onDecision,
   onCancelTurn,
@@ -108,6 +110,8 @@ export function OperatorPlanCard({
   disabled: boolean;
   pendingDecisionActionId?: string;
   pendingCancelTurnId?: string;
+  elevatedDecisionActionId?: string;
+  embedded?: boolean;
   onCommand: (request: OperatorRunCommandRequest) => void;
   onDecision: (
     action: OperatorActionView,
@@ -161,7 +165,12 @@ export function OperatorPlanCard({
   return (
     <article
       data-operator-turn-id={proposalTurnId}
-      className="max-w-full overflow-hidden rounded-2xl border border-border/70 bg-background/75 shadow-[0_10px_32px_rgba(0,0,0,0.2)]"
+      className={cn(
+        'max-w-full overflow-hidden bg-background/75',
+        embedded
+          ? 'border-b border-border/45 last:border-b-0'
+          : 'rounded-2xl border border-border/70 shadow-[0_10px_32px_rgba(0,0,0,0.2)]',
+      )}
     >
       <button
         type="button"
@@ -319,7 +328,14 @@ export function OperatorPlanCard({
                     </div>
                   )}
 
-                  {action?.status === 'pending_approval' ? (
+                  {action?.status === 'pending_approval' &&
+                  action.id === elevatedDecisionActionId ? (
+                    <p className="border-t border-border/35 px-4 py-3 pl-[54px] text-xs text-muted-foreground">
+                      {action.commandName === 'request_user_input'
+                        ? 'Answer in the pinned question below to continue.'
+                        : 'Review the pinned approval below to continue.'}
+                    </p>
+                  ) : action?.status === 'pending_approval' ? (
                     <div className="border-t border-border/35 px-4 py-3 pl-[54px]">
                       <OperatorDecisionCard
                         action={action}

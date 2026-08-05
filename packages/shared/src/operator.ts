@@ -86,6 +86,7 @@ const MAX_OPERATOR_WORKFLOW_EDIT_BYTES = 128 * 1024;
 const MAX_OPERATOR_WORKFLOW_DRAFT_NODES = 200;
 const MAX_OPERATOR_WORKFLOW_DRAFT_EDGES = 1_000;
 const MAX_OPERATOR_WORKFLOW_EDIT_OPERATIONS = 100;
+const MAX_OPERATOR_TEMPLATE_RUNTIME_DEFAULTS = 25;
 
 export const OperatorListWorkflowsInputSchema = z
   .object({
@@ -131,6 +132,64 @@ export const OperatorListComponentsInputSchema = z
     limit: z.number().int().min(1).max(100).default(50),
   })
   .strict();
+
+export const OperatorListWorkflowTemplatesInputSchema = z
+  .object({
+    search: z.string().trim().min(1).max(191).optional(),
+    category: z.string().trim().min(1).max(100).optional(),
+    tags: z.array(z.string().trim().min(1).max(100)).max(10).optional(),
+    requiredComponentIds: z.array(z.string().trim().min(1).max(191)).max(20).optional(),
+    limit: z.number().int().min(1).max(20).default(10),
+  })
+  .strict();
+
+export const OperatorWorkflowTemplateRequiredSecretSchema = z
+  .object({
+    name: z.string().trim().min(1).max(191),
+    type: z.string().trim().min(1).max(100),
+    description: z.string().max(1_000).optional(),
+  })
+  .strict();
+
+export const OperatorWorkflowTemplateSummarySchema = z
+  .object({
+    id: WorkflowIdSchema,
+    name: z.string().trim().min(1).max(255),
+    description: z.string().max(8_000).nullable(),
+    category: z.string().max(100).nullable(),
+    tags: z.array(z.string().max(100)).max(50),
+    isOfficial: z.boolean(),
+    isVerified: z.boolean(),
+    nodeCount: z.number().int().nonnegative(),
+    edgeCount: z.number().int().nonnegative(),
+    componentIds: z.array(z.string().trim().min(1).max(191)).max(100),
+    runtimeInputs: z.array(WorkflowRuntimeInputDescriptorSchema).max(50),
+    requiredSecrets: z.array(OperatorWorkflowTemplateRequiredSecretSchema).max(50),
+  })
+  .strict();
+
+export const OperatorListWorkflowTemplatesResultSchema = z
+  .array(OperatorWorkflowTemplateSummarySchema)
+  .max(20);
+
+export const OperatorProposeWorkflowFromTemplateInputSchema = z
+  .object({
+    templateId: WorkflowIdSchema,
+    name: z.string().trim().min(1).max(191).optional(),
+    description: z.string().max(8_000).optional(),
+    summary: z.string().trim().min(1).max(2_000).optional(),
+    runtimeInputDefaults: z.record(z.string().trim().min(1).max(191), z.json()).default({}),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (Object.keys(value.runtimeInputDefaults).length > MAX_OPERATOR_TEMPLATE_RUNTIME_DEFAULTS) {
+      context.addIssue({
+        code: 'custom',
+        message: `Template proposal supports at most ${MAX_OPERATOR_TEMPLATE_RUNTIME_DEFAULTS} runtime-input defaults`,
+        path: ['runtimeInputDefaults'],
+      });
+    }
+  });
 
 export const OperatorGetComponentInputSchema = z
   .object({ componentId: z.string().trim().min(1).max(191) })
@@ -468,6 +527,14 @@ export const OperatorWorkflowDraftResultSchema = z
     digest: z.string().min(1),
     validation: OperatorWorkflowDraftValidationSchema,
     diff: OperatorWorkflowGraphDiffSchema,
+    templateSnapshot: z
+      .object({
+        templateId: WorkflowIdSchema,
+        templateName: z.string().trim().min(1).max(255),
+        graph: OperatorWorkflowGraphSchema,
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type OperatorWorkflowDraftResult = z.infer<typeof OperatorWorkflowDraftResultSchema>;
@@ -1232,6 +1299,12 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
     effect: 'read',
     inputSchema: OperatorGetWorkflowInputSchema,
   },
+  list_workflow_templates: {
+    description:
+      'Search the maintained Template Library before authoring a common workflow. Returns bounded metadata, graph-derived component IDs, and exact runtime-input IDs and types without exposing or regenerating the template graph. Use requiredComponentIds when the request needs an exact executable capability; names and tags alone are not capability proof.',
+    effect: 'read',
+    inputSchema: OperatorListWorkflowTemplatesInputSchema,
+  },
   list_components: {
     description:
       'Search the current Sentris component catalog before authoring a workflow. Returns exact component IDs and compact capabilities.',
@@ -1249,6 +1322,12 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
       'Inspect one durable workflow draft from this Operator session, including its exact credential-safe proposed graph and compile-validation errors. Use this before revising an invalid draft.',
     effect: 'read',
     inputSchema: OperatorGetWorkflowDraftInputSchema,
+  },
+  propose_workflow_from_template: {
+    description:
+      'Create a compile-checked, unsaved workflow draft from one exact active template. Use only runtime-input IDs returned by list_workflow_templates. This may prefill validated non-secret defaults, but never saves or runs the workflow.',
+    effect: 'execute',
+    inputSchema: OperatorProposeWorkflowFromTemplateInputSchema,
   },
   propose_workflow_draft: {
     description:
@@ -1393,9 +1472,11 @@ export type OperatorCommandInputMap = {
   request_user_input: z.infer<typeof OperatorRequestUserInputSchema>;
   list_workflows: z.infer<typeof OperatorListWorkflowsInputSchema>;
   get_workflow: z.infer<typeof OperatorGetWorkflowInputSchema>;
+  list_workflow_templates: z.infer<typeof OperatorListWorkflowTemplatesInputSchema>;
   list_components: z.infer<typeof OperatorListComponentsInputSchema>;
   get_component: z.infer<typeof OperatorGetComponentInputSchema>;
   get_workflow_draft: z.infer<typeof OperatorGetWorkflowDraftInputSchema>;
+  propose_workflow_from_template: z.infer<typeof OperatorProposeWorkflowFromTemplateInputSchema>;
   propose_workflow_draft: z.infer<typeof OperatorProposeWorkflowDraftInputSchema>;
   propose_workflow_edits: z.infer<typeof OperatorProposeWorkflowEditsInputSchema>;
   revise_workflow_draft: z.infer<typeof OperatorReviseWorkflowDraftInputSchema>;

@@ -5,6 +5,7 @@ import type { FindingsQueryService } from '../../analytics/findings-query.servic
 import type { FindingTriageService } from '../../findings/finding-triage.service';
 import type { ArtifactsService } from '../../storage/artifacts.service';
 import type { AgentTraceService } from '../../agent-trace/agent-trace.service';
+import type { TemplateService } from '../../templates/templates.service';
 import type { TraceService } from '../../trace/trace.service';
 import type { WorkflowsService } from '../../workflows/workflows.service';
 import { OperatorCommandService } from '../operator-command.service';
@@ -36,6 +37,7 @@ describe('OperatorCommandService', () => {
   let trace: Record<string, ReturnType<typeof vi.fn>>;
   let artifacts: Record<string, ReturnType<typeof vi.fn>>;
   let agentTrace: Record<string, ReturnType<typeof vi.fn>>;
+  let templates: Record<string, ReturnType<typeof vi.fn>>;
   let service: OperatorCommandService;
 
   beforeEach(() => {
@@ -86,6 +88,7 @@ describe('OperatorCommandService', () => {
       getDraftDetail: vi.fn(),
       projectGraph: vi.fn((graph) => graph),
       propose: vi.fn(),
+      proposeFromTemplate: vi.fn(),
       proposeEdits: vi.fn(),
       revise: vi.fn(),
       apply: vi.fn(),
@@ -108,6 +111,10 @@ describe('OperatorCommandService', () => {
         operations: [],
       }),
     };
+    templates = {
+      listTemplateCatalog: vi.fn(),
+      materializeTemplateGraph: vi.fn(),
+    };
     service = new OperatorCommandService(
       workflows as unknown as WorkflowsService,
       findings as unknown as FindingsQueryService,
@@ -117,6 +124,7 @@ describe('OperatorCommandService', () => {
       trace as unknown as TraceService,
       artifacts as unknown as ArtifactsService,
       agentTrace as unknown as AgentTraceService,
+      templates as unknown as TemplateService,
     );
   });
 
@@ -142,6 +150,136 @@ describe('OperatorCommandService', () => {
       response: 'lodash',
       selectedOption: 'lodash',
     });
+  });
+
+  it('returns a bounded workflow template catalog through the typed command', async () => {
+    const catalog = [
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        name: 'Web Attack Surface Quick Win Hunt',
+        description: 'Scan a known live website for quick security wins.',
+        category: 'bug-bounty',
+        tags: ['web', 'nuclei'],
+        isOfficial: true,
+        isVerified: true,
+        nodeCount: 10,
+        edgeCount: 15,
+        componentIds: ['core.workflow.entrypoint', 'sentris.httpx.scan', 'sentris.nuclei.scan'],
+        runtimeInputs: [
+          {
+            id: 'liveUrls',
+            label: 'Live URLs',
+            type: 'array',
+            required: true,
+            hasDefaultValue: false,
+          },
+        ],
+        requiredSecrets: [],
+      },
+    ];
+    templates.listTemplateCatalog.mockResolvedValue(catalog);
+
+    const result = await service.execute({
+      commandName: 'list_workflow_templates',
+      arguments: {
+        search: 'website security',
+        requiredComponentIds: ['sentris.nuclei.scan'],
+        limit: 5,
+      },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(templates.listTemplateCatalog).toHaveBeenCalledWith({
+      search: 'website security',
+      requiredComponentIds: ['sentris.nuclei.scan'],
+      limit: 5,
+    });
+    expect(result.result).toEqual(catalog);
+  });
+
+  it('materializes a template and delegates it to the existing draft boundary', async () => {
+    const templateId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const graph = {
+      name: 'livespec.io security scan',
+      nodes: [
+        {
+          id: 'entry',
+          type: 'core.workflow.entrypoint',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Target input',
+            config: { params: { runtimeInputs: [] }, inputOverrides: {} },
+          },
+        },
+      ],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    const proposal = {
+      kind: 'workflow-draft',
+      draftId: ACTION_ID,
+      mode: 'create',
+      workflowId: null,
+      baseVersionId: null,
+      name: graph.name,
+      digest: 'digest',
+      validation: { valid: true, errors: [] },
+      diff: {
+        metadataChanged: ['name', 'description'],
+        successCriteriaChanged: false,
+        addedNodeIds: ['entry'],
+        removedNodeIds: [],
+        changedNodeIds: [],
+        addedEdgeIds: [],
+        removedEdgeIds: [],
+        changedEdgeIds: [],
+      },
+      templateSnapshot: {
+        templateId,
+        templateName: 'Web Attack Surface Quick Win Hunt',
+        graph,
+      },
+    };
+    templates.materializeTemplateGraph.mockResolvedValue({
+      template: { id: templateId, name: 'Web Attack Surface Quick Win Hunt' },
+      graph,
+      runtimeInputs: [],
+    });
+    workflowAuthoring.proposeFromTemplate.mockResolvedValue(proposal);
+    const argumentsValue = {
+      templateId,
+      name: graph.name,
+      runtimeInputDefaults: { liveUrls: ['https://livespec.io'] },
+    };
+
+    const result = await service.execute({
+      commandName: 'propose_workflow_from_template',
+      arguments: argumentsValue,
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(templates.materializeTemplateGraph).toHaveBeenCalledWith(templateId, {
+      workflowName: graph.name,
+      description: undefined,
+      runtimeInputDefaults: argumentsValue.runtimeInputDefaults,
+    });
+    expect(workflowAuthoring.proposeFromTemplate).toHaveBeenCalledWith({
+      graph,
+      templateId,
+      templateName: 'Web Attack Surface Quick Win Hunt',
+      actionId: ACTION_ID,
+    });
+    expect(result.result).toBe(proposal);
   });
 
   it('uses the stable session and action identity as the workflow idempotency key', async () => {

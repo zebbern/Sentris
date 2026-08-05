@@ -362,10 +362,14 @@ and target pointers; the Workflow resolves the durable activity result determini
 canonical backend boundary validates the completed command input. Forward references, nested
 targets, literal/bound conflicts, and turn-scoped MCP snapshots remain excluded. Do not add a
 general expression language, string templating, or a second plan executor. Workflow
-authoring also uses typed durable actions: component discovery is
-registry-backed, new-workflow proposals use credential-safe bounded graphs, and existing-workflow
-proposals use bounded operations keyed by stable node and edge IDs. The backend materializes
-those operations against the exact immutable base; both paths share compile validation and a
+authoring also uses typed durable actions: common new-workflow requests search the maintained
+active Template Library first, whose bounded catalog exposes exact runtime-input contracts.
+Template-backed proposals apply validated non-secret runtime defaults through the canonical
+TemplateService and store the exact credential-safe graph snapshot in the proposal action;
+later template changes cannot alter the reviewed draft. Component-registry-backed freeform
+graphs remain the fallback when no suitable template exists, and existing-workflow proposals
+use bounded operations keyed by stable node and edge IDs. The backend materializes those
+operations against the exact immutable base; all paths share compile validation and a
 graph diff, and apply is a separate consequential action using proposal-ID idempotency plus an
 exact base-version fence. A compile-invalid proposal in a new turn may use one patch-gated repair
 pass through the same action ledger: exact failed-draft inspection, component reads, and at most

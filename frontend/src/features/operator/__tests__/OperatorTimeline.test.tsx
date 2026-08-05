@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test';
 import { cleanup, fireEvent, screen } from '@testing-library/react';
-import type { OperatorActionView, OperatorMessageView } from '@sentris/shared';
+import type { OperatorActionView, OperatorMessageView, OperatorTurnView } from '@sentris/shared';
 
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -70,7 +70,8 @@ describe('OperatorTimeline', () => {
       'href',
       '/runs/sentris-run-1',
     );
-    expect(screen.getByText('Operator is working')).toBeInTheDocument();
+    expect(screen.getByLabelText('1 recorded action')).toBeInTheDocument();
+    expect(screen.queryByText('Operator is working')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
     expect(onDecision).toHaveBeenCalledWith(pendingAction, 'approved');
@@ -112,6 +113,112 @@ describe('OperatorTimeline', () => {
       response: 'lodash',
       selectedOption: 'lodash',
     });
+  });
+
+  it('leaves one timeline marker when a pending question is elevated above the composer', () => {
+    const questionAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'elevated-question-action',
+      commandName: 'request_user_input',
+      effect: 'execute',
+      runId: null,
+      arguments: {
+        question: 'Which package should I inspect?',
+        options: ['axios', 'lodash'],
+        allowFreeform: true,
+      },
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={messages}
+        actions={[questionAction]}
+        isActive
+        elevatedDecisionActionId={questionAction.id}
+        onDecision={mock(() => {})}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(
+      screen.getByText('Answer in the pinned question below to continue.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'lodash' })).not.toBeInTheDocument();
+  });
+
+  it('groups consecutive actions and collapses completed activity from older turns', () => {
+    const oldAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'old-action',
+      turnId: 'turn-old',
+      commandName: 'list_runs',
+      effect: 'read',
+      status: 'succeeded',
+      approvalRequired: false,
+      runId: null,
+      result: [],
+      createdAt: '2026-08-02T09:00:01.000Z',
+      completedAt: '2026-08-02T09:00:02.000Z',
+    };
+    const latestActions: OperatorActionView[] = [
+      {
+        ...oldAction,
+        id: 'latest-action-1',
+        turnId: 'turn-latest',
+        commandName: 'list_workflows',
+        createdAt: '2026-08-02T10:00:01.000Z',
+      },
+      {
+        ...oldAction,
+        id: 'latest-action-2',
+        turnId: 'turn-latest',
+        commandName: 'list_runs',
+        createdAt: '2026-08-02T10:00:02.000Z',
+      },
+    ];
+    const turns: OperatorTurnView[] = [
+      {
+        id: 'turn-old',
+        sessionId: 'session-1',
+        status: 'completed',
+        temporalWorkflowId: null,
+        temporalRunId: null,
+        context: null,
+        error: null,
+        createdAt: '2026-08-02T09:00:00.000Z',
+        startedAt: '2026-08-02T09:00:00.000Z',
+        completedAt: '2026-08-02T09:00:03.000Z',
+      },
+      {
+        id: 'turn-latest',
+        sessionId: 'session-1',
+        status: 'completed',
+        temporalWorkflowId: null,
+        temporalRunId: null,
+        context: null,
+        error: null,
+        createdAt: '2026-08-02T10:00:00.000Z',
+        startedAt: '2026-08-02T10:00:00.000Z',
+        completedAt: '2026-08-02T10:00:03.000Z',
+      },
+    ];
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={[oldAction, ...latestActions]}
+        turns={turns}
+        isActive={false}
+        onDecision={mock(() => {})}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    const olderActivity = screen.getByText('Show activity').closest('details');
+    expect(olderActivity).not.toHaveAttribute('open');
+    expect(screen.getByLabelText('2 recorded actions')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Show activity'));
+    expect(olderActivity).toHaveAttribute('open');
   });
 
   it('opens configure-and-run without repeating a structured saved workflow list', () => {
@@ -165,13 +272,14 @@ describe('OperatorTimeline', () => {
       { initialEntries: ['/operator/session-1'] },
     );
 
+    expect(screen.queryByRole('link', { name: 'npm package investigation' })).toBeNull();
+    expect(screen.queryByText('Result')).not.toBeInTheDocument();
+    expect(screen.queryByText('Input')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show details for list_workflows' }));
     expect(screen.getByRole('link', { name: 'npm package investigation' })).toHaveAttribute(
       'href',
       `/workflows/${workflowId}`,
     );
-    expect(screen.queryByText('Result')).not.toBeInTheDocument();
-    expect(screen.queryByText('Input')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show details for list_workflows' }));
     expect(screen.getByText('Input')).toBeInTheDocument();
     expect(screen.getByText(/"limit": 25/)).toBeInTheDocument();
     expect(
@@ -235,6 +343,8 @@ describe('OperatorTimeline', () => {
       { initialEntries: ['/operator/session-1'] },
     );
 
+    expect(screen.queryByText('Version 4 · 8 nodes · 1 input')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show details for get_workflow' }));
     expect(screen.getByText('Version 4 · 8 nodes · 1 input')).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole('button', { name: 'Configure and run npm package investigation' }),

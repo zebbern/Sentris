@@ -20,6 +20,7 @@ import {
   PanelLeftOpen,
   Plus,
   Send,
+  ShieldCheck,
   Sparkles,
   Square,
   Trash2,
@@ -33,10 +34,11 @@ import { ErrorBanner } from '@/components/ui/error-banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { OperatorDecisionCard } from '@/features/operator/OperatorDecisionCard';
+import { OperatorJourneyPipeline } from '@/features/operator/OperatorJourneyPipeline';
 import { OperatorModelForm } from '@/features/operator/OperatorModelForm';
 import { OperatorModeSelect } from '@/features/operator/OperatorModeSelect';
 import { OperatorSessionModelPicker } from '@/features/operator/OperatorSessionModelPicker';
-import { OperatorJourneyPipeline } from '@/features/operator/OperatorJourneyPipeline';
 import { OperatorTimeline } from '@/features/operator/OperatorTimeline';
 import { OPERATOR_COMMAND_LABELS } from '@/features/operator/operatorCommandLabels';
 import {
@@ -528,6 +530,14 @@ function ActiveSession({
   );
   const journeyPipeline = projectOperatorJourneyPipeline(session);
   const composerActivity = getComposerActivity(session);
+  const pendingDecisionAction = useMemo(() => {
+    const activeTurnIds = new Set(
+      session.turns.filter((turn) => ACTIVE_TURN_STATUSES.has(turn.status)).map((turn) => turn.id),
+    );
+    return [...session.actions]
+      .reverse()
+      .find((action) => action.status === 'pending_approval' && activeTurnIds.has(action.turnId));
+  }, [session.actions, session.turns]);
 
   useEffect(() => {
     const viewport = scrollRef.current;
@@ -672,6 +682,7 @@ function ActiveSession({
             onRunSavedWorkflow={setWorkflowToRun}
             pendingCancelTurnId={cancelTurn.variables?.turnId}
             onCancelTurn={(turnId) => void cancel(turnId)}
+            elevatedDecisionActionId={pendingDecisionAction?.id}
           />
           {latestTurnError ? <ErrorBanner message={latestTurnError} className="mt-3" /> : null}
         </div>
@@ -694,7 +705,43 @@ function ActiveSession({
             </div>
           ) : null}
 
-          {composerActivity ? (
+          {pendingDecisionAction ? (
+            <div
+              className={cn(
+                'relative z-20 mx-4 -mb-px overflow-hidden rounded-t-2xl border bg-card/95 shadow-[0_-12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl',
+                pendingDecisionAction.commandName === 'request_user_input'
+                  ? 'border-blue-500/35'
+                  : 'border-amber-500/40',
+              )}
+              aria-live="polite"
+            >
+              <div className="flex h-9 items-center gap-2 border-b border-border/50 px-4 text-xs font-medium text-foreground">
+                {pendingDecisionAction.commandName === 'request_user_input' ? (
+                  <MessageSquareText className="h-3.5 w-3.5 text-blue-400" aria-hidden="true" />
+                ) : (
+                  <ShieldCheck className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
+                )}
+                <span>
+                  {pendingDecisionAction.commandName === 'request_user_input'
+                    ? 'Operator needs your input'
+                    : 'Approval required'}
+                </span>
+                <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+                  {pendingDecisionAction.commandName}
+                </span>
+              </div>
+              <div className="px-4 py-3">
+                <OperatorDecisionCard
+                  key={pendingDecisionAction.id}
+                  action={pendingDecisionAction}
+                  pending={decideAction.variables?.actionId === pendingDecisionAction.id}
+                  onDecision={(action, decision, response) =>
+                    void decide(action, decision, response)
+                  }
+                />
+              </div>
+            </div>
+          ) : composerActivity ? (
             <div
               className="relative z-0 mx-4 -mb-px overflow-hidden rounded-t-2xl border border-border/70 bg-card/85 px-4 pb-3 pt-2.5 shadow-[0_-12px_40px_rgba(0,0,0,0.12)] backdrop-blur-xl"
               aria-live="polite"

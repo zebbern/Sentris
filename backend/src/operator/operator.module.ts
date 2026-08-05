@@ -7,6 +7,7 @@ import { McpRuntimeModule } from '../mcp-runtime/mcp-runtime.module';
 import { McpServersModule } from '../mcp-servers/mcp-servers.module';
 import { SecretsModule } from '../secrets/secrets.module';
 import { StorageModule } from '../storage/storage.module';
+import { TemplatesModule } from '../templates/templates.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { InternalOperatorController } from './internal-operator.controller';
 import { OperatorActivityStreamService } from './operator-activity-stream.service';
@@ -27,6 +28,7 @@ import { OperatorWorkflowAuthoringService } from './operator-workflow-authoring.
     McpServersModule,
     SecretsModule,
     StorageModule,
+    TemplatesModule,
     WorkflowsModule,
   ],
   controllers: [InternalOperatorController, OperatorController],

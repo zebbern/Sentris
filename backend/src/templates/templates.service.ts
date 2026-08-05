@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   HttpException,
@@ -7,6 +8,12 @@ import {
   Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import {
+  describeWorkflowRuntimeInputs,
+  WorkflowRuntimeInputDefinitionsSchema,
+  workflowRuntimeInputValueSchema,
+  type WorkflowRuntimeInputDefinition,
+} from '@sentris/shared';
 import { WorkflowSanitizationService } from './workflow-sanitization.service';
 import { TemplatesRepository } from './templates.repository';
 import {
@@ -22,7 +29,7 @@ import {
 import { WorkflowsService } from '../workflows/workflows.service';
 import { WorkflowGraphSchema } from '../workflows/dto/workflow-graph.dto';
 import type { AuthContext } from '../auth/types';
-import type { TemplateManifest } from '../database/schema/templates';
+import type { Template, TemplateManifest } from '../database/schema/templates';
 
 /**
  * Templates Service
@@ -59,6 +66,59 @@ export class TemplateService {
   async getTemplateById(id: string) {
     const template = await this.templatesRepository.findById(id);
     return template ? this.withValidation(template) : null;
+  }
+
+  async listTemplateCatalog(
+    input: {
+      category?: string;
+      search?: string;
+      tags?: string[];
+      requiredComponentIds?: string[];
+      limit?: number;
+    } = {},
+  ) {
+    const { limit = 10, requiredComponentIds = [], ...filters } = input;
+    const templates = await this.templatesRepository.findAll(filters);
+    return templates
+      .flatMap((template) => {
+        try {
+          const { graph, runtimeInputs } = this.buildTemplateGraph(template);
+          const componentIds = [...new Set(graph.nodes.map((node) => node.type))];
+          if (
+            requiredComponentIds.some(
+              (requiredComponentId) => !componentIds.includes(requiredComponentId),
+            )
+          ) {
+            return [];
+          }
+          return [
+            {
+              id: template.id,
+              name: template.name,
+              description: template.description,
+              category: template.category,
+              tags: template.tags ?? [],
+              isOfficial: template.isOfficial,
+              isVerified: template.isVerified,
+              nodeCount: graph.nodes.length,
+              edgeCount: graph.edges.length,
+              componentIds,
+              runtimeInputs: describeWorkflowRuntimeInputs(runtimeInputs),
+              requiredSecrets: (template.requiredSecrets ?? []).map((secret) => ({
+                name: secret.name,
+                type: secret.type,
+                ...(secret.description ? { description: secret.description } : {}),
+              })),
+            },
+          ];
+        } catch (error: unknown) {
+          this.logger.warn(
+            `Skipping unusable template ${template.id} in catalog: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return [];
+        }
+      })
+      .slice(0, limit);
   }
 
   /**
@@ -220,6 +280,114 @@ export class TemplateService {
     return this.templateRevalidationService.getJobLog(auditId, params.stream, params.maxBytes);
   }
 
+  private buildTemplateGraph(
+    template: Template,
+    params: {
+      workflowName?: string;
+      description?: string;
+      runtimeInputDefaults?: Record<string, unknown>;
+      secretMappings?: Record<string, string>;
+    } = {},
+  ) {
+    if (!template.graph) {
+      throw new HttpException(
+        'Template does not contain workflow graph data',
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
+
+    let graphData: Record<string, unknown> = {
+      ...template.graph,
+      name: params.workflowName ?? template.name,
+      ...(params.description !== undefined ? { description: params.description } : {}),
+    };
+    if (Array.isArray(graphData.nodes)) {
+      graphData.nodes = (graphData.nodes as Record<string, unknown>[]).map((node, index) =>
+        node.position && typeof node.position === 'object'
+          ? node
+          : { ...node, position: { x: 250, y: index * 150 } },
+      );
+    }
+    if (params.secretMappings && template.requiredSecrets && template.requiredSecrets.length > 0) {
+      graphData = this.applySecretMappings(
+        graphData,
+        params.secretMappings,
+        template.requiredSecrets,
+      );
+    }
+
+    const graph = WorkflowGraphSchema.parse(graphData);
+    const entrypoint = graph.nodes.find(
+      (node) => node.type === 'core.workflow.entrypoint' || node.type === 'entry-point',
+    );
+    const runtimeInputs = WorkflowRuntimeInputDefinitionsSchema.parse(
+      entrypoint?.data.config.params.runtimeInputs ?? [],
+    );
+    const runtimeInputDefaults = params.runtimeInputDefaults ?? {};
+    const definitionsById = new Map(
+      runtimeInputs.map((definition: WorkflowRuntimeInputDefinition) => [
+        definition.id,
+        definition,
+      ]),
+    );
+
+    for (const [inputId, value] of Object.entries(runtimeInputDefaults)) {
+      const definition = definitionsById.get(inputId);
+      if (!definition) {
+        throw new BadRequestException(`Unknown template runtime input "${inputId}"`);
+      }
+      if (definition.type === 'secret') {
+        throw new BadRequestException(
+          `Secret runtime input "${inputId}" cannot be stored as a template default`,
+        );
+      }
+      if (!workflowRuntimeInputValueSchema(definition.type).safeParse(value).success) {
+        throw new BadRequestException(
+          `Template runtime input "${inputId}" must be ${definition.type}`,
+        );
+      }
+      definition.defaultValue = value;
+    }
+    if (entrypoint && Object.keys(runtimeInputDefaults).length > 0) {
+      entrypoint.data.config.params.runtimeInputs = runtimeInputs;
+    }
+    return { graph: WorkflowGraphSchema.parse(graph), runtimeInputs };
+  }
+
+  /**
+   * Materialize an active template as a validated graph without saving it.
+   * This is the canonical preparation boundary shared by product flows that
+   * need an exact template snapshot before deciding whether to persist it.
+   */
+  async materializeTemplateGraph(
+    templateId: string,
+    params: {
+      workflowName?: string;
+      description?: string;
+      runtimeInputDefaults?: Record<string, unknown>;
+      secretMappings?: Record<string, string>;
+    } = {},
+  ) {
+    const template = await this.templatesRepository.findById(templateId);
+    if (!template?.isActive) {
+      throw new NotFoundException(`Template ${templateId} not found`);
+    }
+    if (!template.graph) {
+      throw new HttpException(
+        'Template does not contain workflow graph data',
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
+
+    const { graph, runtimeInputs } = this.buildTemplateGraph(template, params);
+
+    return {
+      template,
+      graph: WorkflowGraphSchema.parse(graph),
+      runtimeInputs,
+    };
+  }
+
   /**
    * Use a template to create a new workflow
    *
@@ -236,50 +404,11 @@ export class TemplateService {
       organizationId?: string;
     },
   ) {
-    // 1. Find the template
-    const template = await this.templatesRepository.findById(templateId);
-    if (!template) {
-      throw new NotFoundException(`Template ${templateId} not found`);
-    }
+    const { template, graph: workflowGraph } = await this.materializeTemplateGraph(templateId, {
+      workflowName: params.workflowName,
+      secretMappings: params.secretMappings,
+    });
 
-    // 2. Validate that the template has graph data
-    if (!template.graph) {
-      throw new HttpException(
-        'Template does not contain workflow graph data',
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
-    }
-
-    // 3. Build the workflow graph from the template, overriding the name
-    //    Templates may lack node positions (stripped during publish to reduce size)
-    //    so we add default positions in a grid layout before schema validation.
-    let graphData: Record<string, unknown> = {
-      ...template.graph,
-      name: params.workflowName,
-    };
-
-    if (Array.isArray(graphData.nodes)) {
-      graphData.nodes = (graphData.nodes as Record<string, unknown>[]).map((node, idx) => {
-        if (!node.position || typeof node.position !== 'object') {
-          return { ...node, position: { x: 250, y: idx * 150 } };
-        }
-        return node;
-      });
-    }
-
-    if (params.secretMappings && template.requiredSecrets && template.requiredSecrets.length > 0) {
-      graphData = this.applySecretMappings(
-        graphData,
-        params.secretMappings,
-        template.requiredSecrets,
-      );
-    }
-
-    // Parse through the WorkflowGraphSchema to ensure it conforms to the
-    // expected shape (adds defaults for viewport, config, etc.)
-    const workflowGraph = WorkflowGraphSchema.parse(graphData);
-
-    // 4. Create the workflow via WorkflowsService
     const authContext: AuthContext = {
       userId: params.userId ?? null,
       organizationId: params.organizationId ?? null,
@@ -294,7 +423,6 @@ export class TemplateService {
 
     const workflow = await this.workflowsService.create(workflowGraph, authContext);
 
-    // 5. Increment the template's popularity counter
     await this.templatesRepository.incrementPopularity(templateId);
 
     this.logger.log(

@@ -1,7 +1,12 @@
 import { ForbiddenException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-import type { OperatorDirectCommand, OperatorJourney, OperatorRouteContext } from '@sentris/shared';
+import type {
+  OperatorDirectCommand,
+  OperatorJourney,
+  OperatorRouteContext,
+  WorkflowGraph,
+} from '@sentris/shared';
 
 import type { AuthContext } from '../../auth/types';
 import type {
@@ -167,6 +172,7 @@ describe('OperatorService', () => {
       getRun: vi.fn(),
       getRunStatus: vi.fn(),
       getRunResult: vi.fn(),
+      resolveGraphPorts: vi.fn((graph: WorkflowGraph) => graph),
     };
     workflowAuthoring = { listDraftDetails: vi.fn().mockResolvedValue([]) };
     service = new OperatorService(
@@ -177,6 +183,52 @@ describe('OperatorService', () => {
       temporal as unknown as TemporalService,
       workflowAuthoring as unknown as OperatorWorkflowAuthoringService,
     );
+  });
+
+  it('resolves config-dependent ports before returning workflow drafts to the Builder', async () => {
+    const proposedGraph: WorkflowGraph = {
+      name: 'Draft workflow',
+      nodes: [
+        {
+          id: 'script',
+          type: 'core.logic.script',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Transform',
+            config: {
+              params: {
+                variables: [{ name: 'target', type: 'text' }],
+                returns: [{ name: 'result', type: 'text' }],
+              },
+              inputOverrides: {},
+            },
+          },
+        },
+      ],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    const resolvedGraph: WorkflowGraph = {
+      ...proposedGraph,
+      nodes: proposedGraph.nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          dynamicInputs: [{ id: 'target', label: 'target' }],
+          dynamicOutputs: [{ id: 'result', label: 'result' }],
+        },
+      })),
+    };
+    workflowAuthoring.listDraftDetails.mockResolvedValue([
+      { proposedGraph, baseGraph: proposedGraph },
+    ]);
+    workflows.resolveGraphPorts.mockReturnValue(resolvedGraph);
+
+    const [draft] = await service.listWorkflowDrafts(auth, SESSION_ID);
+
+    expect(workflows.resolveGraphPorts).toHaveBeenCalledTimes(2);
+    expect(draft?.proposedGraph).toEqual(resolvedGraph);
+    expect(draft?.baseGraph).toEqual(resolvedGraph);
   });
 
   it('loads a succeeded immutable plan only from the executing session', async () => {

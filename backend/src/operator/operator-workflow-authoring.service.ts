@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   OperatorProposeWorkflowEditsInputSchema,
+  OperatorProposeWorkflowFromTemplateInputSchema,
   OperatorProposeWorkflowDraftInputSchema,
   OperatorReviseWorkflowDraftInputSchema,
   OperatorWorkflowDraftResultSchema,
@@ -38,6 +39,12 @@ export const OPERATOR_PRESERVE_CREDENTIAL = '__SENTRIS_PRESERVE_CREDENTIAL__';
 type JsonRecord = Record<string, unknown>;
 
 type StoredWorkflowProposal =
+  | {
+      kind: 'template';
+      action: OperatorActionRecord;
+      arguments: OperatorCommandInputMap['propose_workflow_from_template'];
+      result: OperatorWorkflowDraftResult;
+    }
   | {
       kind: 'graph';
       action: OperatorActionRecord;
@@ -762,6 +769,31 @@ export class OperatorWorkflowAuthoringService {
     });
   }
 
+  async proposeFromTemplate(input: {
+    graph: WorkflowGraph;
+    templateId: string;
+    templateName: string;
+    actionId: string;
+  }): Promise<OperatorWorkflowDraftResult> {
+    const projectedGraph = this.projectGraph(input.graph);
+    const result = this.buildProposalResult({
+      actionId: input.actionId,
+      workflowId: undefined,
+      baseVersionId: undefined,
+      sourceRunId: undefined,
+      proposedGraph: projectedGraph,
+      persistedBaseGraph: undefined,
+    });
+    return OperatorWorkflowDraftResultSchema.parse({
+      ...result,
+      templateSnapshot: {
+        templateId: input.templateId,
+        templateName: input.templateName,
+        graph: projectedGraph,
+      },
+    });
+  }
+
   async proposeEdits(input: {
     arguments: OperatorCommandInputMap['propose_workflow_edits'];
     auth: AuthContext;
@@ -873,6 +905,13 @@ export class OperatorWorkflowAuthoringService {
     if (action.commandName === 'propose_workflow_draft') {
       return OperatorProposeWorkflowDraftInputSchema.parse(action.arguments).graph;
     }
+    if (action.commandName === 'propose_workflow_from_template') {
+      const result = OperatorWorkflowDraftResultSchema.parse(action.result);
+      if (!result.templateSnapshot) {
+        throw new ConflictException('Operator template draft has no stored graph snapshot');
+      }
+      return result.templateSnapshot.graph;
+    }
     if (action.commandName === 'propose_workflow_edits') {
       if (!persistedBaseGraph) {
         throw new NotFoundException('Operator workflow draft base version no longer exists');
@@ -922,6 +961,7 @@ export class OperatorWorkflowAuthoringService {
     }
     if (
       context.action.commandName !== 'propose_workflow_draft' &&
+      context.action.commandName !== 'propose_workflow_from_template' &&
       context.action.commandName !== 'propose_workflow_edits' &&
       context.action.commandName !== 'revise_workflow_draft'
     ) {
@@ -996,6 +1036,7 @@ export class OperatorWorkflowAuthoringService {
     const proposals = actions.filter(
       (action) =>
         (action.commandName === 'propose_workflow_draft' ||
+          action.commandName === 'propose_workflow_from_template' ||
           action.commandName === 'propose_workflow_edits' ||
           action.commandName === 'revise_workflow_draft') &&
         action.status === 'succeeded',
@@ -1004,6 +1045,20 @@ export class OperatorWorkflowAuthoringService {
     for (const action of proposals) {
       const result = OperatorWorkflowDraftResultSchema.safeParse(action.result);
       if (!result.success) continue;
+      if (action.commandName === 'propose_workflow_from_template') {
+        const argumentsResult = OperatorProposeWorkflowFromTemplateInputSchema.safeParse(
+          action.arguments,
+        );
+        if (argumentsResult.success && result.data.templateSnapshot) {
+          parsed.push({
+            kind: 'template',
+            action,
+            arguments: argumentsResult.data,
+            result: result.data,
+          });
+        }
+        continue;
+      }
       if (action.commandName === 'propose_workflow_draft') {
         const argumentsResult = OperatorProposeWorkflowDraftInputSchema.safeParse(action.arguments);
         if (argumentsResult.success) {
@@ -1052,7 +1107,9 @@ export class OperatorWorkflowAuthoringService {
       const baseVersion = result.baseVersionId ? baseById.get(result.baseVersionId) : undefined;
       if (kind === 'edits' && !baseVersion) continue;
       let proposedGraph: WorkflowGraph;
-      if (kind === 'graph') {
+      if (kind === 'template') {
+        proposedGraph = result.templateSnapshot!.graph;
+      } else if (kind === 'graph') {
         try {
           proposedGraph = this.projectGraph(
             restoreCredentialValues(value.graph, baseVersion?.graph),

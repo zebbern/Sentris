@@ -385,6 +385,109 @@ describe('Operator activities', () => {
     expect(JSON.stringify(recoveryMessages)).not.toContain('tool-result');
   });
 
+  for (const scenario of [
+    {
+      label: 'plain-text capability refusal',
+      firstResult: {
+        text: 'Sorry, I cannot fulfill your request to create a security scanning workflow.',
+        finishReason: 'stop',
+        toolCalls: [],
+      },
+    },
+    {
+      label: 'refusal-shaped question tool call',
+      firstResult: {
+        text: '',
+        finishReason: 'tool-calls',
+        toolCalls: [
+          {
+            toolCallId: 'provider-refusal-question',
+            toolName: 'request_user_input',
+            input: {
+              question: 'Sorry, I cannot fulfill your request to configure vulnerability scanning.',
+              reason: 'Refusal due to policy constraints on concrete target scanning',
+            },
+          },
+        ],
+      },
+    },
+  ]) {
+    test(`recovers a ${scenario.label} through the typed Operator tools`, async () => {
+      fetchImpl.mockResolvedValueOnce(
+        jsonResponse({
+          session: {
+            id: SESSION_ID,
+            title: 'Session',
+            organizationId: ORGANIZATION_ID,
+            userId: USER_ID,
+            approvalMode: 'ask',
+            status: 'active',
+            model: {
+              provider: 'openai',
+              modelId: 'gpt-test',
+              apiKeySecretId: SECRET_ID,
+              baseUrl: null,
+            },
+            createdAt: '2026-08-05T00:00:00.000Z',
+            updatedAt: '2026-08-05T00:00:00.000Z',
+          },
+          turn: {
+            id: TURN_ID,
+            sessionId: SESSION_ID,
+            status: 'running',
+            context: { path: '/operator' },
+          },
+          messages: [
+            {
+              role: 'user',
+              content: 'Can we make a workflow to scan my website for security flaws?',
+            },
+          ],
+          actions: [],
+        }),
+      );
+      generateTextImpl.mockResolvedValueOnce(scenario.firstResult).mockResolvedValueOnce({
+        text: '',
+        finishReason: 'tool-calls',
+        toolCalls: [
+          {
+            toolCallId: 'provider-list-components',
+            toolName: 'list_components',
+            input: { query: 'website security' },
+          },
+        ],
+      });
+
+      const result = await activities.operatorModelStepActivity({ ...base, step: 1 });
+
+      expect(result).toEqual({
+        text: '',
+        finishReason: 'tool-calls',
+        toolCalls: [
+          {
+            toolCallId: `${TURN_ID}:1:0`,
+            modelToolCallId: 'provider-list-components',
+            commandName: 'list_components',
+            arguments: { query: 'website security' },
+          },
+        ],
+      });
+      expect(generateTextImpl).toHaveBeenCalledTimes(2);
+      expect(generateTextImpl.mock.calls[1]?.[0]?.tools).toHaveProperty('list_components');
+      expect(generateTextImpl.mock.calls[1]?.[0]?.tools).not.toHaveProperty('request_user_input');
+      expect(generateTextImpl.mock.calls[1]?.[0]?.toolChoice).toBe('required');
+      expect(String(generateTextImpl.mock.calls[1]?.[0]?.system)).toContain(
+        'choose a practical balanced starter scope',
+      );
+      expect(String(generateTextImpl.mock.calls[1]?.[0]?.system)).toContain(
+        'search the maintained Template Library first',
+      );
+      expect(String(generateTextImpl.mock.calls[1]?.[0]?.system)).toContain(
+        'define its runtimeInputs explicitly',
+      );
+    });
+  }
+
   test('fails the activity when the text-only recovery also returns a provider error', async () => {
     fetchImpl.mockResolvedValueOnce(
       jsonResponse({

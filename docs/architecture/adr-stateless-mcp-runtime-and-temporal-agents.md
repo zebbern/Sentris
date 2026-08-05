@@ -186,15 +186,24 @@ shared contract is enforced in `WorkflowRunService` for every launch path before
 or Temporal start; an Operator preflight failure is a durable failed tool result that the
 model can correct within the turn rather than a doomed workflow run.
 Workflow authoring uses that same typed command ledger rather than a second agent loop.
-The Operator discovers components from the canonical registry and receives an editable
-graph whose inline and component-declared credentials are opaque placeholders. Creating a
-workflow stores one bounded complete graph in its proposal action. Updating an existing
+For common new-workflow requests, Operator first searches the maintained active Template
+Library. The bounded catalog exposes exact runtime-input IDs and types plus unique component
+IDs derived from each validated graph. Exact component requirements filter the materializable
+catalog before its result limit, so a popular metadata match cannot displace a template that
+actually contains the requested capability. Explicit web vulnerability, flaw, exposure, or
+misconfiguration requests require `sentris.nuclei.scan`; reconnaissance-only requests do not.
+The canonical TemplateService then materializes the selected graph with validated non-secret
+defaults. The proposal action stores that exact credential-safe graph snapshot, so later
+template updates cannot change a reviewed draft. When no suitable template exists, Operator discovers
+components from the canonical registry and receives an editable graph whose inline and
+component-declared credentials are opaque placeholders. Freeform creation stores one bounded
+complete graph in its proposal action. Updating an existing
 workflow instead stores bounded domain operations keyed by stable node and edge IDs, including
 one canonical `set_success_criteria` operation for the versioned benchmark. The backend
 materializes them against the exact immutable base graph. Structured node patches
 merge recursively so an update to one nested value retains unrelated credential placeholders;
 explicit remove operations remain top-level and full-graph proposals retain replacement
-semantics. Both proposal forms use
+semantics. All proposal forms use
 the same credential restoration, compilation, validation, and graph-diff path without
 mutating a workflow. Applying either is a separate consequential action: the proposal action
 ID is the workflow-mutation idempotency key, updates fence on the exact immutable base

@@ -20,6 +20,7 @@ const REVISION_ACTION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const WORKFLOW_ID = '55555555-5555-4555-8555-555555555555';
 const BASE_VERSION_ID = '66666666-6666-4666-8666-666666666666';
 const SAVED_VERSION_ID = '77777777-7777-4777-8777-777777777777';
+const TEMPLATE_ID = '88888888-8888-4888-8888-888888888888';
 const SOURCE_RUN_ID = 'sentris-run-source';
 const INLINE_API_KEY = 'sk-inline-value-that-must-never-reach-the-model';
 
@@ -341,6 +342,64 @@ describe('OperatorWorkflowAuthoringService', () => {
     });
     expect(result).not.toHaveProperty('graph');
     expect(JSON.stringify(result)).not.toContain(INLINE_API_KEY);
+  });
+
+  it('keeps the exact template graph snapshot through review and apply', async () => {
+    const graph = makeGraph({ name: 'livespec.io security scan' });
+    graph.nodes[0]!.data.config.params.runtimeInputs = [
+      {
+        id: 'liveUrls',
+        label: 'Live URLs',
+        type: 'array',
+        required: true,
+        defaultValue: ['https://livespec.io'],
+      },
+    ];
+
+    const proposal = await service.proposeFromTemplate({
+      graph,
+      templateId: TEMPLATE_ID,
+      templateName: 'Web Attack Surface Quick Win Hunt',
+      actionId: PROPOSAL_ACTION_ID,
+    });
+    const action = {
+      id: PROPOSAL_ACTION_ID,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      commandName: 'propose_workflow_from_template',
+      status: 'succeeded',
+      arguments: {
+        templateId: TEMPLATE_ID,
+        runtimeInputDefaults: { liveUrls: ['https://livespec.io'] },
+      },
+      result: proposal,
+    };
+    const context = {
+      action,
+      turn: { id: TURN_ID, sessionId: SESSION_ID },
+      session: { id: SESSION_ID, organizationId: ORGANIZATION_ID },
+    };
+    operatorRepository.getActionWithTurnSession.mockResolvedValue(context);
+    operatorRepository.listActions.mockResolvedValue([action]);
+    workflows.create.mockResolvedValue({
+      id: WORKFLOW_ID,
+      name: graph.name,
+      currentVersionId: SAVED_VERSION_ID,
+      currentVersion: 1,
+    });
+
+    const [detail] = await service.listDraftDetails([action] as never, auth);
+    expect(detail?.proposedGraph).toEqual(graph);
+
+    await service.apply({
+      arguments: { draftId: PROPOSAL_ACTION_ID },
+      auth,
+      sessionId: SESSION_ID,
+    });
+
+    expect(workflows.create).toHaveBeenCalledWith(graph, auth, {
+      idempotencyKey: `operator-draft:${PROPOSAL_ACTION_ID}`,
+    });
   });
 
   it('materializes compact ID-based edits against the exact credential-safe base graph', async () => {

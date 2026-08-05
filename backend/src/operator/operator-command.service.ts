@@ -9,6 +9,7 @@ import {
   OperatorPlanProposalResultSchema,
   OperatorUserInputResultSchema,
   OperatorListWorkflowsResultSchema,
+  OperatorListWorkflowTemplatesResultSchema,
   OperatorWorkflowInspectionResultSchema,
   OperatorWorkflowPromotionResultSchema,
   MCP_CAPABILITY_CONTRACT_VERSION,
@@ -42,6 +43,7 @@ import { ArtifactsService } from '../storage/artifacts.service';
 import { AgentTraceService } from '../agent-trace/agent-trace.service';
 import { TraceService } from '../trace/trace.service';
 import { WorkflowsService } from '../workflows/workflows.service';
+import { TemplateService } from '../templates/templates.service';
 import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
 import {
   OPERATOR_PRESERVE_CREDENTIAL,
@@ -306,6 +308,7 @@ export class OperatorCommandService {
     private readonly traceService: TraceService,
     private readonly artifactsService: ArtifactsService,
     private readonly agentTraceService: AgentTraceService,
+    private readonly templateService: TemplateService,
   ) {}
 
   async execute(input: {
@@ -336,6 +339,10 @@ export class OperatorCommandService {
           OPERATOR_COMMAND_DEFINITIONS.get_workflow.inputSchema.parse(input.arguments),
           input.auth,
         );
+      case 'list_workflow_templates':
+        return this.listWorkflowTemplates(
+          OPERATOR_COMMAND_DEFINITIONS.list_workflow_templates.inputSchema.parse(input.arguments),
+        );
       case 'list_components':
         return this.listComponents(
           OPERATOR_COMMAND_DEFINITIONS.list_components.inputSchema.parse(input.arguments),
@@ -349,6 +356,13 @@ export class OperatorCommandService {
           OPERATOR_COMMAND_DEFINITIONS.get_workflow_draft.inputSchema.parse(input.arguments),
           input.auth,
           input.sessionId,
+        );
+      case 'propose_workflow_from_template':
+        return this.proposeWorkflowFromTemplate(
+          OPERATOR_COMMAND_DEFINITIONS.propose_workflow_from_template.inputSchema.parse(
+            input.arguments,
+          ),
+          input.actionId,
         );
       case 'propose_workflow_draft':
         return this.proposeWorkflowDraft(
@@ -570,6 +584,15 @@ export class OperatorCommandService {
     };
   }
 
+  private async listWorkflowTemplates(
+    input: OperatorCommandInputMap['list_workflow_templates'],
+  ): Promise<{ result: unknown }> {
+    const catalog = await this.templateService.listTemplateCatalog(input);
+    return {
+      result: toBoundedJson(OperatorListWorkflowTemplatesResultSchema.parse(catalog)),
+    };
+  }
+
   private getComponent(input: OperatorCommandInputMap['get_component']): { result: unknown } {
     return { result: toBoundedJson(this.operatorWorkflowAuthoringService.getComponent(input)) };
   }
@@ -597,6 +620,25 @@ export class OperatorCommandService {
       result: await this.operatorWorkflowAuthoringService.propose({
         arguments: input,
         auth,
+        actionId,
+      }),
+    };
+  }
+
+  private async proposeWorkflowFromTemplate(
+    input: OperatorCommandInputMap['propose_workflow_from_template'],
+    actionId: string,
+  ): Promise<{ result: unknown }> {
+    const materialized = await this.templateService.materializeTemplateGraph(input.templateId, {
+      workflowName: input.name,
+      description: input.description,
+      runtimeInputDefaults: input.runtimeInputDefaults,
+    });
+    return {
+      result: await this.operatorWorkflowAuthoringService.proposeFromTemplate({
+        graph: materialized.graph,
+        templateId: materialized.template.id,
+        templateName: materialized.template.name,
         actionId,
       }),
     };
