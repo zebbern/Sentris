@@ -15,7 +15,9 @@ import {
   OperatorListFindingsInputSchema,
   OperatorPersistedTurnPayloadSchema,
   OperatorPersistedTurnPayloadV1Schema,
+  OperatorActionDecisionSchema,
   OperatorProposePlanInputSchema,
+  OperatorRequestUserInputSchema,
   resolveOperatorPlanStepArguments,
   OperatorReadMcpResourceInputSchema,
   OperatorSessionStreamErrorSchema,
@@ -32,6 +34,39 @@ import {
 import { WorkflowSuccessCriteriaSchema } from '../workflow-graph.js';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
+
+describe('Operator user input', () => {
+  it('requires an answer path and carries a bounded durable response', () => {
+    expect(
+      OperatorRequestUserInputSchema.parse({
+        question: 'Which package should I inspect?',
+        options: ['axios', 'lodash'],
+        allowFreeform: true,
+      }),
+    ).toEqual({
+      question: 'Which package should I inspect?',
+      options: ['axios', 'lodash'],
+      allowFreeform: true,
+    });
+    expect(
+      OperatorRequestUserInputSchema.safeParse({
+        question: 'Which package should I inspect?',
+        allowFreeform: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorActionDecisionSchema.parse({
+        decision: 'approved',
+        expectedVersion: 3,
+        response: { response: 'lodash', selectedOption: 'lodash' },
+      }),
+    ).toEqual({
+      decision: 'approved',
+      expectedVersion: 3,
+      response: { response: 'lodash', selectedOption: 'lodash' },
+    });
+  });
+});
 
 describe('Operator run controls', () => {
   it('can inspect the exact workflow version before launching it', () => {

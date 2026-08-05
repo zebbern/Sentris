@@ -12,24 +12,28 @@ import {
   OperatorRunInputProposalResultSchema,
   OperatorPlanProposalResultSchema,
   OperatorRunWorkflowInputSchema,
+  OperatorUserInputResultSchema,
   type OperatorActionStatus,
   type OperatorActionView,
   type FindingTriageStatus,
   type OperatorMessageView,
   type OperatorTurnView,
+  type OperatorUserInputResponse,
   type OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
 import {
   Bot,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleDot,
   Clock3,
   ListChecks,
   Loader2,
+  MessageCircleQuestion,
   ShieldCheck,
-  X,
 } from 'lucide-react';
+import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,7 +47,7 @@ import { OperatorSavedWorkflowCard } from './OperatorSavedWorkflowCard';
 import { OperatorPlanCard } from './OperatorPlanCard';
 import { OperatorWorkflowDraftCard } from './OperatorWorkflowDraftCard';
 import type { OperatorWorkflowRunSelection } from './OperatorWorkflowRunDialog';
-import { OPERATOR_COMMAND_LABELS } from './operatorCommandLabels';
+import { OperatorDecisionCard } from './OperatorDecisionCard';
 
 const ACTION_STATUS_LABELS: Record<OperatorActionStatus, string> = {
   proposed: 'Proposed',
@@ -114,7 +118,7 @@ function MessageEvent({
     return (
       <article
         data-operator-turn-id={message.turnId}
-        className="ml-auto max-w-[85%] rounded-xl rounded-br-sm bg-primary px-3.5 py-2.5 text-sm text-primary-foreground shadow-sm md:max-w-[72%]"
+        className="ml-auto max-w-[88%] rounded-[18px] rounded-br-md bg-muted/80 px-3.5 py-2.5 text-[13px] leading-relaxed text-foreground shadow-sm md:max-w-[360px]"
       >
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
       </article>
@@ -129,14 +133,11 @@ function MessageEvent({
         : `${workflowListCount} saved workflow${workflowListCount === 1 ? ' is' : 's are'} shown above. Choose Configure & run to continue.`;
 
   return (
-    <article
-      data-operator-turn-id={message.turnId}
-      className="flex max-w-[92%] items-start gap-2.5 md:max-w-[82%]"
-    >
-      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-card text-primary">
-        <Bot className="h-4 w-4" />
+    <article data-operator-turn-id={message.turnId} className="flex max-w-full items-start gap-2.5">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background/75 text-primary shadow-sm">
+        <Bot className="h-3.5 w-3.5" />
       </div>
-      <div className="min-w-0 rounded-xl rounded-tl-sm border border-border/70 bg-card/70 px-3.5 py-2.5 shadow-sm">
+      <div className="min-w-0 flex-1 px-1 py-1">
         {workflowListTransition ? (
           <>
             <p className="text-sm text-foreground">{workflowListTransition}</p>
@@ -147,7 +148,7 @@ function MessageEvent({
               <MarkdownView
                 content={message.content}
                 dataTestId={`operator-message-${message.id}`}
-                className="prose prose-sm mt-2 max-w-none break-words border-t border-border/60 pt-2 text-foreground dark:prose-invert prose-p:my-1 prose-pre:my-2 prose-pre:max-w-full prose-pre:overflow-auto"
+                className="prose prose-sm mt-2 max-w-none break-words border-t border-border/60 pt-2 text-[13px] leading-relaxed text-foreground dark:prose-invert prose-headings:my-4 prose-headings:text-base prose-headings:leading-snug prose-p:my-1.5 prose-pre:my-2 prose-pre:max-w-full prose-pre:overflow-auto"
               />
             </details>
           </>
@@ -155,7 +156,7 @@ function MessageEvent({
           <MarkdownView
             content={message.content}
             dataTestId={`operator-message-${message.id}`}
-            className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-1 prose-pre:my-2 prose-pre:max-w-full prose-pre:overflow-auto"
+            className="prose prose-sm max-w-none break-words text-[13px] leading-relaxed text-foreground dark:prose-invert prose-headings:my-4 prose-headings:text-base prose-headings:leading-snug prose-p:my-1.5 prose-pre:my-2 prose-pre:max-w-full prose-pre:overflow-auto"
           />
         )}
       </div>
@@ -219,10 +220,10 @@ function InvestigationFollowUps({
 
   if (runInput?.success) {
     return (
-      <div className="ml-9 max-w-[calc(100%-2.25rem)] space-y-2 rounded-lg border border-primary/20 bg-primary/[0.03] p-2.5">
+      <div className="max-w-full space-y-2 rounded-xl border border-border/70 bg-background/65 p-3 shadow-sm">
         <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
           <ListChecks className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-          Suggested follow-ups
+          Run details
         </div>
         <OperatorRunEvidenceCard
           runId={runInput.data.runId}
@@ -254,10 +255,10 @@ function InvestigationFollowUps({
   if (!nextStatus && !sourceRunId) return null;
 
   return (
-    <div className="ml-9 max-w-[calc(100%-2.25rem)] space-y-2 rounded-lg border border-primary/20 bg-primary/[0.03] p-2.5">
+    <div className="max-w-full space-y-2 rounded-xl border border-border/70 bg-background/65 p-3 shadow-sm">
       <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
         <ListChecks className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-        Suggested follow-ups
+        Finding actions
       </div>
       {nextStatus ? (
         <Button
@@ -296,8 +297,13 @@ interface ActionEventProps {
   action: OperatorActionView;
   actions: OperatorActionView[];
   pendingDecision: boolean;
+  pendingDecisionActionId?: string;
   runCommandDisabled: boolean;
-  onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
+  onDecision: (
+    action: OperatorActionView,
+    decision: 'approved' | 'rejected',
+    response?: OperatorUserInputResponse,
+  ) => void;
   onRunCommand: (request: OperatorRunCommandRequest) => void;
   onRunSavedWorkflow: (workflow: OperatorWorkflowRunSelection) => void;
   workflowDrafts: OperatorWorkflowDraftDetail[];
@@ -312,6 +318,7 @@ function ActionEvent({
   action,
   actions,
   pendingDecision,
+  pendingDecisionActionId,
   runCommandDisabled,
   onDecision,
   onRunCommand,
@@ -323,7 +330,9 @@ function ActionEvent({
   pendingCancelTurnId,
   onCancelTurn,
 }: ActionEventProps) {
-  const argumentsPreview = formatPreview(action.arguments);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const isUserInput = action.commandName === 'request_user_input';
+  const argumentsPreview = isUserInput ? null : formatPreview(action.arguments);
   const draftResult = OperatorWorkflowDraftResultSchema.safeParse(action.result);
   const applyResult = OperatorWorkflowApplyResultSchema.safeParse(action.result);
   const listedWorkflows =
@@ -337,10 +346,45 @@ function ActionEvent({
   const runComparison = OperatorRunComparisonResultSchema.safeParse(action.result);
   const runInputProposal = OperatorRunInputProposalResultSchema.safeParse(action.result);
   const planProposal = OperatorPlanProposalResultSchema.safeParse(action.result);
+  const userInputResult = OperatorUserInputResultSchema.safeParse(action.result);
   const runWorkflowInput =
     action.commandName === 'run_workflow'
       ? OperatorRunWorkflowInputSchema.safeParse(action.arguments)
       : null;
+
+  if (planProposal.success) {
+    return (
+      <OperatorPlanCard
+        plan={planProposal.data}
+        proposalTurnId={action.turnId}
+        turns={turns}
+        actions={actions}
+        disabled={runCommandDisabled}
+        pendingDecisionActionId={pendingDecisionActionId}
+        pendingCancelTurnId={pendingCancelTurnId}
+        onCommand={onRunCommand}
+        onDecision={onDecision}
+        onCancelTurn={onCancelTurn}
+      />
+    );
+  }
+
+  if (action.runId && action.commandName === 'run_workflow') {
+    return (
+      <div data-operator-turn-id={action.turnId}>
+        <OperatorRunActivity
+          runId={action.runId}
+          sourceRunId={runWorkflowInput?.success ? runWorkflowInput.data.sourceRunId : undefined}
+          allowSourceComparison={
+            runWorkflowInput?.success ? !runWorkflowInput.data.inputChanges : true
+          }
+          disabled={runCommandDisabled}
+          onCommand={onRunCommand}
+        />
+      </div>
+    );
+  }
+
   const workflowAuthoringResult = draftResult.success
     ? draftResult.data
     : applyResult.success
@@ -361,7 +405,9 @@ function ActionEvent({
                 ? null
                 : planProposal.success
                   ? null
-                  : formatPreview(action.result);
+                  : userInputResult.success
+                    ? null
+                    : formatPreview(action.result);
   const isActive = action.status === 'executing' || action.status === 'approved';
   const workflowDraft = draftResult.success
     ? workflowDrafts.find(
@@ -369,185 +415,215 @@ function ActionEvent({
           draft.draftId === draftResult.data.draftId && draft.proposalActionId === action.id,
       )
     : undefined;
+  const collapsibleResultPreview = action.status === 'failed' ? null : resultPreview;
+  const hasTechnicalDetails = Boolean(argumentsPreview || collapsibleResultPreview);
+  const hasStructuredContent = Boolean(
+    workflowAuthoringResult ||
+    listedWorkflows?.success ||
+    inspectedWorkflow?.success ||
+    runComparison.success ||
+    runInputProposal.success ||
+    (action.runId && action.commandName !== 'run_workflow') ||
+    action.status === 'pending_approval' ||
+    userInputResult.success,
+  );
+  const headerContent = (
+    <>
+      {isActive ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+      ) : action.status === 'succeeded' ? (
+        <Check className="h-3.5 w-3.5 text-emerald-500" />
+      ) : action.status === 'pending_approval' && isUserInput ? (
+        <MessageCircleQuestion className="h-3.5 w-3.5 text-blue-400" />
+      ) : action.status === 'pending_approval' ? (
+        <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
+      ) : (
+        <CircleDot className="h-3.5 w-3.5 text-muted-foreground" />
+      )}
+      <span className="font-mono text-xs font-semibold">{action.commandName}</span>
+      <Badge
+        variant="outline"
+        className={cn(
+          'ml-auto h-5 px-1.5 text-[10px]',
+          action.status === 'pending_approval' && isUserInput
+            ? 'border-blue-500/35 bg-blue-500/10 text-blue-400'
+            : ACTION_STATUS_STYLES[action.status],
+        )}
+      >
+        {action.status === 'pending_approval' && isUserInput
+          ? 'Needs input'
+          : ACTION_STATUS_LABELS[action.status]}
+      </Badge>
+      {hasTechnicalDetails ? (
+        <ChevronDown
+          className={cn(
+            'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform',
+            detailsExpanded && 'rotate-180',
+          )}
+          aria-hidden="true"
+        />
+      ) : null}
+    </>
+  );
 
   return (
     <article
       data-operator-turn-id={action.turnId}
       className={cn(
-        'ml-9 max-w-[calc(100%-2.25rem)] overflow-hidden rounded-lg border bg-card/50',
-        action.status === 'pending_approval' && 'border-amber-500/40 bg-amber-500/[0.04]',
+        'max-w-full overflow-hidden rounded-2xl border border-border/70 bg-background/75 shadow-[0_10px_32px_rgba(0,0,0,0.2)]',
+        action.status === 'pending_approval' &&
+          (isUserInput
+            ? 'border-blue-500/35 bg-blue-500/[0.035]'
+            : 'border-amber-500/40 bg-amber-500/[0.04]'),
       )}
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2">
-        {isActive ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
-        ) : action.status === 'succeeded' ? (
-          <Check className="h-3.5 w-3.5 text-emerald-500" />
-        ) : action.status === 'pending_approval' ? (
-          <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
-        ) : (
-          <CircleDot className="h-3.5 w-3.5 text-muted-foreground" />
-        )}
-        <span className="text-xs font-semibold">{OPERATOR_COMMAND_LABELS[action.commandName]}</span>
-        <Badge
-          variant="outline"
-          className={cn('ml-auto h-5 px-1.5 text-[10px]', ACTION_STATUS_STYLES[action.status])}
+      {hasTechnicalDetails ? (
+        <button
+          type="button"
+          className={cn(
+            'flex min-h-11 w-full flex-wrap items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-muted/25',
+            (detailsExpanded || hasStructuredContent || resultPreview) &&
+              'border-b border-border/50',
+          )}
+          aria-expanded={detailsExpanded}
+          aria-label={`${detailsExpanded ? 'Hide' : 'Show'} details for ${action.commandName}`}
+          onClick={() => setDetailsExpanded((value) => !value)}
         >
-          {ACTION_STATUS_LABELS[action.status]}
-        </Badge>
-      </div>
+          {headerContent}
+        </button>
+      ) : (
+        <div
+          className={cn(
+            'flex min-h-11 flex-wrap items-center gap-2 px-4 py-2.5',
+            (hasStructuredContent || resultPreview) && 'border-b border-border/50',
+          )}
+        >
+          {headerContent}
+        </div>
+      )}
 
-      <div className="space-y-2 px-3 py-2.5">
-        {action.status === 'pending_approval' ? (
-          <p className="text-xs text-muted-foreground">
-            Operator wants to perform a consequential action. Review it before continuing.
-          </p>
-        ) : null}
+      {detailsExpanded ? (
+        <div className="grid gap-2.5 border-b border-border/40 px-4 py-3 sm:grid-cols-2">
+          {argumentsPreview ? (
+            <div className="min-w-0">
+              <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Input
+              </p>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md bg-background/70 p-2 font-mono text-[10px] text-foreground">
+                {argumentsPreview}
+              </pre>
+            </div>
+          ) : null}
+          {collapsibleResultPreview ? (
+            <div className="min-w-0">
+              <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Output
+              </p>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md bg-background/70 p-2 font-mono text-[10px] text-foreground">
+                {collapsibleResultPreview}
+              </pre>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
-        {argumentsPreview ? (
-          <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer select-none font-medium">Command input</summary>
-            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md bg-background/70 p-2 font-mono text-[11px] text-foreground">
-              {argumentsPreview}
-            </pre>
-          </details>
-        ) : null}
+      {action.status === 'failed' && resultPreview ? (
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all border-b border-destructive/20 bg-destructive/5 px-4 py-2.5 font-mono text-[10px] text-destructive">
+          {resultPreview}
+        </pre>
+      ) : null}
 
-        {resultPreview ? (
-          <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer select-none font-medium">
-              {action.status === 'failed' ? 'Error' : 'Result'}
-            </summary>
-            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md bg-background/70 p-2 font-mono text-[11px] text-foreground">
-              {resultPreview}
-            </pre>
-          </details>
-        ) : null}
-
-        {workflowAuthoringResult ? (
-          <OperatorWorkflowDraftCard
-            sessionId={action.sessionId}
-            result={workflowAuthoringResult}
-            detail={workflowDraft}
-            disabled={runCommandDisabled}
-            applied={draftResult.success && appliedDraftIds.has(draftResult.data.draftId)}
-            onApply={(draft) =>
-              onRunCommand({
-                message: `Save workflow draft ${draft.draftId} as a new immutable workflow version`,
-                directCommand: {
-                  commandName: 'apply_workflow_draft',
-                  arguments: { draftId: draft.draftId },
-                },
-              })
-            }
-            onRunSavedVersion={onRunSavedWorkflow}
-            onRunImprovedVersion={(savedWorkflow) =>
-              onRunCommand({
-                message: `Run improved workflow version ${savedWorkflow.versionId} using inputs from run ${savedWorkflow.sourceRunId}`,
-                directCommand: {
-                  commandName: 'run_workflow',
-                  arguments: {
-                    workflowId: savedWorkflow.workflowId,
-                    versionId: savedWorkflow.versionId,
-                    sourceRunId: savedWorkflow.sourceRunId,
-                    inputs: {},
+      {hasStructuredContent ? (
+        <div className="space-y-2.5 px-4 py-3">
+          {workflowAuthoringResult ? (
+            <OperatorWorkflowDraftCard
+              sessionId={action.sessionId}
+              result={workflowAuthoringResult}
+              detail={workflowDraft}
+              disabled={runCommandDisabled}
+              applied={draftResult.success && appliedDraftIds.has(draftResult.data.draftId)}
+              onApply={(draft) =>
+                onRunCommand({
+                  message: `Save workflow draft ${draft.draftId} as a new immutable workflow version`,
+                  directCommand: {
+                    commandName: 'apply_workflow_draft',
+                    arguments: { draftId: draft.draftId },
                   },
-                },
-              })
-            }
-          />
-        ) : null}
+                })
+              }
+              onRunSavedVersion={onRunSavedWorkflow}
+              onRunImprovedVersion={(savedWorkflow) =>
+                onRunCommand({
+                  message: `Run improved workflow version ${savedWorkflow.versionId} using inputs from run ${savedWorkflow.sourceRunId}`,
+                  directCommand: {
+                    commandName: 'run_workflow',
+                    arguments: {
+                      workflowId: savedWorkflow.workflowId,
+                      versionId: savedWorkflow.versionId,
+                      sourceRunId: savedWorkflow.sourceRunId,
+                      inputs: {},
+                    },
+                  },
+                })
+              }
+            />
+          ) : null}
 
-        {listedWorkflows?.success ? (
-          <OperatorSavedWorkflowCard
-            kind="list"
-            result={listedWorkflows.data}
-            disabled={runCommandDisabled}
-            onRun={onRunSavedWorkflow}
-          />
-        ) : null}
+          {listedWorkflows?.success ? (
+            <OperatorSavedWorkflowCard
+              kind="list"
+              result={listedWorkflows.data}
+              disabled={runCommandDisabled}
+              onRun={onRunSavedWorkflow}
+            />
+          ) : null}
 
-        {inspectedWorkflow?.success ? (
-          <OperatorSavedWorkflowCard
-            kind="inspection"
-            result={inspectedWorkflow.data}
-            disabled={runCommandDisabled}
-            onRun={onRunSavedWorkflow}
-          />
-        ) : null}
+          {inspectedWorkflow?.success ? (
+            <OperatorSavedWorkflowCard
+              kind="inspection"
+              result={inspectedWorkflow.data}
+              disabled={runCommandDisabled}
+              onRun={onRunSavedWorkflow}
+            />
+          ) : null}
 
-        {runComparison.success ? (
-          <OperatorRunComparisonCard
-            result={runComparison.data}
-            disabled={runCommandDisabled}
-            kept={
-              Boolean(runComparison.data.candidate.workflowVersionId) &&
-              keptVersionIds.has(runComparison.data.candidate.workflowVersionId ?? '')
-            }
-            onCommand={onRunCommand}
-          />
-        ) : null}
+          {runComparison.success ? (
+            <OperatorRunComparisonCard
+              result={runComparison.data}
+              disabled={runCommandDisabled}
+              kept={
+                Boolean(runComparison.data.candidate.workflowVersionId) &&
+                keptVersionIds.has(runComparison.data.candidate.workflowVersionId ?? '')
+              }
+              onCommand={onRunCommand}
+            />
+          ) : null}
 
-        {runInputProposal.success ? (
-          <OperatorRunInputProposalCard
-            result={runInputProposal.data}
-            disabled={runCommandDisabled}
-            onCommand={onRunCommand}
-          />
-        ) : null}
+          {runInputProposal.success ? (
+            <OperatorRunInputProposalCard
+              result={runInputProposal.data}
+              disabled={runCommandDisabled}
+              onCommand={onRunCommand}
+            />
+          ) : null}
 
-        {planProposal.success ? (
-          <OperatorPlanCard
-            plan={planProposal.data}
-            turns={turns}
-            actions={actions}
-            disabled={runCommandDisabled}
-            pendingCancelTurnId={pendingCancelTurnId}
-            onCommand={onRunCommand}
-            onCancelTurn={onCancelTurn}
-          />
-        ) : null}
+          {action.runId && action.commandName !== 'run_workflow' ? (
+            <OperatorRunActivity
+              runId={action.runId}
+              disabled={runCommandDisabled}
+              onCommand={onRunCommand}
+            />
+          ) : null}
 
-        {action.runId ? (
-          <OperatorRunActivity
-            runId={action.runId}
-            sourceRunId={runWorkflowInput?.success ? runWorkflowInput.data.sourceRunId : undefined}
-            allowSourceComparison={
-              runWorkflowInput?.success ? !runWorkflowInput.data.inputChanges : true
-            }
-            disabled={runCommandDisabled}
-            onCommand={onRunCommand}
-          />
-        ) : null}
-
-        {action.status === 'pending_approval' ? (
-          <div className="flex items-center gap-2 pt-1">
-            <Button
-              size="sm"
-              className="h-8 gap-1.5 px-2.5 text-xs"
-              onClick={() => onDecision(action, 'approved')}
-              disabled={pendingDecision}
-            >
-              {pendingDecision ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Check className="h-3.5 w-3.5" />
-              )}
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 px-2.5 text-xs"
-              onClick={() => onDecision(action, 'rejected')}
-              disabled={pendingDecision}
-            >
-              <X className="h-3.5 w-3.5" />
-              Reject
-            </Button>
-          </div>
-        ) : null}
-      </div>
+          {action.status === 'pending_approval' || userInputResult.success ? (
+            <OperatorDecisionCard
+              action={action}
+              pending={pendingDecision}
+              onDecision={onDecision}
+            />
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -560,7 +636,11 @@ interface OperatorTimelineProps {
   pendingDecisionActionId?: string;
   runCommandDisabled?: boolean;
   workflowDrafts?: OperatorWorkflowDraftDetail[];
-  onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
+  onDecision: (
+    action: OperatorActionView,
+    decision: 'approved' | 'rejected',
+    response?: OperatorUserInputResponse,
+  ) => void;
   onRunCommand?: (request: OperatorRunCommandRequest) => void;
   onRunSavedWorkflow?: (workflow: OperatorWorkflowRunSelection) => void;
   pendingCancelTurnId?: string;
@@ -581,7 +661,21 @@ export function OperatorTimeline({
   pendingCancelTurnId,
   onCancelTurn = () => {},
 }: OperatorTimelineProps) {
-  const events = toTimelineEvents(messages, actions);
+  const planIds = actions.flatMap((action) => {
+    const plan = OperatorPlanProposalResultSchema.safeParse(action.result);
+    return plan.success ? [plan.data.planId] : [];
+  });
+  const planStepActionIds = new Set(
+    actions.flatMap((action) =>
+      planIds.some((planId) => action.toolCallId.includes(`:plan:${planId}:`)) ? [action.id] : [],
+    ),
+  );
+  const events = toTimelineEvents(messages, actions).filter(
+    (event) =>
+      event.kind === 'message' ||
+      !planStepActionIds.has(event.value.id) ||
+      (event.value.commandName === 'run_workflow' && Boolean(event.value.runId)),
+  );
   const latestInvestigationAction = [...actions]
     .reverse()
     .find(
@@ -619,7 +713,7 @@ export function OperatorTimeline({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3.5">
       {events.map((event) =>
         event.kind === 'message' ? (
           <MessageEvent
@@ -633,6 +727,7 @@ export function OperatorTimeline({
             action={event.value}
             actions={actions}
             pendingDecision={pendingDecisionActionId === event.value.id}
+            pendingDecisionActionId={pendingDecisionActionId}
             runCommandDisabled={runCommandDisabled}
             onDecision={onDecision}
             onRunCommand={onRunCommand}
@@ -657,7 +752,7 @@ export function OperatorTimeline({
       ) : null}
 
       {isActive ? (
-        <div className="ml-9 flex items-center gap-2 py-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/60 px-3 py-2.5 text-xs text-muted-foreground shadow-sm">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
           Operator is working
           <ChevronRight className="h-3 w-3 animate-pulse" />

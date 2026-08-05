@@ -1188,7 +1188,38 @@ export const OperatorGetMcpPromptInputSchema = z
   })
   .strict();
 
+export const OperatorRequestUserInputSchema = z
+  .object({
+    question: z.string().trim().min(1).max(500),
+    description: z.string().trim().min(1).max(2_000).optional(),
+    options: z.array(z.string().trim().min(1).max(120)).min(2).max(6).optional(),
+    allowFreeform: z.boolean().default(true),
+  })
+  .strict()
+  .refine((value) => value.allowFreeform || Boolean(value.options?.length), {
+    message: 'A user-input request must allow freeform input or provide options',
+  });
+
+export const OperatorUserInputResponseSchema = z
+  .object({
+    response: z.string().trim().min(1).max(20_000),
+    selectedOption: z.string().trim().min(1).max(120).optional(),
+  })
+  .strict();
+export type OperatorUserInputResponse = z.infer<typeof OperatorUserInputResponseSchema>;
+
+export const OperatorUserInputResultSchema = OperatorUserInputResponseSchema.extend({
+  kind: z.literal('operator-user-input'),
+}).strict();
+export type OperatorUserInputResult = z.infer<typeof OperatorUserInputResultSchema>;
+
 export const OPERATOR_COMMAND_DEFINITIONS = {
+  request_user_input: {
+    description:
+      'Pause this durable Operator turn and ask the user one necessary question. Use this instead of guessing when a required value, target, preference, or choice is missing. Keep the question focused and provide 2-6 concise options when there are clear choices. The same turn resumes with the user response.',
+    effect: 'execute',
+    inputSchema: OperatorRequestUserInputSchema,
+  },
   list_workflows: {
     description:
       "List the user's existing Sentris workflows. Use this to resolve a workflow name before inspecting or running it.",
@@ -1359,6 +1390,7 @@ export const OperatorCommandNameSchema = z.enum(OPERATOR_COMMAND_NAMES);
 export type OperatorCommandName = z.infer<typeof OperatorCommandNameSchema>;
 
 export type OperatorCommandInputMap = {
+  request_user_input: z.infer<typeof OperatorRequestUserInputSchema>;
   list_workflows: z.infer<typeof OperatorListWorkflowsInputSchema>;
   get_workflow: z.infer<typeof OperatorGetWorkflowInputSchema>;
   list_components: z.infer<typeof OperatorListComponentsInputSchema>;
@@ -1569,6 +1601,7 @@ export const OperatorActionDecisionSchema = z
   .object({
     decision: z.enum(['approved', 'rejected']),
     expectedVersion: z.number().int().nonnegative(),
+    response: OperatorUserInputResponseSchema.optional(),
   })
   .strict();
 export type OperatorActionDecision = z.infer<typeof OperatorActionDecisionSchema>;

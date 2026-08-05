@@ -1,20 +1,28 @@
 import { isDeepStrictEqual } from 'node:util';
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type {
-  McpOperationResult,
-  OperatorApprovalMode,
-  OperatorCommandEffect,
-  OperatorCommandName,
-  OperatorDirectCommand,
-  OperatorJourney,
-  OperatorModelConfig,
-  OperatorPersistedTurnPayload,
-  OperatorRouteContext,
-  OperatorRunObservation,
-  OperatorTurnStatus,
+import {
+  OperatorUserInputResponseSchema,
+  type McpOperationResult,
+  type OperatorApprovalMode,
+  type OperatorCommandEffect,
+  type OperatorCommandName,
+  type OperatorDirectCommand,
+  type OperatorJourney,
+  type OperatorModelConfig,
+  type OperatorPersistedTurnPayload,
+  type OperatorRouteContext,
+  type OperatorRunObservation,
+  type OperatorTurnStatus,
+  type OperatorUserInputResponse,
 } from '@sentris/shared';
 
 import type { AuthContext, AuthRole } from '../auth/types';
@@ -709,6 +717,7 @@ export class OperatorRepository {
     owner: { organizationId: string; userId: string };
     expectedVersion: number;
     decision: 'approved' | 'rejected';
+    response?: OperatorUserInputResponse;
     auth: AuthContext;
   }): Promise<OperatorActionRecord> {
     return this.db.transaction(async (tx) => {
@@ -734,6 +743,17 @@ export class OperatorRepository {
         throw new ConflictException(`Operator action is already ${owned.action.status}`);
       }
 
+      const requestsUserInput = owned.action.commandName === 'request_user_input';
+      const response = input.response
+        ? OperatorUserInputResponseSchema.parse(input.response)
+        : undefined;
+      if (requestsUserInput && input.decision === 'approved' && !response) {
+        throw new BadRequestException('A response is required to answer this Operator question');
+      }
+      if (!requestsUserInput && input.decision === 'approved' && response) {
+        throw new BadRequestException('Approval actions do not accept a response');
+      }
+
       const [updated] = await tx
         .update(operatorActionsTable)
         .set({
@@ -741,6 +761,18 @@ export class OperatorRepository {
           version: input.expectedVersion + 1,
           decidedBy: input.owner.userId,
           decidedAt: new Date(),
+          ...(requestsUserInput && input.decision === 'approved' && response
+            ? { result: { kind: 'operator-user-input', ...response } }
+            : {}),
+          ...(input.decision === 'rejected'
+            ? {
+                error: response
+                  ? `User requested changes: ${response.response}`
+                  : requestsUserInput
+                    ? 'User cancelled the question'
+                    : 'Operator action rejected by user',
+              }
+            : {}),
           ...(input.decision === 'rejected' && { completedAt: new Date() }),
         })
         .where(
@@ -760,7 +792,11 @@ export class OperatorRepository {
         resourceType: 'operator_action',
         resourceId: updated.id,
         resourceName: updated.commandName,
-        metadata: { sessionId: updated.sessionId, turnId: updated.turnId },
+        metadata: {
+          sessionId: updated.sessionId,
+          turnId: updated.turnId,
+          responseProvided: Boolean(response),
+        },
       });
       return updated;
     });

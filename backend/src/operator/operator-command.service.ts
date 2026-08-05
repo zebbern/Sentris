@@ -7,6 +7,7 @@ import {
   OperatorRunComparisonResultSchema,
   OperatorRunInputProposalResultSchema,
   OperatorPlanProposalResultSchema,
+  OperatorUserInputResultSchema,
   OperatorListWorkflowsResultSchema,
   OperatorWorkflowInspectionResultSchema,
   OperatorWorkflowPromotionResultSchema,
@@ -316,12 +317,15 @@ export class OperatorCommandService {
     turnCreatedAt: string;
     actionId: string;
     actionRequestedAt: string;
+    storedResult?: unknown;
   }): Promise<{
     result: unknown;
     runId?: string;
     mcpOperationRequest?: McpOperationInvocationRequest;
   }> {
     switch (input.commandName) {
+      case 'request_user_input':
+        return { result: OperatorUserInputResultSchema.parse(input.storedResult) };
       case 'list_workflows':
         return this.listWorkflows(
           OPERATOR_COMMAND_DEFINITIONS.list_workflows.inputSchema.parse(input.arguments),

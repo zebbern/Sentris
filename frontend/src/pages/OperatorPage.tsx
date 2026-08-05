@@ -1,5 +1,5 @@
 import {
-  LLM_PROVIDER_CATALOG,
+  OperatorPlanProposalResultSchema,
   type OperatorActionView,
   type OperatorApprovalMode,
   type OperatorDirectCommand,
@@ -7,17 +7,21 @@ import {
   type OperatorRouteContext,
   type OperatorSessionDetail,
   type OperatorSessionSummary,
+  type OperatorUserInputResponse,
 } from '@sentris/shared';
 import { formatDistanceToNowStrict } from 'date-fns';
 import {
   Bot,
-  CheckCircle2,
   ChevronDown,
   Loader2,
   MessageSquarePlus,
+  MessageSquareText,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
   Send,
-  Settings2,
   Sparkles,
+  Square,
   Trash2,
 } from 'lucide-react';
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -31,8 +35,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { OperatorModelForm } from '@/features/operator/OperatorModelForm';
 import { OperatorModeSelect } from '@/features/operator/OperatorModeSelect';
+import { OperatorSessionModelPicker } from '@/features/operator/OperatorSessionModelPicker';
 import { OperatorJourneyPipeline } from '@/features/operator/OperatorJourneyPipeline';
 import { OperatorTimeline } from '@/features/operator/OperatorTimeline';
+import { OPERATOR_COMMAND_LABELS } from '@/features/operator/operatorCommandLabels';
 import {
   OperatorWorkflowRunDialog,
   type OperatorWorkflowRunSelection,
@@ -41,7 +47,6 @@ import { projectOperatorJourneyPipeline } from '@/features/operator/operatorJour
 import {
   createDefaultOperatorModelDraft,
   draftToModelConfig,
-  modelConfigToDraft,
   type OperatorModelDraft,
 } from '@/features/operator/operatorModelDraft';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -75,6 +80,64 @@ const SUGGESTED_PROMPTS = [
   'Summarize the latest failed run',
   'Build a workflow that scans a domain and summarizes findings',
 ] as const;
+
+const ACTIVE_TURN_STATUSES = new Set(['queued', 'running', 'awaiting_approval']);
+const SETTLED_ACTION_STATUSES = new Set(['succeeded', 'failed', 'rejected']);
+
+interface ComposerActivity {
+  turnId: string;
+  label: string;
+  stepLabel?: string;
+  progress?: number;
+  waitingForUser: boolean;
+}
+
+function getComposerActivity(session: OperatorSessionDetail): ComposerActivity | null {
+  const turn = [...session.turns]
+    .reverse()
+    .find((candidate) => ACTIVE_TURN_STATUSES.has(candidate.status));
+  if (!turn) return null;
+
+  const actions = session.actions.filter((action) => action.turnId === turn.id);
+  const currentAction = [...actions]
+    .reverse()
+    .find((action) => !SETTLED_ACTION_STATUSES.has(action.status));
+  const waitingForUser =
+    turn.status === 'awaiting_approval' && currentAction?.status === 'pending_approval';
+  const label = waitingForUser
+    ? currentAction?.commandName === 'request_user_input'
+      ? 'Waiting for your answer'
+      : 'Waiting for approval'
+    : currentAction
+      ? `${OPERATOR_COMMAND_LABELS[currentAction.commandName]}…`
+      : turn.status === 'queued'
+        ? 'Operator is queued…'
+        : 'Operator is thinking…';
+
+  if (turn.journey?.kind !== 'execute_plan') {
+    return { turnId: turn.id, label, waitingForUser };
+  }
+
+  const planActionId = turn.journey.planActionId;
+  const planAction = session.actions.find(
+    (action) => action.id === planActionId && action.status === 'succeeded',
+  );
+  const plan = OperatorPlanProposalResultSchema.safeParse(planAction?.result);
+  if (!plan.success) return { turnId: turn.id, label, waitingForUser };
+
+  const planActions = actions.filter((action) =>
+    action.toolCallId.includes(`:plan:${plan.data.planId}:`),
+  );
+  const settled = planActions.filter((action) => SETTLED_ACTION_STATUSES.has(action.status)).length;
+  const currentStep = Math.min(plan.data.steps.length, settled + 1);
+  return {
+    turnId: turn.id,
+    label,
+    stepLabel: `Step ${Math.max(1, currentStep)} / ${plan.data.steps.length}`,
+    progress: Math.max(4, (settled / plan.data.steps.length) * 100),
+    waitingForUser,
+  };
+}
 
 function formatUpdatedAt(value: string): string {
   try {
@@ -139,23 +202,83 @@ function SessionRail({
   deletingSessionId: string | null;
   onDeleteSession: (session: OperatorSessionSummary) => void;
 }) {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sentris:operator-session-rail-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem('sentris:operator-session-rail-collapsed', String(next));
+      } catch {
+        // The rail still works for this page load when storage is unavailable.
+      }
+      return next;
+    });
+  };
+
   return (
-    <aside className="hidden w-56 shrink-0 flex-col border-r border-border/70 bg-app-chrome/35 md:flex lg:w-64">
-      <div className="flex h-10 items-center justify-between border-b border-border/60 px-3">
-        <span className="text-xs font-semibold text-muted-foreground">Sessions</span>
-        <Button asChild variant="ghost" size="icon" className="h-7 w-7">
-          <Link to="/operator" aria-label="New Operator session" title="New Operator session">
-            <MessageSquarePlus className="h-3.5 w-3.5" />
-          </Link>
-        </Button>
+    <aside
+      className={cn(
+        'hidden shrink-0 flex-col border-r border-border/60 bg-background/80 backdrop-blur-xl transition-[width] duration-200 md:flex',
+        collapsed ? 'w-14' : 'w-56 lg:w-64',
+      )}
+    >
+      <div
+        className={cn(
+          'border-b border-border/50',
+          collapsed
+            ? 'flex flex-col items-center gap-1 p-1.5'
+            : 'flex h-10 items-center justify-between px-3',
+        )}
+      >
+        {collapsed ? null : (
+          <span className="text-xs font-semibold text-muted-foreground">Sessions</span>
+        )}
+        <div className={cn('flex items-center', collapsed ? 'flex-col gap-1' : 'gap-1')}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            aria-label={collapsed ? 'Expand chat sessions' : 'Collapse chat sessions'}
+            title={collapsed ? 'Expand chat sessions' : 'Collapse chat sessions'}
+            onClick={toggleCollapsed}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-3.5 w-3.5" />
+            ) : (
+              <PanelLeftClose className="h-3.5 w-3.5" />
+            )}
+          </Button>
+          <Button asChild variant="ghost" size="icon" className="h-7 w-7">
+            <Link to="/operator" aria-label="New Operator session" title="New Operator session">
+              <MessageSquarePlus className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
       </div>
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2" aria-label="Operator sessions">
+      <nav
+        className={cn(
+          'min-h-0 flex-1 space-y-1 overflow-y-auto',
+          collapsed ? 'px-1.5 py-2' : 'p-2',
+        )}
+        aria-label="Operator sessions"
+      >
         {isLoading
           ? Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-14 w-full" />
+              <Skeleton
+                key={index}
+                className={collapsed ? 'h-10 w-10 rounded-xl' : 'h-14 w-full'}
+              />
             ))
           : null}
-        {!isLoading && sessions?.length === 0 ? (
+        {!collapsed && !isLoading && sessions?.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground">
             Your Operator conversations will appear here.
           </p>
@@ -167,32 +290,55 @@ function SessionRail({
                 to={`/operator/${session.id}`}
                 aria-current={session.id === sessionId ? 'page' : undefined}
                 aria-label={`${session.title}${unreadSessionIds.has(session.id) ? ', unread activity' : ''}`}
+                title={collapsed ? session.title : undefined}
                 className={cn(
-                  'block rounded-md border border-transparent px-2.5 py-2 pr-9 transition-colors',
+                  'border border-transparent transition-colors',
+                  collapsed
+                    ? 'relative flex h-10 w-10 items-center justify-center rounded-xl'
+                    : 'block rounded-lg px-2.5 py-2 pr-9',
                   session.id === sessionId
-                    ? 'border-primary/25 bg-primary/10 text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                    ? 'border-border/80 bg-muted/55 text-foreground'
+                    : 'text-muted-foreground hover:bg-muted/35 hover:text-foreground',
                 )}
               >
-                <span className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                    {session.title}
-                  </span>
-                  {unreadSessionIds.has(session.id) ? (
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
-                  ) : null}
-                </span>
-                <span className="mt-1 block text-[10px] text-muted-foreground">
-                  {formatUpdatedAt(session.updatedAt)}
-                </span>
+                {collapsed ? (
+                  <>
+                    <MessageSquareText className="h-4 w-4" aria-hidden="true" />
+                    {unreadSessionIds.has(session.id) ? (
+                      <span
+                        className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <span className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                        {session.title}
+                      </span>
+                      {unreadSessionIds.has(session.id) ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full bg-primary"
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                    </span>
+                    <span className="mt-1 block text-[10px] text-muted-foreground">
+                      {formatUpdatedAt(session.updatedAt)}
+                    </span>
+                  </>
+                )}
               </Link>
-              <DeleteSessionButton
-                session={session}
-                deletingSessionId={deletingSessionId}
-                onDeleteSession={onDeleteSession}
-                className="absolute right-1.5 top-1.5 h-6 w-6 text-muted-foreground opacity-0 hover:text-destructive group-hover:opacity-100 group-focus-within:opacity-100"
-                iconClassName="h-3.5 w-3.5"
-              />
+              {collapsed ? null : (
+                <DeleteSessionButton
+                  session={session}
+                  deletingSessionId={deletingSessionId}
+                  onDeleteSession={onDeleteSession}
+                  className="absolute right-1.5 top-1.5 h-6 w-6 text-muted-foreground opacity-0 hover:text-destructive group-hover:opacity-100 group-focus-within:opacity-100"
+                  iconClassName="h-3.5 w-3.5"
+                />
+              )}
             </div>
           );
         })}
@@ -343,69 +489,6 @@ function NewOperatorSession({ handoff }: { handoff: OperatorTurnHandoff | null }
   );
 }
 
-function SessionModelSettings({ session }: { session: OperatorSessionDetail }) {
-  const { toast } = useToast();
-  const updateSession = useUpdateOperatorSession();
-  const [model, setModel] = useState<OperatorModelDraft>(() => modelConfigToDraft(session.model));
-  const modelConfig = draftToModelConfig(model);
-  const isDirty = modelConfig
-    ? JSON.stringify(modelConfig) !== JSON.stringify(session.model)
-    : false;
-
-  const save = async () => {
-    if (!modelConfig || !isDirty) return;
-    try {
-      await updateSession.mutateAsync({ sessionId: session.id, input: { model: modelConfig } });
-      toast({ title: 'Operator model updated' });
-    } catch (error) {
-      toast({
-        title: 'Could not update model',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  return (
-    <details className="group border-b border-border/60 bg-card/20">
-      <summary className="flex h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs text-muted-foreground md:px-4">
-        <Settings2 className="h-3.5 w-3.5" />
-        <span>{LLM_PROVIDER_CATALOG[session.model.provider].label}</span>
-        <span className="text-border">/</span>
-        <span className="truncate font-mono text-[10px]">{session.model.modelId}</span>
-        <span className="ml-auto flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          Credential ready
-        </span>
-      </summary>
-      <div className="border-t border-border/50 px-3 py-3 md:px-4">
-        <div className="mx-auto max-w-2xl">
-          <OperatorModelForm
-            value={model}
-            onChange={setModel}
-            disabled={updateSession.isPending}
-            compact
-          />
-          <div className="mt-3 flex justify-end">
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => void save()}
-              disabled={!modelConfig || !isDirty || updateSession.isPending}
-            >
-              {updateSession.isPending ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : null}
-              Save model
-            </Button>
-          </div>
-        </div>
-      </div>
-    </details>
-  );
-}
-
 function ActiveSession({
   session,
   activitySummary,
@@ -423,6 +506,7 @@ function ActiveSession({
   const createTurn = useCreateOperatorTurn();
   const cancelTurn = useCancelOperatorTurn();
   const decideAction = useDecideOperatorAction();
+  const updateSession = useUpdateOperatorSession();
   const [message, setMessage] = useState('');
   const [workflowToRun, setWorkflowToRun] = useState<OperatorWorkflowRunSelection | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -443,6 +527,7 @@ function ActiveSession({
     expectedWorkflowDraftCount,
   );
   const journeyPipeline = projectOperatorJourneyPipeline(session);
+  const composerActivity = getComposerActivity(session);
 
   useEffect(() => {
     const viewport = scrollRef.current;
@@ -523,12 +608,16 @@ function ActiveSession({
     void submit();
   };
 
-  const decide = async (action: OperatorActionView, decision: 'approved' | 'rejected') => {
+  const decide = async (
+    action: OperatorActionView,
+    decision: 'approved' | 'rejected',
+    response?: OperatorUserInputResponse,
+  ) => {
     try {
       await decideAction.mutateAsync({
         sessionId: session.id,
         actionId: action.id,
-        input: { decision, expectedVersion: action.version },
+        input: { decision, expectedVersion: action.version, ...(response ? { response } : {}) },
       });
     } catch (error) {
       toast({
@@ -544,7 +633,19 @@ function ActiveSession({
       await cancelTurn.mutateAsync({ sessionId: session.id, turnId });
     } catch (error) {
       toast({
-        title: 'Could not stop Operator plan',
+        title: 'Could not stop Operator',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const updateApprovalMode = async (approvalMode: OperatorApprovalMode) => {
+    try {
+      await updateSession.mutateAsync({ sessionId: session.id, input: { approvalMode } });
+    } catch (error) {
+      toast({
+        title: 'Could not update approval mode',
         description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
@@ -552,11 +653,9 @@ function ActiveSession({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <SessionModelSettings key={session.id} session={session} />
-
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-5">
-        <div className="mx-auto max-w-3xl">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:py-8">
+        <div className="mx-auto max-w-[800px]">
           {journeyPipeline ? <OperatorJourneyPipeline pipeline={journeyPipeline} /> : null}
           <OperatorTimeline
             messages={session.messages}
@@ -566,7 +665,7 @@ function ActiveSession({
             isActive={isActive}
             pendingDecisionActionId={decideAction.variables?.actionId}
             runCommandDisabled={isActive || createTurn.isPending}
-            onDecision={(action, decision) => void decide(action, decision)}
+            onDecision={(action, decision, response) => void decide(action, decision, response)}
             onRunCommand={(request) =>
               void sendTurn(request.message, request.directCommand, request.journey)
             }
@@ -574,19 +673,19 @@ function ActiveSession({
             pendingCancelTurnId={cancelTurn.variables?.turnId}
             onCancelTurn={(turnId) => void cancel(turnId)}
           />
-          {latestTurnError ? <ErrorBanner message={latestTurnError} className="ml-9 mt-3" /> : null}
+          {latestTurnError ? <ErrorBanner message={latestTurnError} className="mt-3" /> : null}
         </div>
       </div>
 
-      <div className="border-t border-border/70 bg-app-chrome/55 px-3 py-3 backdrop-blur-sm md:px-5">
-        <form onSubmit={(event) => void submit(event)} className="mx-auto max-w-3xl">
+      <div className="sticky bottom-0 z-30 shrink-0 bg-gradient-to-t from-background via-background/98 to-transparent px-4 pb-4 pt-3">
+        <form onSubmit={(event) => void submit(event)} className="mx-auto max-w-[800px]">
           {session.messages.length === 0 ? (
             <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1">
               {SUGGESTED_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
                   type="button"
-                  className="shrink-0 rounded-md border border-border/70 bg-background/70 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+                  className="shrink-0 rounded-full border border-border/70 bg-background/75 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
                   onClick={() => setMessage(prompt)}
                 >
                   {prompt}
@@ -594,34 +693,126 @@ function ActiveSession({
               ))}
             </div>
           ) : null}
-          <div className="relative">
+
+          {composerActivity ? (
+            <div
+              className="relative z-0 mx-4 -mb-px overflow-hidden rounded-t-2xl border border-border/70 bg-card/85 px-4 pb-3 pt-2.5 shadow-[0_-12px_40px_rgba(0,0,0,0.12)] backdrop-blur-xl"
+              aria-live="polite"
+            >
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span className="flex h-4 items-end gap-0.5" aria-hidden="true">
+                  <span className="h-1.5 w-0.5 rounded-full bg-current" />
+                  <span className="h-2.5 w-0.5 rounded-full bg-current" />
+                  <span className="h-3.5 w-0.5 rounded-full bg-current" />
+                  <span className="h-2 w-0.5 rounded-full bg-current" />
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {composerActivity.label}
+                </span>
+                {composerActivity.stepLabel ? (
+                  <span className="shrink-0 text-[10px]">{composerActivity.stepLabel}</span>
+                ) : null}
+              </div>
+              <div className="mt-2 h-0.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn(
+                    'h-full rounded-full bg-blue-500 transition-[width] duration-500',
+                    composerActivity.progress === undefined &&
+                      !composerActivity.waitingForUser &&
+                      'w-2/5 animate-pulse',
+                    composerActivity.waitingForUser && 'w-full bg-amber-500/70',
+                  )}
+                  style={
+                    composerActivity.progress === undefined
+                      ? undefined
+                      : { width: `${composerActivity.progress}%` }
+                  }
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <div className="relative z-10 rounded-[26px] border border-border/80 bg-card/95 px-3 pb-2.5 pt-2 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl">
             <Textarea
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               onKeyDown={handleComposerKeyDown}
-              placeholder={isActive ? 'Operator is completing the current turn…' : 'Ask Operator…'}
+              placeholder={isActive ? 'Operator is completing the current turn…' : 'Ask anything…'}
               aria-label="Message Operator"
-              className="min-h-[52px] resize-none rounded-lg pr-12 text-sm"
+              className="min-h-[58px] resize-none border-0 bg-transparent px-1 py-2 text-[13px] shadow-none focus-visible:ring-0"
               disabled={isActive || createTurn.isPending}
               rows={2}
             />
-            <Button
-              type="submit"
-              size="icon"
-              className="absolute bottom-2 right-2 h-8 w-8"
-              aria-label="Send message"
-              disabled={!message.trim() || isActive || createTurn.isPending}
-            >
-              {createTurn.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Send className="h-3.5 w-3.5" />
-              )}
-            </Button>
+
+            <div className="flex min-w-0 items-center gap-1.5">
+              <details className="group relative">
+                <summary className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/45 hover:text-foreground">
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  <span className="sr-only">Suggested prompts</span>
+                </summary>
+                <div className="absolute bottom-[calc(100%+12px)] left-0 z-50 w-72 space-y-1 rounded-xl border border-border/80 bg-popover/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+                  <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Quick prompts
+                  </p>
+                  {SUGGESTED_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      className="w-full rounded-lg px-2 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/55 hover:text-foreground"
+                      onClick={() => setMessage(prompt)}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </details>
+
+              <OperatorSessionModelPicker key={session.id} session={session} />
+
+              <OperatorModeSelect
+                value={session.approvalMode}
+                onChange={(mode) => void updateApprovalMode(mode)}
+                disabled={updateSession.isPending}
+                compact
+                className="h-7 w-auto min-w-16 border-0 bg-transparent px-1.5 text-[11px] shadow-none"
+              />
+
+              <div className="ml-auto shrink-0">
+                {composerActivity ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="h-8 w-8 rounded-full bg-foreground text-background hover:bg-foreground/85"
+                    aria-label="Stop Operator"
+                    title="Stop Operator"
+                    onClick={() => void cancel(composerActivity.turnId)}
+                    disabled={cancelTurn.isPending}
+                  >
+                    {cancelTurn.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Square className="h-3 w-3 fill-current" />
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    aria-label="Send message"
+                    disabled={!message.trim() || createTurn.isPending}
+                  >
+                    {createTurn.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
-          <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
-            Enter to send · Shift+Enter for a new line
-          </p>
         </form>
       </div>
 
@@ -754,7 +945,7 @@ export function OperatorPage() {
   );
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-2.5rem)] bg-background">
+    <div className="operator-surface flex h-[calc(100dvh-2.5rem)] min-h-0 max-h-[calc(100dvh-2.5rem)] overflow-hidden">
       <SessionRail
         sessionId={sessionId}
         sessions={sessionsQuery.data}
@@ -764,7 +955,10 @@ export function OperatorPage() {
         onDeleteSession={handleDeleteSession}
       />
 
-      <section className="flex min-w-0 flex-1 flex-col" aria-busy={sessionQuery.isFetching}>
+      <section
+        className="flex min-w-0 flex-1 flex-col overflow-hidden"
+        aria-busy={sessionQuery.isFetching}
+      >
         <MobileSessionPicker
           sessionId={sessionId}
           sessions={sessionsQuery.data}
@@ -785,7 +979,7 @@ export function OperatorPage() {
         ) : null}
 
         {sessionId && sessionQuery.isLoading ? (
-          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 px-4 py-8">
+          <div className="mx-auto flex w-full max-w-[800px] flex-1 flex-col gap-3 px-4 py-8">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-24 w-4/5" />
             <Skeleton className="ml-auto h-16 w-3/5" />

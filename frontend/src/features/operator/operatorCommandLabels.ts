@@ -1,6 +1,7 @@
 import type { OperatorCommandName } from '@sentris/shared';
 
 export const OPERATOR_COMMAND_LABELS: Record<OperatorCommandName, string> = {
+  request_user_input: 'Operator needs your input',
   list_workflows: 'List workflows',
   get_workflow: 'Inspect workflow',
   list_components: 'List components',

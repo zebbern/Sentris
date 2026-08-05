@@ -120,6 +120,30 @@ describe('OperatorCommandService', () => {
     );
   });
 
+  it('returns the persisted user response as the request_user_input tool result', async () => {
+    const result = await service.execute({
+      commandName: 'request_user_input',
+      arguments: { question: 'Which package?', options: ['axios', 'lodash'] },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+      storedResult: {
+        kind: 'operator-user-input',
+        response: 'lodash',
+        selectedOption: 'lodash',
+      },
+    });
+
+    expect(result.result).toEqual({
+      kind: 'operator-user-input',
+      response: 'lodash',
+      selectedOption: 'lodash',
+    });
+  });
+
   it('uses the stable session and action identity as the workflow idempotency key', async () => {
     const result = await service.execute({
       commandName: 'run_workflow',

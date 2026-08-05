@@ -20870,6 +20870,25 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "response": {
+            "type": "object",
+            "properties": {
+              "response": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20000
+              },
+              "selectedOption": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "response"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

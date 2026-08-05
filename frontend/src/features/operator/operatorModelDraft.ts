@@ -18,6 +18,18 @@ export function getDefaultBaseUrl(provider: LlmModelProvider): string {
   return entry.defaultBaseUrl ?? '';
 }
 
+export function changeOperatorModelProvider(
+  draft: OperatorModelDraft,
+  provider: LlmModelProvider,
+): OperatorModelDraft {
+  return {
+    ...draft,
+    provider,
+    modelId: getRecommendedLlmModel(provider),
+    baseUrl: getDefaultBaseUrl(provider),
+  };
+}
+
 export function createDefaultOperatorModelDraft(): OperatorModelDraft {
   const provider: LlmModelProvider = 'gemini';
   return {

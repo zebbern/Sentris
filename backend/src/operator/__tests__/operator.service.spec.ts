@@ -619,6 +619,34 @@ describe('OperatorService', () => {
     expect(result.disposition).toBe('execute');
   });
 
+  it('waits for required user input even when the session auto-approves actions', async () => {
+    const session = sessionRecord('auto');
+    repository.getTurnWithSession.mockResolvedValue({ turn: turnRecord(), session });
+    repository.createAction.mockImplementation(async (input: { approvalRequired: boolean }) => ({
+      action: {
+        ...actionRecord('auto', input.approvalRequired ? 'pending_approval' : 'approved'),
+        commandName: 'request_user_input',
+        effect: 'execute',
+        approvalRequired: input.approvalRequired,
+        arguments: { question: 'Which package?', options: ['axios', 'lodash'] },
+      },
+      created: true,
+    }));
+
+    const result = await service.prepareInternalAction({
+      turnId: TURN_ID,
+      organizationId: 'operator-org',
+      toolCallId: 'question-1',
+      commandName: 'request_user_input',
+      arguments: { question: 'Which package?', options: ['axios', 'lodash'] },
+    });
+
+    expect(repository.createAction).toHaveBeenCalledWith(
+      expect.objectContaining({ approvalMode: 'auto', approvalRequired: true }),
+    );
+    expect(result.disposition).toBe('wait_for_approval');
+  });
+
   it('persists invalid model arguments as a failed action for the next model step', async () => {
     repository.createAction.mockImplementation(
       async (input: { arguments: Record<string, unknown>; validationError?: string }) => ({

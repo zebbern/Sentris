@@ -75,8 +75,43 @@ describe('OperatorTimeline', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
     expect(onDecision).toHaveBeenCalledWith(pendingAction, 'approved');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onDecision).toHaveBeenCalledWith(pendingAction, 'rejected');
+  });
+
+  it('renders a durable Operator question and returns the selected answer', () => {
+    const onDecision = mock(() => {});
+    const questionAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'question-action',
+      commandName: 'request_user_input',
+      effect: 'execute',
+      runId: null,
+      arguments: {
+        question: 'Which package should I inspect?',
+        description: 'Choose one package or provide another.',
+        options: ['axios', 'lodash'],
+        allowFreeform: true,
+      },
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={messages}
+        actions={[questionAction]}
+        isActive
+        onDecision={onDecision}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getByText('Which package should I inspect?')).toBeInTheDocument();
+    expect(screen.getByText('Needs input')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'lodash' }));
+    expect(onDecision).toHaveBeenCalledWith(questionAction, 'approved', {
+      response: 'lodash',
+      selectedOption: 'lodash',
+    });
   });
 
   it('opens configure-and-run without repeating a structured saved workflow list', () => {
@@ -135,6 +170,10 @@ describe('OperatorTimeline', () => {
       `/workflows/${workflowId}`,
     );
     expect(screen.queryByText('Result')).not.toBeInTheDocument();
+    expect(screen.queryByText('Input')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show details for list_workflows' }));
+    expect(screen.getByText('Input')).toBeInTheDocument();
+    expect(screen.getByText(/"limit": 25/)).toBeInTheDocument();
     expect(
       screen.getByText('1 saved workflow is shown above. Choose Configure & run to continue.'),
     ).toBeInTheDocument();
@@ -317,7 +356,7 @@ describe('OperatorTimeline', () => {
       { initialEntries: ['/operator/session-1'] },
     );
 
-    expect(screen.getByText('Draft workflow edits')).toBeInTheDocument();
+    expect(screen.getByText('propose_workflow_edits')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /save version/i })).toBeEnabled();
   });
 

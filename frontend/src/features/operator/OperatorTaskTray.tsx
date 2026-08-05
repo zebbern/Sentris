@@ -57,7 +57,7 @@ function turnStatusPresentation(status: OperatorTurnStatus): TurnStatusPresentat
     case 'running':
       return { label: 'Running', icon: Loader2, className: 'text-blue-500' };
     case 'awaiting_approval':
-      return { label: 'Needs approval', icon: CircleAlert, className: 'text-amber-500' };
+      return { label: 'Needs attention', icon: CircleAlert, className: 'text-amber-500' };
     case 'completed':
       return { label: 'Completed', icon: Check, className: 'text-emerald-500' };
     case 'failed':
@@ -89,7 +89,11 @@ function taskProgress(turn: OperatorLatestTurnSummary): string {
       }
       return 'Planning the next action';
     case 'awaiting_approval':
-      return currentLabel ? `Approval needed: ${currentLabel}` : 'Waiting for your decision';
+      return currentAction?.commandName === 'request_user_input'
+        ? 'Operator is waiting for your answer'
+        : currentLabel
+          ? `Approval needed: ${currentLabel}`
+          : 'Waiting for your decision';
     case 'completed':
       return actionCount > 0
         ? `${settledActionCount} recorded ${settledActionCount === 1 ? 'action' : 'actions'} finished`
@@ -196,7 +200,7 @@ export function OperatorTaskTray({ className }: { className?: string }) {
   const triggerLabel =
     activeCount === 0
       ? 'Operator tasks'
-      : `Operator tasks — ${activeCount} active${approvalCount > 0 ? `, ${approvalCount} awaiting approval` : ''}`;
+      : `Operator tasks — ${activeCount} active${approvalCount > 0 ? `, ${approvalCount} need attention` : ''}`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -235,7 +239,7 @@ export function OperatorTaskTray({ className }: { className?: string }) {
             <h2 className="text-sm font-semibold">Operator tasks</h2>
             <p className="text-[11px] text-muted-foreground">
               {activeCount > 0
-                ? `${activeCount} active${approvalCount > 0 ? ` · ${approvalCount} need approval` : ''}`
+                ? `${activeCount} active${approvalCount > 0 ? ` · ${approvalCount} need attention` : ''}`
                 : 'No active tasks'}
             </p>
           </div>
@@ -314,8 +318,13 @@ function OperatorTaskItem({
   const presentation = turnStatusPresentation(task.turn.status);
   const StatusIcon = presentation.icon;
   const isActive = ACTIVE_TURN_STATUSES.has(task.turn.status);
+  const needsInput =
+    task.turn.status === 'awaiting_approval' &&
+    task.turn.currentAction?.commandName === 'request_user_input' &&
+    task.turn.currentAction.status === 'pending_approval';
   const canDecide =
     task.turn.status === 'awaiting_approval' &&
+    task.turn.currentAction?.commandName !== 'request_user_input' &&
     task.turn.currentAction?.status === 'pending_approval';
 
   return (
@@ -381,7 +390,19 @@ function OperatorTaskItem({
             </div>
           ) : null}
 
-          {isActive && !canDecide ? (
+          {needsInput ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2 h-7 w-full text-xs"
+              onClick={onOpen}
+            >
+              Answer in chat
+            </Button>
+          ) : null}
+
+          {isActive && !canDecide && !needsInput ? (
             <Button
               type="button"
               variant="outline"

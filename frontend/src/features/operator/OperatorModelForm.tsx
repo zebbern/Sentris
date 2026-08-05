@@ -1,9 +1,4 @@
-import {
-  LLM_PROVIDER_CATALOG,
-  LLM_PROVIDER_IDS,
-  getRecommendedLlmModel,
-  isLlmModelProvider,
-} from '@sentris/shared';
+import { LLM_PROVIDER_CATALOG, LLM_PROVIDER_IDS, isLlmModelProvider } from '@sentris/shared';
 import { KeyRound, SlidersHorizontal } from 'lucide-react';
 
 import { SecretSelect } from '@/components/inputs/SecretSelect';
@@ -16,13 +11,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getDefaultBaseUrl, type OperatorModelDraft } from './operatorModelDraft';
+import {
+  changeOperatorModelProvider,
+  getDefaultBaseUrl,
+  type OperatorModelDraft,
+} from './operatorModelDraft';
 
 interface OperatorModelFormProps {
   value: OperatorModelDraft;
   onChange: (next: OperatorModelDraft) => void;
   disabled?: boolean;
   compact?: boolean;
+  showModelSelectors?: boolean;
 }
 
 export function OperatorModelForm({
@@ -30,62 +30,60 @@ export function OperatorModelForm({
   onChange,
   disabled = false,
   compact = false,
+  showModelSelectors = true,
 }: OperatorModelFormProps) {
   const provider = LLM_PROVIDER_CATALOG[value.provider];
 
   const handleProviderChange = (next: string) => {
     if (!isLlmModelProvider(next)) return;
-    onChange({
-      ...value,
-      provider: next,
-      modelId: getRecommendedLlmModel(next),
-      baseUrl: getDefaultBaseUrl(next),
-    });
+    onChange(changeOperatorModelProvider(value, next));
   };
 
   return (
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="operator-provider" className="text-xs text-muted-foreground">
-            Provider
-          </Label>
-          <Select value={value.provider} onValueChange={handleProviderChange} disabled={disabled}>
-            <SelectTrigger id="operator-provider" className="h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LLM_PROVIDER_IDS.map((providerId) => (
-                <SelectItem key={providerId} value={providerId}>
-                  {LLM_PROVIDER_CATALOG[providerId].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {showModelSelectors ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="operator-provider" className="text-xs text-muted-foreground">
+              Provider
+            </Label>
+            <Select value={value.provider} onValueChange={handleProviderChange} disabled={disabled}>
+              <SelectTrigger id="operator-provider" className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LLM_PROVIDER_IDS.map((providerId) => (
+                  <SelectItem key={providerId} value={providerId}>
+                    {LLM_PROVIDER_CATALOG[providerId].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="operator-model" className="text-xs text-muted-foreground">
-            Model
-          </Label>
-          <Select
-            value={value.modelId}
-            onValueChange={(modelId) => onChange({ ...value, modelId })}
-            disabled={disabled}
-          >
-            <SelectTrigger id="operator-model" className="h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {provider.models.map((model) => (
-                <SelectItem key={model.value} value={model.value}>
-                  {model.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-1.5">
+            <Label htmlFor="operator-model" className="text-xs text-muted-foreground">
+              Model
+            </Label>
+            <Select
+              value={value.modelId}
+              onValueChange={(modelId) => onChange({ ...value, modelId })}
+              disabled={disabled}
+            >
+              <SelectTrigger id="operator-model" className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {provider.models.map((model) => (
+                  <SelectItem key={model.value} value={model.value}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="space-y-1.5">
         <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">

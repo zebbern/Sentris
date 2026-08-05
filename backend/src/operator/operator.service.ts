@@ -225,6 +225,7 @@ export class OperatorService {
       owner: { organizationId: user.organizationId, userId: user.userId },
       expectedVersion: input.expectedVersion,
       decision: input.decision,
+      ...(input.response ? { response: input.response } : {}),
       auth: user,
     });
     const context = await this.repository.getActionWithTurnSession(action.id);
@@ -511,9 +512,10 @@ export class OperatorService {
       : formatOperatorArgumentValidationError(input.commandName, parsedArguments.error.issues);
     const approvalRequired =
       parsedArguments.success &&
-      definition.effect === 'consequential' &&
-      session.approvalMode === 'ask' &&
-      !input.userConfirmed;
+      (input.commandName === 'request_user_input' ||
+        (definition.effect === 'consequential' &&
+          session.approvalMode === 'ask' &&
+          !input.userConfirmed));
     const actor = this.authForTurn(session, turn);
     const { action } = await this.repository.createAction({
       session,
@@ -585,6 +587,7 @@ export class OperatorService {
           executing.decidedAt ??
           executing.createdAt
         ).toISOString(),
+        storedResult: executing.result,
       });
     } catch (error: unknown) {
       if (!(error instanceof WorkflowRuntimeInputValidationException)) throw error;

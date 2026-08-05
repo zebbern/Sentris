@@ -6369,6 +6369,10 @@ export interface components {
       /** @enum {string} */
       decision: 'approved' | 'rejected';
       expectedVersion: number;
+      response?: {
+        response: string;
+        selectedOption?: string;
+      };
     };
     OperatorRetryTurnDto: {
       /** Format: uuid */

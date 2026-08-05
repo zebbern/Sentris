@@ -14,6 +14,7 @@ interface OperatorModeSelectProps {
   onChange: (mode: OperatorApprovalMode) => void;
   disabled?: boolean;
   className?: string;
+  compact?: boolean;
 }
 
 export function OperatorModeSelect({
@@ -21,6 +22,7 @@ export function OperatorModeSelect({
   onChange,
   disabled,
   className,
+  compact = false,
 }: OperatorModeSelectProps) {
   return (
     <Select value={value} onValueChange={(next) => onChange(next as OperatorApprovalMode)}>
@@ -29,7 +31,7 @@ export function OperatorModeSelect({
         className={cn('h-8 w-[148px] text-xs', className)}
         disabled={disabled}
       >
-        <SelectValue />
+        <SelectValue>{compact ? (value === 'ask' ? 'Ask' : 'Auto') : undefined}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="ask">Ask for approval</SelectItem>

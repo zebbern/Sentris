@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TERMINAL_STATUSES, type OperatorCreateTurn } from '@sentris/shared';
 import {
+  Check,
+  Circle,
+  CircleAlert,
   ExternalLink,
   GitCompareArrows,
   Loader2,
@@ -8,6 +11,7 @@ import {
   Search,
   SlidersHorizontal,
   Square,
+  X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -47,6 +51,15 @@ interface AgentEntry {
   agentRunId: string;
 }
 
+type RunStepState = 'active' | 'attention' | 'completed' | 'failed' | 'skipped';
+
+interface RunStep {
+  nodeId: string;
+  label: string;
+  detail: string | null;
+  state: RunStepState;
+}
+
 export function OperatorRunActivity({
   runId,
   sourceRunId,
@@ -71,6 +84,7 @@ export function OperatorRunActivity({
     traceRequested &&
     getOperatorRunTraceRefetchInterval(status, statusUpdatedAt, Date.now(), streamState) !== false;
   const agents = useMemo(() => extractAgentEntries(traceQuery.data), [traceQuery.data]);
+  const runSteps = useMemo(() => readRunSteps(traceQuery.data), [traceQuery.data]);
   const currentStep = useMemo(() => readCurrentStep(traceQuery.data), [traceQuery.data]);
   const progress = readProgress(statusQuery.data);
   const failureReason = readFailureReason(statusQuery.data);
@@ -81,9 +95,11 @@ export function OperatorRunActivity({
     if (live) setAgentActivityRequested(true);
   }, [live]);
 
+  const remainingSteps = progress ? Math.max(0, progress.totalActions - runSteps.length) : 0;
+
   return (
-    <div className="space-y-2 rounded-md border border-border/70 bg-background/60 p-2.5">
-      <div className="flex flex-wrap items-center gap-2">
+    <section className="max-w-full overflow-hidden rounded-2xl border border-border/70 bg-background/75 shadow-[0_10px_32px_rgba(0,0,0,0.2)]">
+      <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-border/50 px-4 py-2.5">
         <Link
           to={`/runs/${encodeURIComponent(runId)}`}
           className="flex min-w-0 flex-1 items-center gap-2 text-xs transition-colors hover:text-primary"
@@ -94,35 +110,40 @@ export function OperatorRunActivity({
             <ExternalLink className="h-3.5 w-3.5 shrink-0 text-primary" />
           )}
           <span className="min-w-0">
-            <span className="block font-medium text-foreground">{label}</span>
+            <span className="block text-sm font-semibold text-foreground">{label}</span>
             <span className="block truncate font-mono text-[10px] text-muted-foreground">
               {runId}
             </span>
           </span>
         </Link>
+        {progress && live ? (
+          <span className="text-[10px] text-muted-foreground">
+            Step {Math.min(progress.totalActions, progress.completedActions + 1)} of{' '}
+            {progress.totalActions}
+          </span>
+        ) : null}
         {status ? (
           <Badge
             variant="outline"
             className={cn(
               'h-5 px-1.5 text-[10px]',
               live
-                ? 'border-blue-500/40 bg-blue-500/10 text-blue-600 dark:text-blue-300'
+                ? 'border-blue-500/40 bg-blue-500/10 text-blue-400'
                 : status === 'COMPLETED'
-                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
-                  : 'border-border bg-muted/30 text-muted-foreground',
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                  : status === 'FAILED'
+                    ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                    : 'border-border bg-muted/30 text-muted-foreground',
             )}
           >
-            {status}
+            {live ? 'Live' : status}
           </Badge>
         ) : null}
       </div>
 
       {live ? (
-        <div
-          className="space-y-1.5 rounded border border-border/60 bg-card/40 px-2 py-1.5"
-          aria-live="polite"
-        >
-          <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+        <div aria-live="polite">
+          <div className="flex items-center justify-between gap-2 border-b border-border/35 px-4 py-2 text-[10px] text-muted-foreground">
             <span>{status === 'QUEUED' ? 'Preparing workflow' : 'Workflow in progress'}</span>
             <span className="flex shrink-0 items-center gap-1">
               {streamState === 'live' ? (
@@ -137,8 +158,107 @@ export function OperatorRunActivity({
                   : 'Updating every few seconds'}
             </span>
           </div>
+
+          {runSteps.length > 0 ? (
+            <ol aria-label="Workflow steps">
+              {runSteps.map((step) => (
+                <li
+                  key={step.nodeId}
+                  className={cn(
+                    'relative grid grid-cols-[22px_minmax(0,1fr)_auto] items-start gap-2.5 border-b border-border/30 px-4 py-2.5 last:border-b-0',
+                    step.state === 'active' && 'bg-blue-500/[0.055]',
+                    step.state === 'attention' && 'bg-amber-500/[0.05]',
+                    step.state === 'failed' && 'bg-destructive/[0.045]',
+                  )}
+                >
+                  {step.state === 'active' ||
+                  step.state === 'attention' ||
+                  step.state === 'failed' ? (
+                    <span
+                      className={cn(
+                        'absolute inset-y-0 left-0 w-0.5',
+                        step.state === 'active' && 'bg-blue-500',
+                        step.state === 'attention' && 'bg-amber-500',
+                        step.state === 'failed' && 'bg-destructive',
+                      )}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  <span className="flex h-5 w-5 items-center justify-center">
+                    {step.state === 'completed' ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                    ) : step.state === 'failed' ? (
+                      <X className="h-3.5 w-3.5 text-destructive" aria-hidden="true" />
+                    ) : step.state === 'attention' ? (
+                      <CircleAlert className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
+                    ) : step.state === 'active' ? (
+                      <Loader2
+                        className="h-3.5 w-3.5 animate-spin text-blue-500"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Circle className="h-3 w-3 text-muted-foreground/60" aria-hidden="true" />
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <p className="truncate text-xs font-medium text-foreground">{step.label}</p>
+                      <span className="truncate font-mono text-[10px] text-muted-foreground">
+                        {step.nodeId}
+                      </span>
+                    </div>
+                    {step.detail && (step.state === 'active' || step.state === 'attention') ? (
+                      <p
+                        className="mt-1 truncate text-[10px] text-muted-foreground"
+                        title={step.detail}
+                      >
+                        {step.detail}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span
+                    className={cn(
+                      'pt-0.5 text-[10px] font-medium text-muted-foreground',
+                      step.state === 'active' && 'text-blue-400',
+                      step.state === 'attention' && 'text-amber-400',
+                      step.state === 'completed' && 'text-emerald-400',
+                      step.state === 'failed' && 'text-destructive',
+                    )}
+                  >
+                    {step.state === 'active'
+                      ? 'Running'
+                      : step.state === 'attention'
+                        ? 'Waiting'
+                        : step.state === 'completed'
+                          ? 'Done'
+                          : step.state === 'failed'
+                            ? 'Failed'
+                            : 'Skipped'}
+                  </span>
+                </li>
+              ))}
+              {remainingSteps > 0 ? (
+                <li className="grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2.5 px-4 py-2.5 opacity-55">
+                  <span className="flex h-5 w-5 items-center justify-center">
+                    <Circle className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {remainingSteps} {remainingSteps === 1 ? 'step' : 'steps'} queued
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">Queued</span>
+                </li>
+              ) : null}
+            </ol>
+          ) : currentStep ? (
+            <div className="border-b border-border/35 bg-blue-500/[0.055] px-4 py-2.5">
+              <p className="truncate text-xs text-foreground" title={currentStep}>
+                {currentStep}
+              </p>
+            </div>
+          ) : null}
+
           {progress ? (
-            <>
+            <div className="space-y-1.5 border-t border-border/35 px-4 py-2">
               <div
                 role="progressbar"
                 aria-label="Workflow progress"
@@ -160,29 +280,24 @@ export function OperatorRunActivity({
               <p className="text-[10px] text-muted-foreground">
                 {progress.completedActions} of {progress.totalActions} steps complete
               </p>
-            </>
-          ) : null}
-          {currentStep ? (
-            <p className="truncate text-[11px] text-foreground" title={currentStep}>
-              {currentStep}
-            </p>
+            </div>
           ) : null}
         </div>
       ) : null}
 
       {failureReason ? (
-        <p className="rounded border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
+        <p className="border-b border-destructive/20 bg-destructive/5 px-4 py-2.5 text-[11px] text-destructive">
           {failureReason}
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-border/50 px-4 py-3">
         {live ? (
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="h-7 gap-1.5 px-2 text-[11px]"
+            className="h-8 gap-1.5 rounded-full px-4 text-[11px]"
             disabled={disabled}
             onClick={() =>
               onCommand({
@@ -202,7 +317,7 @@ export function OperatorRunActivity({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-7 gap-1.5 px-2 text-[11px]"
+                className="h-8 gap-1.5 rounded-full px-3 text-[11px]"
                 disabled={disabled}
                 onClick={() =>
                   onCommand({
@@ -222,7 +337,7 @@ export function OperatorRunActivity({
               type="button"
               size="sm"
               variant="outline"
-              className="h-7 gap-1.5 px-2 text-[11px]"
+              className="h-8 gap-1.5 rounded-full px-3 text-[11px]"
               disabled={disabled}
               onClick={() =>
                 onCommand({
@@ -238,7 +353,7 @@ export function OperatorRunActivity({
               type="button"
               size="sm"
               variant="outline"
-              className="h-7 gap-1.5 px-2 text-[11px]"
+              className="h-8 gap-1.5 rounded-full px-3 text-[11px]"
               disabled={disabled}
               onClick={() =>
                 onCommand({
@@ -253,7 +368,7 @@ export function OperatorRunActivity({
               type="button"
               size="sm"
               variant="outline"
-              className="h-7 gap-1.5 px-2 text-[11px]"
+              className="h-8 gap-1.5 rounded-full px-3 text-[11px]"
               disabled={disabled}
               onClick={() =>
                 onCommand({
@@ -272,7 +387,7 @@ export function OperatorRunActivity({
       {live || (status && TERMINAL_RUN_STATUSES.has(status)) ? (
         <details
           open={live || undefined}
-          className="group border-t border-border/50 pt-2"
+          className="group border-t border-border/50 px-4 py-2.5"
           onToggle={(event) => {
             if (event.currentTarget.open) setAgentActivityRequested(true);
           }}
@@ -315,7 +430,7 @@ export function OperatorRunActivity({
           ) : null}
         </details>
       ) : null}
-    </div>
+    </section>
   );
 }
 
@@ -362,6 +477,101 @@ function readFailureReason(value: unknown): string | null {
   if (!failure || typeof failure !== 'object' || Array.isArray(failure)) return null;
   const reason = (failure as { reason?: unknown }).reason;
   return typeof reason === 'string' && reason.trim() ? reason : null;
+}
+
+function humanizeNodeId(nodeId: string): string {
+  const normalized = nodeId.replace(/[-_]+/g, ' ').trim();
+  if (!normalized) return nodeId;
+  return `${normalized[0].toUpperCase()}${normalized.slice(1)}`;
+}
+
+function readRunSteps(value: unknown): RunStep[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const events = (value as { events?: unknown }).events;
+  if (!Array.isArray(events)) return [];
+
+  const steps = new Map<string, RunStep>();
+  for (const event of events) {
+    if (!event || typeof event !== 'object' || Array.isArray(event)) continue;
+    const record = event as {
+      nodeId?: unknown;
+      type?: unknown;
+      message?: unknown;
+      error?: unknown;
+      data?: unknown;
+    };
+    if (typeof record.nodeId !== 'string' || typeof record.type !== 'string') continue;
+    const data =
+      record.data && typeof record.data === 'object' && !Array.isArray(record.data)
+        ? (record.data as { title?: unknown })
+        : null;
+    const error =
+      record.error && typeof record.error === 'object' && !Array.isArray(record.error)
+        ? (record.error as { message?: unknown })
+        : null;
+    const existing = steps.get(record.nodeId);
+    const label =
+      typeof data?.title === 'string' && data.title.trim()
+        ? data.title
+        : (existing?.label ?? humanizeNodeId(record.nodeId));
+    const message =
+      typeof record.message === 'string' && record.message.trim()
+        ? record.message
+        : typeof error?.message === 'string' && error.message.trim()
+          ? error.message
+          : (existing?.detail ?? null);
+
+    switch (record.type) {
+      case 'STARTED':
+      case 'PROGRESS':
+        steps.set(record.nodeId, {
+          nodeId: record.nodeId,
+          label,
+          detail: message,
+          state: 'active',
+        });
+        break;
+      case 'AWAITING_INPUT':
+        steps.set(record.nodeId, {
+          nodeId: record.nodeId,
+          label,
+          detail: message,
+          state: 'attention',
+        });
+        break;
+      case 'COMPLETED':
+        steps.set(record.nodeId, {
+          nodeId: record.nodeId,
+          label,
+          detail: message,
+          state: 'completed',
+        });
+        break;
+      case 'FAILED':
+        steps.set(record.nodeId, {
+          nodeId: record.nodeId,
+          label,
+          detail: message,
+          state: 'failed',
+        });
+        break;
+      case 'SKIPPED':
+        steps.set(record.nodeId, {
+          nodeId: record.nodeId,
+          label,
+          detail: message,
+          state: 'skipped',
+        });
+        break;
+      case 'HTTP_REQUEST_SENT':
+      case 'HTTP_RESPONSE_RECEIVED':
+      case 'HTTP_REQUEST_ERROR':
+        break;
+      default:
+        break;
+    }
+  }
+  return [...steps.values()];
 }
 
 function readCurrentStep(value: unknown): string | null {

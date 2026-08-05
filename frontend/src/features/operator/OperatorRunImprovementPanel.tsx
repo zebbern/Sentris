@@ -1,8 +1,10 @@
-import { Loader2, Sparkles } from 'lucide-react';
+import { ChevronDown, Loader2, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   createOperatorDirectCommandNavigationState,
   createOperatorImproveRunNavigationState,
@@ -29,23 +31,51 @@ export function OperatorRunImprovementPanel({
   improvement: ProjectedOperatorRunImprovement;
 }) {
   const navigate = useNavigate();
+  const [comparisonExpanded, setComparisonExpanded] = useState(false);
   const active = ['queued', 'running', 'awaiting_approval'].includes(improvement.status);
   const summary = improvement.summary?.replace(/\s+/g, ' ').trim();
 
   return (
     <div className="border-b px-3 py-2">
       <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5">
-        <div className="flex items-center gap-2">
-          {active ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden="true" />
-          ) : (
-            <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-          )}
-          <span className="text-xs font-medium">Operator improvement</span>
-          <Badge variant="outline" className="ml-auto h-5 px-1.5 text-[10px]">
-            {STAGE_LABELS[improvement.stage]}
-          </Badge>
-        </div>
+        {improvement.comparison ? (
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 text-left"
+            aria-expanded={comparisonExpanded}
+            aria-label={`${comparisonExpanded ? 'Hide' : 'Show'} recorded run comparison`}
+            onClick={() => setComparisonExpanded((value) => !value)}
+          >
+            {active ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden="true" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            )}
+            <span className="text-xs font-medium">Operator improvement</span>
+            <Badge variant="outline" className="ml-auto h-5 px-1.5 text-[10px]">
+              {STAGE_LABELS[improvement.stage]}
+            </Badge>
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 text-muted-foreground transition-transform',
+                comparisonExpanded && 'rotate-180',
+              )}
+              aria-hidden="true"
+            />
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            {active ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden="true" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            )}
+            <span className="text-xs font-medium">Operator improvement</span>
+            <Badge variant="outline" className="ml-auto h-5 px-1.5 text-[10px]">
+              {STAGE_LABELS[improvement.stage]}
+            </Badge>
+          </div>
+        )}
 
         {summary ? (
           <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
@@ -81,12 +111,9 @@ export function OperatorRunImprovementPanel({
           ) : null}
         </div>
 
-        {improvement.comparison ? (
-          <details className="mt-2 border-t border-border/60 pt-2">
-            <summary className="cursor-pointer text-[11px] font-medium text-primary">
-              View recorded comparison
-            </summary>
-            <div className="mt-2">
+        {improvement.comparison && comparisonExpanded ? (
+          <div className="mt-2 border-t border-border/60 pt-2">
+            <div>
               <OperatorRunComparisonCard
                 result={improvement.comparison}
                 disabled={active}
@@ -111,7 +138,7 @@ export function OperatorRunImprovementPanel({
                 }}
               />
             </div>
-          </details>
+          </div>
         ) : null}
       </div>
     </div>
