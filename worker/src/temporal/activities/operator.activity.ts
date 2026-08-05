@@ -49,6 +49,7 @@ const RUN_OBSERVATION_POLL_MS = 2_000;
 const INTERNAL_REQUEST_HEARTBEAT_INTERVAL_MS = 10_000;
 const PLAIN_CAPABILITY_REFUSAL_PATTERNS = [
   /\b(?:i|we)\s+(?:cannot|can't|am unable to|are unable to)\s+(?:fulfill|assist|help|comply|support)\b/i,
+  /\b(?:i|we)\s+(?:cannot|can't|am unable to|are unable to)\s+(?:run|execute|perform|conduct|launch|start)\b/i,
   /\b(?:i|we)\s+(?:must|have to)\s+(?:decline|refuse)\b/i,
   /\b(?:i'm|we're|i am|we are)\s+not able to\s+(?:fulfill|assist|help|comply|support)\b/i,
 ] as const;

@@ -457,6 +457,14 @@ describe('Operator activities', () => {
       },
     },
     {
+      label: 'operational capability refusal',
+      firstResult: {
+        text: 'I cannot run security reconnaissance scans or execute scan workflows against specific target endpoints.',
+        finishReason: 'stop',
+        toolCalls: [],
+      },
+    },
+    {
       label: 'refusal-shaped question tool call',
       firstResult: {
         text: '',

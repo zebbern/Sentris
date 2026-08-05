@@ -27,10 +27,13 @@ export class TemplatesRepository {
     }
 
     if (filters?.search) {
-      const escaped = filters.search.replace(/%/g, '\\%').replace(/_/g, '\\_');
-      conditions.push(
-        sql`(${templatesTable.name} ILIKE ${'%' + escaped + '%'} OR ${templatesTable.description} ILIKE ${'%' + escaped + '%'})`,
-      );
+      for (const term of filters.search.trim().split(/\s+/).filter(Boolean)) {
+        const escaped = term.replace(/%/g, '\\%').replace(/_/g, '\\_');
+        const pattern = `%${escaped}%`;
+        conditions.push(
+          sql`(${templatesTable.name} ILIKE ${pattern} OR ${templatesTable.description} ILIKE ${pattern} OR ${templatesTable.tags}::text ILIKE ${pattern})`,
+        );
+      }
     }
 
     if (filters?.tags && filters.tags.length > 0) {
