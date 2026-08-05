@@ -4,25 +4,31 @@
 
 **Goal:** Make dependency-CVE template advisories appear as canonical Sentris findings and make the website quick-win template skip TLS scanning cleanly for HTTP-only targets.
 
-**Architecture:** Reuse `sentris.osv.query`'s analytics-ready `results` and the existing `core.analytics.sink` rather than adding a findings path. Model optional TLS work as two mutually exclusive conditional-router branches that rejoin through one `any`-join script before the existing all-input ranking node.
+**Architecture:** Reuse `sentris.osv.query`'s analytics-ready `results` and the existing `core.analytics.sink` in canonical no-suffix mode rather than adding a findings path. Model optional TLS work as two mutually exclusive conditional-router branches that rejoin through one `any`-join script before the existing all-input ranking node.
 
 **Tech Stack:** Seed-template JSON graphs, NestJS workflow graph compiler, Bun tests, Temporal workflow scheduler, OpenSearch findings ingestion, React Operator UI.
 
 ## Global Constraints
 
 - OpenSearch analytics ingestion remains the one canonical findings write path.
+- Finding-producing sinks omit `indexSuffix`; explicit suffixes remain available for non-finding custom analytics such as asset inventories.
 - OSV report artifacts remain available and are not replaced by indexed findings.
 - HTTPS targets continue through `sentris.testssl.run`; only absence of an HTTPS target yields an empty TLS result.
 - Genuine TLS execution failures remain visible.
 - No new component implementation, persistence service, scheduler, or output scraper is introduced.
+- Existing workflow versions and historical runs remain immutable; only workflows materialized from the updated templates use the corrected graphs.
 - Use active local instance `0` for seeding and real-user verification.
 
 ## File Structure
 
 - `backend/scripts/seed-templates/npm-dependency-cve-hunt.json` — add one OSV analytics sink and its typed input edge.
 - `backend/scripts/seed-templates/github-repo-dependency-cve-triage.json` — add one multi-input OSV analytics sink and five typed input edges.
+- `backend/scripts/seed-templates/github-actions-supply-chain-triage.json` — keep finding output on canonical no-suffix storage.
+- `backend/scripts/seed-templates/public-repo-full-code-security.json` — keep finding output on canonical no-suffix storage.
 - `backend/scripts/seed-templates/web-attack-surface-quick-win-hunt.json` — replace the fake TLS target with route, empty-result, and any-join nodes.
 - `backend/src/templates/__tests__/seed-templates.spec.ts` — keep focused graph and embedded-script contract checks for both root-cause fixes.
+- `worker/src/components/security/osv.ts` — retain bounded advisory timestamps and reference links in canonical evidence.
+- `worker/src/components/security/__tests__/osv.test.ts` — cover the OSV analytics evidence projection.
 
 ---
 
@@ -48,12 +54,10 @@ it('dependency CVE templates publish OSV results through canonical analytics sin
   const cases = [
     {
       fileName: 'npm-dependency-cve-hunt.json',
-      indexSuffix: 'npm-dependency-cve',
       inputs: [{ source: 'osv_query', targetHandle: 'osv_npm' }],
     },
     {
       fileName: 'github-repo-dependency-cve-triage.json',
-      indexSuffix: 'github-repo-dependency-cve',
       inputs: [
         { source: 'osv_npm_query', targetHandle: 'osv_npm' },
         { source: 'osv_pypi_query', targetHandle: 'osv_pypi' },
@@ -73,10 +77,10 @@ it('dependency CVE templates publish OSV results through canonical analytics sin
 
     expect(sink?.type).toBe('core.analytics.sink');
     expect(sink.data.config.params).toMatchObject({
-      indexSuffix: templateCase.indexSuffix,
       assetKeyField: 'auto',
       failOnError: false,
     });
+    expect(sink.data.config.params.indexSuffix).toBeUndefined();
     expect(sink.data.config.params.dataInputs.map((input: { id: string }) => input.id)).toEqual(
       templateCase.inputs.map((input) => input.targetHandle),
     );
@@ -119,7 +123,6 @@ Update the manifest to `nodeCount: 5` and `edgeCount: 7`. Add this node after `o
     "config": {
       "params": {
         "dataInputs": [{ "id": "osv_npm", "label": "OSV NPM", "sourceTag": "osv_npm" }],
-        "indexSuffix": "npm-dependency-cve",
         "assetKeyField": "auto",
         "failOnError": false
       },
@@ -165,7 +168,6 @@ Update the manifest to `nodeCount: 10` and `edgeCount: 33`. Add one `analytics_s
             "sourceTag": "osv_packagist"
           }
         ],
-        "indexSuffix": "github-repo-dependency-cve",
         "assetKeyField": "auto",
         "failOnError": false
       },
@@ -206,6 +208,50 @@ Expected: both commands PASS, including the suite's schema and `compileWorkflowG
 git add -- backend/scripts/seed-templates/npm-dependency-cve-hunt.json backend/scripts/seed-templates/github-repo-dependency-cve-triage.json backend/src/templates/__tests__/seed-templates.spec.ts
 git commit -s -m "fix: publish dependency template findings"
 ```
+
+### Task 1A: Align Finding Templates and Preserve OSV Advisory Evidence
+
+**Files:**
+
+- Modify: `backend/scripts/seed-templates/npm-dependency-cve-hunt.json`
+- Modify: `backend/scripts/seed-templates/github-repo-dependency-cve-triage.json`
+- Modify: `backend/scripts/seed-templates/github-actions-supply-chain-triage.json`
+- Modify: `backend/scripts/seed-templates/public-repo-full-code-security.json`
+- Modify: `worker/src/components/security/osv.ts`
+- Test: `backend/src/templates/__tests__/seed-templates.spec.ts`
+- Test: `worker/src/components/security/__tests__/osv.test.ts`
+
+- [ ] **Step 1: Enforce canonical no-suffix mode across finding-producing templates**
+
+Require each maintained finding-producing `core.analytics.sink` to omit `indexSuffix`. Cover the npm dependency, GitHub repository dependency, GitHub Actions supply-chain, public repository full-code-security, and Gemini npm investigator templates. Do not remove explicit suffixes from asset-oriented custom analytics templates.
+
+- [ ] **Step 2: Retain bounded OSV advisory evidence**
+
+Project the OSV finding's existing bounded advisory fields into the analytics result's canonical `evidence` object:
+
+```ts
+evidence: {
+  published: finding.published,
+  modified: finding.modified,
+  references: finding.references,
+}
+```
+
+`getReferences()` already limits the normalized advisory/web references to eight. Keep that bound and use the existing passthrough analytics result plus canonical observation contract; do not add another evidence schema or findings reader.
+
+- [ ] **Step 3: Verify the shared storage and evidence boundaries**
+
+Run:
+
+```powershell
+bun --cwd=backend test src/templates/__tests__/seed-templates.spec.ts
+bun --cwd=worker test src/components/security/__tests__/osv.test.ts
+bun --cwd=worker test src/components/core/__tests__/analytics-sink-result.test.ts
+bun --cwd=worker test src/utils/__tests__/opensearch-indexer.test.ts
+bun --cwd=worker run typecheck
+```
+
+Expected: finding templates select canonical storage, custom analytics suffix behavior remains covered, and hydrated OSV results retain `published`, `modified`, and bounded `references` through canonical evidence.
 
 ---
 
@@ -444,7 +490,7 @@ git commit -s -m "fix: skip tls review without https targets"
 
 **Interfaces:**
 
-- Consumes: the three changed official seed graphs, instance-0 backend/worker/frontend services, Operator's existing template-run path, and canonical run findings APIs.
+- Consumes: the changed official finding/TLS seed graphs, instance-0 backend/worker/frontend services, Operator's existing template-run path, and canonical run findings APIs.
 - Produces: real user-facing evidence that indexed findings agree across surfaces and HTTP-only TLS absence no longer appears as a failed scan.
 
 - [ ] **Step 1: Confirm instance 0 and local service health**
@@ -468,7 +514,7 @@ bun --cwd=backend scripts/seed-templates.ts
 bun run template-library:verify
 ```
 
-Expected: the dry run prints the instance-0 database target, the real seed updates the three template rows, and the scoped library verification passes.
+Expected: the dry run prints the instance-0 database target, the real seed updates the affected template rows, and the changed templates have current live-validation entries. If the broader catalog command remains red because of unrelated missing or stale entries, record those separately instead of treating them as a failure of this slice.
 
 - [ ] **Step 3: Run a real dependency-CVE journey through Operator**
 
