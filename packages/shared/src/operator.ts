@@ -730,7 +730,9 @@ export const OPERATOR_RUN_INPUT_CHANGE_OPERATIONS = ['set', 'unset'] as const;
 export const OperatorRunInputSetSchema = z
   .object({
     inputId: z.string().trim().min(1).max(191),
-    value: z.unknown(),
+    value: z
+      .unknown()
+      .refine((value) => value !== undefined, { message: 'Runtime input set value is required' }),
   })
   .strict();
 

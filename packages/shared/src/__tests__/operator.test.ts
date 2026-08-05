@@ -72,6 +72,30 @@ describe('Operator user input', () => {
 });
 
 describe('Operator run controls', () => {
+  it('requires an explicit set value while accepting JSON value shapes', () => {
+    expect(
+      OperatorRunInputChangesSchema.safeParse({
+        set: [{ inputId: 'target' }],
+        unset: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorRunInputChangesSchema.safeParse({
+        set: [{ inputId: 'target', value: undefined }],
+        unset: [],
+      }).success,
+    ).toBe(false);
+
+    for (const value of [null, false, 0, '', {}, []]) {
+      expect(
+        OperatorRunInputChangesSchema.safeParse({
+          set: [{ inputId: 'target', value }],
+          unset: [],
+        }).success,
+      ).toBe(true);
+    }
+  });
+
   it('can inspect the exact workflow version before launching it', () => {
     expect(
       OperatorGetWorkflowInputSchema.parse({
