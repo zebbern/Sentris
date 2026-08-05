@@ -82,12 +82,10 @@ describe('new seed templates', () => {
     const cases = [
       {
         fileName: 'npm-dependency-cve-hunt.json',
-        indexSuffix: 'npm-dependency-cve',
         inputs: [{ source: 'osv_query', targetHandle: 'osv_npm' }],
       },
       {
         fileName: 'github-repo-dependency-cve-triage.json',
-        indexSuffix: 'github-repo-dependency-cve',
         inputs: [
           { source: 'osv_npm_query', targetHandle: 'osv_npm' },
           { source: 'osv_pypi_query', targetHandle: 'osv_pypi' },
@@ -109,10 +107,10 @@ describe('new seed templates', () => {
 
       expect(sink?.type).toBe('core.analytics.sink');
       expect(sink.data.config.params).toMatchObject({
-        indexSuffix: templateCase.indexSuffix,
         assetKeyField: 'auto',
         failOnError: false,
       });
+      expect(sink.data.config.params.indexSuffix).toBeUndefined();
       expect(sink.data.config.params.dataInputs.map((input: { id: string }) => input.id)).toEqual(
         templateCase.inputs.map((input) => input.targetHandle),
       );
@@ -127,6 +125,29 @@ describe('new seed templates', () => {
           }),
         );
       }
+    }
+  });
+
+  it('finding-producing analytics sinks use the canonical observation index', () => {
+    const templateFiles = [
+      'npm-dependency-cve-hunt.json',
+      'github-repo-dependency-cve-triage.json',
+      'github-actions-supply-chain-triage.json',
+      'public-repo-full-code-security.json',
+      'gemini-autonomous-npm-investigator.json',
+    ];
+
+    for (const fileName of templateFiles) {
+      const template = readSeed(fileName);
+      const sink = template.graph.nodes.find(
+        (node: { type: string }) => node.type === 'core.analytics.sink',
+      );
+
+      expect(sink, `${fileName} should have an analytics sink`).toBeDefined();
+      expect(
+        sink.data.config.params.indexSuffix,
+        `${fileName} should write canonical finding observations`,
+      ).toBeUndefined();
     }
   });
 
@@ -4013,7 +4034,7 @@ describe('new seed templates', () => {
       (node: { id: string }) => node.id === 'analytics_sink',
     );
     expect(analyticsNode.data.config.params.failOnError).toBe(false);
-    expect(analyticsNode.data.config.params.indexSuffix).toBe('repo-full-scan');
+    expect(analyticsNode.data.config.params.indexSuffix).toBeUndefined();
   });
 
   it('public-repo-full-code-security dedupe script merges and deduplicates cross-scanner findings', () => {
@@ -4122,7 +4143,7 @@ describe('new seed templates', () => {
       (node: { id: string }) => node.id === 'analytics_sink',
     );
     expect(analyticsNode.data.config.params.failOnError).toBe(false);
-    expect(analyticsNode.data.config.params.indexSuffix).toBe('github-actions-supply-chain');
+    expect(analyticsNode.data.config.params.indexSuffix).toBeUndefined();
   });
 
   it('github-actions-supply-chain-triage prioritizes exploitable workflow patterns', () => {

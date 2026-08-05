@@ -189,7 +189,6 @@
                   "sourceTag": "github_actions"
                 }
               ],
-              "indexSuffix": "github-actions-supply-chain",
               "assetKeyField": "auto",
               "failOnError": false
             },

@@ -334,7 +334,6 @@
                 { "id": "osv_maven", "label": "OSV Maven", "sourceTag": "osv_maven" },
                 { "id": "osv_packagist", "label": "OSV Packagist", "sourceTag": "osv_packagist" }
               ],
-              "indexSuffix": "repo-full-scan",
               "assetKeyField": "auto",
               "failOnError": false
             },
