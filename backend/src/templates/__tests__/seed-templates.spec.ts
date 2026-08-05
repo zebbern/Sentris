@@ -78,6 +78,58 @@ function normalizeCatalogName(value: string): string {
 }
 
 describe('new seed templates', () => {
+  it('dependency CVE templates publish OSV results through canonical analytics sinks', () => {
+    const cases = [
+      {
+        fileName: 'npm-dependency-cve-hunt.json',
+        indexSuffix: 'npm-dependency-cve',
+        inputs: [{ source: 'osv_query', targetHandle: 'osv_npm' }],
+      },
+      {
+        fileName: 'github-repo-dependency-cve-triage.json',
+        indexSuffix: 'github-repo-dependency-cve',
+        inputs: [
+          { source: 'osv_npm_query', targetHandle: 'osv_npm' },
+          { source: 'osv_pypi_query', targetHandle: 'osv_pypi' },
+          { source: 'osv_go_query', targetHandle: 'osv_go' },
+          { source: 'osv_maven_query', targetHandle: 'osv_maven' },
+          { source: 'osv_packagist_query', targetHandle: 'osv_packagist' },
+        ],
+      },
+    ] as const;
+
+    for (const templateCase of cases) {
+      const template = readSeed(templateCase.fileName);
+      const sink = template.graph.nodes.find(
+        (node: { id: string }) => node.id === 'analytics_sink',
+      );
+      const sinkEdges = template.graph.edges.filter(
+        (edge: { target: string }) => edge.target === 'analytics_sink',
+      );
+
+      expect(sink?.type).toBe('core.analytics.sink');
+      expect(sink.data.config.params).toMatchObject({
+        indexSuffix: templateCase.indexSuffix,
+        assetKeyField: 'auto',
+        failOnError: false,
+      });
+      expect(sink.data.config.params.dataInputs.map((input: { id: string }) => input.id)).toEqual(
+        templateCase.inputs.map((input) => input.targetHandle),
+      );
+
+      for (const input of templateCase.inputs) {
+        expect(sinkEdges).toContainEqual(
+          expect.objectContaining({
+            source: input.source,
+            sourceHandle: 'results',
+            target: 'analytics_sink',
+            targetHandle: input.targetHandle,
+          }),
+        );
+      }
+    }
+  });
+
   it('keeps the seed catalog focused and non-duplicative', () => {
     const actualFiles = readdirSync(seedTemplatesDir)
       .filter((fileName) => fileName.endsWith('.json'))
