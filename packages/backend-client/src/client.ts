@@ -6008,6 +6008,107 @@ export interface components {
         removedEdgeIds: string[];
         changedEdgeIds: string[];
       };
+      templateSnapshot?: {
+        /** Format: uuid */
+        templateId: string;
+        templateName: string;
+        graph: {
+          id?: string;
+          name: string;
+          description?: string;
+          nodes: {
+            id: string;
+            type: string;
+            position: {
+              x: number;
+              y: number;
+            };
+            data: {
+              label: string;
+              /**
+               * @default {
+               *       "params": {},
+               *       "inputOverrides": {}
+               *     }
+               */
+              config: {
+                /** @default {} */
+                params: {
+                  [key: string]: unknown;
+                };
+                /** @default {} */
+                inputOverrides: {
+                  [key: string]: unknown;
+                };
+                /** @enum {string} */
+                joinStrategy?: 'all' | 'any' | 'first';
+                streamId?: string;
+                groupId?: string;
+                maxConcurrency?: number;
+                /** @enum {string} */
+                mode?: 'normal' | 'tool';
+                toolConfig?: {
+                  /** @default [] */
+                  boundInputIds: string[];
+                  /** @default [] */
+                  exposedInputIds: string[];
+                };
+                connectedToolNodeIds?: string[];
+              };
+              dynamicInputs?: {
+                [key: string]: unknown;
+              }[];
+              dynamicOutputs?: {
+                [key: string]: unknown;
+              }[];
+            };
+          }[];
+          edges: {
+            id: string;
+            source: string;
+            target: string;
+            sourceHandle?: string;
+            targetHandle?: string;
+            /** @enum {string} */
+            kind?: 'success' | 'error';
+            /** @enum {string} */
+            type?: 'default' | 'smoothstep' | 'step' | 'straight' | 'bezier';
+          }[];
+          /**
+           * @default {
+           *       "x": 0,
+           *       "y": 0,
+           *       "zoom": 1
+           *     }
+           */
+          viewport: {
+            x: number;
+            y: number;
+            zoom: number;
+          };
+          successCriteria?: (
+            | {
+                id: string;
+                title: string;
+                /** @enum {string} */
+                kind: 'output_assertion';
+                nodeRef: string;
+                path: string;
+                /** @enum {string} */
+                operator: 'exists' | 'not_empty' | 'equals' | 'contains' | 'gte' | 'lte';
+                expected?: (string | null) | (number | null) | (boolean | null);
+              }
+            | {
+                id: string;
+                title: string;
+                /** @enum {string} */
+                kind: 'finding_count';
+                minimum?: number;
+                maximum?: number;
+              }
+          )[];
+        };
+      };
       /** Format: uuid */
       proposalActionId: string;
       /** Format: uuid */
@@ -6297,19 +6398,13 @@ export interface components {
               /** Format: uuid */
               scopeId?: string;
               sourceRunId?: string;
-              inputChanges?: (
-                | {
-                    /** @enum {string} */
-                    operation: 'set';
-                    inputId: string;
-                    value: unknown;
-                  }
-                | {
-                    /** @enum {string} */
-                    operation: 'unset';
-                    inputId: string;
-                  }
-              )[];
+              inputChanges?: {
+                set: {
+                  inputId: string;
+                  value: unknown;
+                }[];
+                unset: string[];
+              };
             };
           }
         | {

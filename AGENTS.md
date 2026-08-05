@@ -350,7 +350,11 @@ result. Explicit run-card inspect, cancel, and retry controls are structured,
 user-confirmed Operator turns. Retry creates one new run from the original stored version,
 inputs, and scope with action-ID idempotency; it never mutates a completed Agent child. Its
 tool, resource, and prompt calls dispatch through the same canonical runtime and durable
-invocation path. Bounded multi-action requests may produce an immutable three-to-eight-step
+invocation path. Run-input proposals and reviewed launches share one strict `inputChanges` object with
+required `set` and `unset` arrays; model argument-validation attempts repaired by a later same-command
+success remain durable but are collapsed under recovered diagnostics in the UI. There is no
+provider-specific argument normalization or legacy model-facing schema. Bounded multi-action requests
+may produce an immutable three-to-eight-step
 `propose_operator_plan` preview. Run starts a separate patch-gated `execute_plan` journey by
 proposal-action ID; it schedules the existing typed action boundary sequentially with stable
 step identities, keeps Ask/Auto approval semantics, projects progress from the action ledger,

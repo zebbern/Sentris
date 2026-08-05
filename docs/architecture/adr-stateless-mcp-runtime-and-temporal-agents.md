@@ -97,6 +97,7 @@ replaying older histories. Explicit run-card inspect, cancel, and retry controls
 turn path as user-confirmed structured commands. Retry starts one new run from the original
 stored version, inputs, and scope using the Operator action identity for idempotency; it does
 not mutate or reset a completed Agent child.
+Run-input proposals and reviewed launches share one strict `inputChanges` object with required `set` and `unset` arrays; model argument-validation attempts repaired by a later same-command success remain durable but are collapsed under recovered diagnostics in the UI; no provider-specific argument normalization or legacy model-facing schema exists.
 For bounded multi-action requests, `propose_operator_plan` persists an immutable preview of
 three to eight exact typed commands. Running that proposal starts a separate patch-gated
 `execute_plan` journey by proposal-action identity. Temporal schedules the existing Operator
