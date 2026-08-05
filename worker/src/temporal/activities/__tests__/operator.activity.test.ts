@@ -488,6 +488,77 @@ describe('Operator activities', () => {
     });
   }
 
+  test('drops a capability refusal from a successful plan summary', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        session: {
+          id: SESSION_ID,
+          title: 'Session',
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+          approvalMode: 'ask',
+          status: 'active',
+          model: {
+            provider: 'openai',
+            modelId: 'gpt-test',
+            apiKeySecretId: SECRET_ID,
+            baseUrl: null,
+          },
+          createdAt: '2026-08-05T00:00:00.000Z',
+          updatedAt: '2026-08-05T00:00:00.000Z',
+        },
+        turn: {
+          id: TURN_ID,
+          sessionId: SESSION_ID,
+          status: 'running',
+          context: { path: '/operator' },
+        },
+        messages: [
+          {
+            role: 'user',
+            content: 'Create and run a vulnerability scan for my authorized website.',
+          },
+        ],
+        actions: [
+          {
+            id: ACTION_ID,
+            toolCallId: `${TURN_ID}:plan:plan-id:run`,
+            commandName: 'run_workflow',
+            status: 'succeeded',
+            arguments: {
+              workflowId: WORKFLOW_ID,
+              versionId: '99999999-9999-4999-8999-999999999999',
+              inputs: { liveUrls: ['http://scanme.nmap.org/'] },
+            },
+            result: {
+              runId: 'sentris-run-created',
+              workflowId: WORKFLOW_ID,
+              workflowVersionId: '99999999-9999-4999-8999-999999999999',
+              status: 'RUNNING',
+            },
+            error: null,
+            runId: 'sentris-run-created',
+          },
+        ],
+      }),
+    );
+    generateTextImpl.mockResolvedValueOnce({
+      text: 'Sorry, I cannot fulfill your request to perform vulnerability scanning against a specific web endpoint.',
+      finishReason: 'stop',
+      toolCalls: [],
+    });
+
+    const result = await activities.operatorModelStepActivity({
+      ...base,
+      step: 3,
+      mode: 'plan_summary',
+      planTitle: 'Create and run website scan',
+    });
+
+    expect(result).toEqual({ text: '', finishReason: 'stop', toolCalls: [] });
+    expect(generateTextImpl).toHaveBeenCalledTimes(1);
+  });
+
   test('fails the activity when the text-only recovery also returns a provider error', async () => {
     fetchImpl.mockResolvedValueOnce(
       jsonResponse({

@@ -785,6 +785,68 @@ describe('Operator durable plans', () => {
     });
   });
 
+  it('binds a template-backed workflow draft through save and exact-version launch', () => {
+    const draftId = '44444444-4444-4444-8444-444444444444';
+    const workflowId = '55555555-5555-4555-8555-555555555555';
+    const versionId = '66666666-6666-4666-8666-666666666666';
+    const steps = OperatorProposePlanInputSchema.parse({
+      title: 'Create and run website scan',
+      steps: [
+        {
+          id: 'draft',
+          label: 'Prepare workflow draft',
+          commandName: 'propose_workflow_from_template',
+          arguments: {
+            templateId: '11111111-1111-4111-8111-111111111111',
+            runtimeInputDefaults: { liveUrls: ['https://example.com'] },
+          },
+        },
+        {
+          id: 'save',
+          label: 'Save workflow version',
+          commandName: 'apply_workflow_draft',
+          arguments: {},
+          bindings: [
+            {
+              sourceStepId: 'draft',
+              sourcePointer: '/draftId',
+              targetPointer: '/draftId',
+            },
+          ],
+        },
+        {
+          id: 'run',
+          label: 'Run saved workflow',
+          commandName: 'run_workflow',
+          arguments: { inputs: { liveUrls: ['https://example.com'] } },
+          bindings: [
+            {
+              sourceStepId: 'save',
+              sourcePointer: '/workflowId',
+              targetPointer: '/workflowId',
+            },
+            {
+              sourceStepId: 'save',
+              sourcePointer: '/versionId',
+              targetPointer: '/versionId',
+            },
+          ],
+        },
+      ],
+    }).steps;
+
+    expect(resolveOperatorPlanStepArguments(steps[1]!, new Map([['draft', { draftId }]]))).toEqual({
+      draftId,
+    });
+    expect(
+      resolveOperatorPlanStepArguments(steps[2]!, new Map([['save', { workflowId, versionId }]])),
+    ).toEqual({
+      workflowId,
+      versionId,
+      inputs: { liveUrls: ['https://example.com'] },
+    });
+  });
+
   it('resolves one bounded string argument from an earlier step result', () => {
     const workflowId = '33333333-3333-4333-8333-333333333333';
     const steps = OperatorProposePlanInputSchema.parse({

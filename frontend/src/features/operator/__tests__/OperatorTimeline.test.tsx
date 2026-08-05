@@ -221,6 +221,216 @@ describe('OperatorTimeline', () => {
     expect(olderActivity).toHaveAttribute('open');
   });
 
+  it('presents a completed plan and its execution as one pipeline', () => {
+    const planId = '11111111-1111-4111-8111-111111111111';
+    const workflowId = '22222222-2222-4222-8222-222222222222';
+    const versionId = '33333333-3333-4333-8333-333333333333';
+    const planSteps = [
+      {
+        id: 'draft',
+        label: 'Prepare workflow draft',
+        commandName: 'propose_workflow_from_template' as const,
+        arguments: {
+          templateId: '44444444-4444-4444-8444-444444444444',
+          runtimeInputDefaults: { liveUrls: ['https://example.com'] },
+        },
+        effect: 'execute' as const,
+      },
+      {
+        id: 'save',
+        label: 'Save workflow version',
+        commandName: 'apply_workflow_draft' as const,
+        arguments: {},
+        bindings: [
+          {
+            sourceStepId: 'draft',
+            sourcePointer: '/draftId' as const,
+            targetPointer: '/draftId' as const,
+          },
+        ],
+        effect: 'consequential' as const,
+      },
+      {
+        id: 'run',
+        label: 'Run saved workflow',
+        commandName: 'run_workflow' as const,
+        arguments: { inputs: { liveUrls: ['https://example.com'] } },
+        bindings: [
+          {
+            sourceStepId: 'save',
+            sourcePointer: '/workflowId' as const,
+            targetPointer: '/workflowId' as const,
+          },
+          {
+            sourceStepId: 'save',
+            sourcePointer: '/versionId' as const,
+            targetPointer: '/versionId' as const,
+          },
+        ],
+        effect: 'execute' as const,
+      },
+    ];
+    const planAction: OperatorActionView = {
+      ...pendingAction,
+      id: planId,
+      turnId: 'turn-proposal',
+      commandName: 'propose_operator_plan',
+      effect: 'execute',
+      approvalRequired: false,
+      status: 'succeeded',
+      result: {
+        kind: 'operator-plan',
+        planId,
+        title: 'Create and run website scan',
+        summary: 'Prepare, save, and run one workflow.',
+        steps: planSteps,
+      },
+      runId: null,
+      completedAt: '2026-08-02T10:00:01.500Z',
+    };
+    const executionActions: OperatorActionView[] = [
+      {
+        ...pendingAction,
+        id: 'draft-action',
+        turnId: 'turn-execute',
+        toolCallId: `operator:plan:${planId}:draft`,
+        commandName: 'propose_workflow_from_template',
+        effect: 'execute',
+        approvalRequired: false,
+        status: 'succeeded',
+        result: { kind: 'workflow-draft', draftId: 'draft-id' },
+        runId: null,
+        createdAt: '2026-08-02T10:00:04.000Z',
+        completedAt: '2026-08-02T10:00:04.500Z',
+      },
+      {
+        ...pendingAction,
+        id: 'save-action',
+        turnId: 'turn-execute',
+        toolCallId: `operator:plan:${planId}:save`,
+        commandName: 'apply_workflow_draft',
+        effect: 'consequential',
+        approvalRequired: true,
+        status: 'succeeded',
+        result: { workflowId, versionId },
+        runId: null,
+        createdAt: '2026-08-02T10:00:05.000Z',
+        completedAt: '2026-08-02T10:00:05.500Z',
+      },
+      {
+        ...pendingAction,
+        id: 'run-action',
+        turnId: 'turn-execute',
+        toolCallId: `operator:plan:${planId}:run`,
+        commandName: 'run_workflow',
+        effect: 'execute',
+        approvalRequired: false,
+        status: 'succeeded',
+        arguments: {
+          workflowId,
+          versionId,
+          inputs: { liveUrls: ['https://example.com'] },
+        },
+        result: { runId: 'sentris-run-plan' },
+        runId: 'sentris-run-plan',
+        createdAt: '2026-08-02T10:00:06.000Z',
+        completedAt: '2026-08-02T10:00:06.500Z',
+      },
+    ];
+    const planMessages: OperatorMessageView[] = [
+      {
+        id: 'plan-request',
+        sessionId: 'session-1',
+        turnId: 'turn-proposal',
+        sequence: 1,
+        role: 'user',
+        content: 'Create and run a website scan workflow',
+        createdAt: '2026-08-02T10:00:00.000Z',
+      },
+      {
+        id: 'plan-ready',
+        sessionId: 'session-1',
+        turnId: 'turn-proposal',
+        sequence: 2,
+        role: 'assistant',
+        content: 'Plan ready for review. Select Run plan or Revise.',
+        createdAt: '2026-08-02T10:00:02.000Z',
+      },
+      {
+        id: 'execute-control-message',
+        sessionId: 'session-1',
+        turnId: 'turn-execute',
+        sequence: 1,
+        role: 'user',
+        content: `Run Operator plan ${planId}: Create and run website scan`,
+        createdAt: '2026-08-02T10:00:03.000Z',
+      },
+      {
+        id: 'plan-result',
+        sessionId: 'session-1',
+        turnId: 'turn-execute',
+        sequence: 2,
+        role: 'assistant',
+        content: 'Created the workflow and completed its first run.',
+        createdAt: '2026-08-02T10:00:07.000Z',
+      },
+    ];
+    const turns: OperatorTurnView[] = [
+      {
+        id: 'turn-proposal',
+        sessionId: 'session-1',
+        status: 'completed',
+        temporalWorkflowId: null,
+        temporalRunId: null,
+        context: null,
+        journey: null,
+        error: null,
+        createdAt: '2026-08-02T10:00:00.000Z',
+        startedAt: '2026-08-02T10:00:00.000Z',
+        completedAt: '2026-08-02T10:00:02.000Z',
+      },
+      {
+        id: 'turn-execute',
+        sessionId: 'session-1',
+        status: 'completed',
+        temporalWorkflowId: null,
+        temporalRunId: null,
+        context: null,
+        journey: { kind: 'execute_plan', planActionId: planId },
+        error: null,
+        createdAt: '2026-08-02T10:00:03.000Z',
+        startedAt: '2026-08-02T10:00:03.000Z',
+        completedAt: '2026-08-02T10:00:07.000Z',
+      },
+    ];
+
+    const { container } = renderWithProviders(
+      <OperatorTimeline
+        messages={planMessages}
+        actions={[planAction, ...executionActions]}
+        turns={turns}
+        isActive={false}
+        onDecision={mock(() => {})}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(container.querySelectorAll('[data-operator-turn-group]')).toHaveLength(1);
+    expect(
+      screen.queryByText('Plan ready for review. Select Run plan or Revise.'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Run Operator plan /)).not.toBeInTheDocument();
+    expect(screen.getByText('Create and run website scan')).toBeInTheDocument();
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /workflow run/i })).toHaveAttribute(
+      'href',
+      '/runs/sentris-run-plan',
+    );
+    expect(
+      screen.getByText('Created the workflow and completed its first run.'),
+    ).toBeInTheDocument();
+  });
+
   it('opens configure-and-run without repeating a structured saved workflow list', () => {
     const onRunSavedWorkflow = mock(() => {});
     const workflowId = '22222222-2222-4222-8222-222222222222';

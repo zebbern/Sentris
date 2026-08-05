@@ -68,6 +68,8 @@ const ACTION_STATUS_STYLES: Record<OperatorActionStatus, string> = {
   failed: 'border-destructive/40 bg-destructive/10 text-destructive',
 };
 
+const PLAN_READY_MESSAGE = 'Plan ready for review. Select Run plan or Revise.';
+
 type TimelineEvent =
   | { kind: 'message'; at: string; sequence: number; value: OperatorMessageView }
   | { kind: 'action'; at: string; sequence: number; value: OperatorActionView };
@@ -108,15 +110,37 @@ function toTimelineEvents(
   });
 }
 
-function groupEventsByTurn(events: TimelineEvent[]): TimelineTurnGroup[] {
+function groupEventsByTurn(
+  events: TimelineEvent[],
+  displayTurnIds: ReadonlyMap<string, string> = new Map(),
+): TimelineTurnGroup[] {
   const groups = new Map<string, TimelineTurnGroup>();
   for (const event of events) {
-    const turnId = event.value.turnId;
+    const turnId = displayTurnIds.get(event.value.turnId) ?? event.value.turnId;
     const existing = groups.get(turnId);
     if (existing) existing.events.push(event);
     else groups.set(turnId, { turnId, events: [event] });
   }
   return [...groups.values()];
+}
+
+function planExecutionDisplayTurnIds(
+  turns: OperatorTurnView[],
+  actions: OperatorActionView[],
+): ReadonlyMap<string, string> {
+  const proposalTurnIds = new Map<string, string>();
+  for (const action of actions) {
+    const plan = OperatorPlanProposalResultSchema.safeParse(action.result);
+    if (plan.success) proposalTurnIds.set(plan.data.planId, action.turnId);
+  }
+
+  const displayTurnIds = new Map<string, string>();
+  for (const turn of turns) {
+    if (turn.journey?.kind !== 'execute_plan') continue;
+    const proposalTurnId = proposalTurnIds.get(turn.journey.planActionId);
+    if (proposalTurnId) displayTurnIds.set(turn.id, proposalTurnId);
+  }
+  return displayTurnIds;
 }
 
 function segmentTurnEvents(events: TimelineEvent[]): TimelineSegment[] {
@@ -764,6 +788,8 @@ export function OperatorTimeline({
   onCancelTurn = () => {},
   elevatedDecisionActionId,
 }: OperatorTimelineProps) {
+  const displayTurnIds = planExecutionDisplayTurnIds(turns, actions);
+  const executedProposalTurnIds = new Set(displayTurnIds.values());
   const planIds = actions.flatMap((action) => {
     const plan = OperatorPlanProposalResultSchema.safeParse(action.result);
     return plan.success ? [plan.data.planId] : [];
@@ -773,13 +799,21 @@ export function OperatorTimeline({
       planIds.some((planId) => action.toolCallId.includes(`:plan:${planId}:`)) ? [action.id] : [],
     ),
   );
-  const events = toTimelineEvents(messages, actions).filter(
-    (event) =>
-      event.kind === 'message' ||
+  const events = toTimelineEvents(messages, actions).filter((event) => {
+    if (event.kind === 'message') {
+      if (displayTurnIds.has(event.value.turnId) && event.value.role === 'user') return false;
+      return !(
+        executedProposalTurnIds.has(event.value.turnId) &&
+        event.value.role === 'assistant' &&
+        event.value.content === PLAN_READY_MESSAGE
+      );
+    }
+    return (
       !planStepActionIds.has(event.value.id) ||
-      (event.value.commandName === 'run_workflow' && Boolean(event.value.runId)),
-  );
-  const turnGroups = groupEventsByTurn(events);
+      (event.value.commandName === 'run_workflow' && Boolean(event.value.runId))
+    );
+  });
+  const turnGroups = groupEventsByTurn(events, displayTurnIds);
   const turnsById = new Map(turns.map((turn) => [turn.id, turn]));
   const latestTurnId = turnGroups[turnGroups.length - 1]?.turnId;
   const latestInvestigationAction = [...actions]
