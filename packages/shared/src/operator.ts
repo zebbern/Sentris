@@ -727,45 +727,57 @@ export const OperatorRunInspectionResultSchema = z
 export type OperatorRunInspectionResult = z.infer<typeof OperatorRunInspectionResultSchema>;
 
 export const OPERATOR_RUN_INPUT_CHANGE_OPERATIONS = ['set', 'unset'] as const;
-export const OperatorRunInputChangeSchema = z.discriminatedUnion('operation', [
-  z
-    .object({
-      operation: z.literal('set'),
-      inputId: z.string().trim().min(1).max(191),
-      value: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      operation: z.literal('unset'),
-      inputId: z.string().trim().min(1).max(191),
-    })
-    .strict(),
-]);
-export type OperatorRunInputChange = z.infer<typeof OperatorRunInputChangeSchema>;
+export const OperatorRunInputSetSchema = z
+  .object({
+    inputId: z.string().trim().min(1).max(191),
+    value: z.unknown(),
+  })
+  .strict();
 
 export const OperatorRunInputChangesSchema = z
-  .array(OperatorRunInputChangeSchema)
-  .min(1)
-  .max(20)
-  .superRefine((changes, context) => {
+  .object({
+    set: z.array(OperatorRunInputSetSchema).max(20),
+    unset: z.array(z.string().trim().min(1).max(191)).max(20),
+  })
+  .strict()
+  .superRefine((inputChanges, context) => {
+    const total = inputChanges.set.length + inputChanges.unset.length;
+    if (total < 1 || total > 20) {
+      context.addIssue({
+        code: 'custom',
+        path: [],
+        message: 'Runtime input changes must contain between 1 and 20 operations',
+      });
+    }
+
     const seen = new Set<string>();
-    for (const [index, change] of changes.entries()) {
+    for (const [index, change] of inputChanges.set.entries()) {
       if (seen.has(change.inputId)) {
         context.addIssue({
           code: 'custom',
-          path: [index, 'inputId'],
+          path: ['set', index, 'inputId'],
           message: `Duplicate runtime input change for "${change.inputId}"`,
         });
       }
       seen.add(change.inputId);
     }
+    for (const [index, inputId] of inputChanges.unset.entries()) {
+      if (seen.has(inputId)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['unset', index],
+          message: `Duplicate runtime input change for "${inputId}"`,
+        });
+      }
+      seen.add(inputId);
+    }
   });
+export type OperatorRunInputChanges = z.infer<typeof OperatorRunInputChangesSchema>;
 
 export const OperatorProposeRunInputChangesInputSchema = z
   .object({
     sourceRunId: RunIdSchema,
-    changes: OperatorRunInputChangesSchema,
+    inputChanges: OperatorRunInputChangesSchema,
   })
   .strict();
 
@@ -1379,7 +1391,7 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
   },
   propose_run_input_changes: {
     description:
-      'Validate a bounded set of ID-based runtime-input changes against the exact immutable version and stored inputs of a terminal source run. Secret inputs are always preserved and cannot be changed. This only creates a reviewable proposal; it does not launch a run.',
+      'Validate a bounded set of ID-based runtime-input changes against the exact immutable version and stored inputs of a terminal source run. Call with { inputChanges: { set: [{ inputId, value }], unset: [] } }. Secret inputs are always preserved and cannot be changed. This only creates a reviewable proposal; it does not launch a run.',
     effect: 'execute',
     inputSchema: OperatorProposeRunInputChangesInputSchema,
   },

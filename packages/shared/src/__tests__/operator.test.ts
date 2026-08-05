@@ -9,6 +9,7 @@ import {
   OperatorGetRunInputSchema,
   OperatorGetWorkflowInputSchema,
   OperatorRunWorkflowInputSchema,
+  OperatorRunInputChangesSchema,
   OperatorRunComparisonResultSchema,
   OperatorGetMcpPromptInputSchema,
   OperatorInvokeMcpToolInputSchema,
@@ -18,6 +19,7 @@ import {
   OperatorPersistedTurnPayloadV1Schema,
   OperatorActionDecisionSchema,
   OperatorProposePlanInputSchema,
+  OperatorProposeRunInputChangesInputSchema,
   OperatorRequestUserInputSchema,
   resolveOperatorPlanStepArguments,
   OperatorReadMcpResourceInputSchema,
@@ -125,24 +127,101 @@ describe('Operator run controls', () => {
         scopeId: '44444444-4444-4444-8444-444444444444',
       }).success,
     ).toBe(false);
+    const inputChanges = {
+      set: [{ inputId: 'packageSpec', value: 'minimist@1.2.9' }],
+      unset: [],
+    };
+    expect(OperatorRunInputChangesSchema.parse(inputChanges)).toEqual(inputChanges);
+    expect(OperatorRunInputChangesSchema.parse({ set: [], unset: ['scanIntensity'] })).toEqual({
+      set: [],
+      unset: ['scanIntensity'],
+    });
+    expect(
+      OperatorRunInputChangesSchema.parse({
+        set: [{ inputId: 'packageSpec', value: 'minimist@1.2.9' }],
+        unset: ['scanIntensity'],
+      }),
+    ).toEqual({
+      set: [{ inputId: 'packageSpec', value: 'minimist@1.2.9' }],
+      unset: ['scanIntensity'],
+    });
+    for (const invalid of [
+      { set: [], unset: [] },
+      {
+        set: [
+          { inputId: 'target', value: 'one' },
+          { inputId: 'target', value: 'two' },
+        ],
+        unset: [],
+      },
+      { set: [{ inputId: 'target', value: 'one' }], unset: ['target'] },
+    ]) {
+      expect(OperatorRunInputChangesSchema.safeParse(invalid).success).toBe(false);
+    }
+    expect(
+      OperatorRunInputChangesSchema.safeParse({
+        set: [
+          { inputId: 'input01', value: 'one' },
+          { inputId: 'input02', value: 'two' },
+          { inputId: 'input03', value: 'three' },
+          { inputId: 'input04', value: 'four' },
+          { inputId: 'input05', value: 'five' },
+          { inputId: 'input06', value: 'six' },
+          { inputId: 'input07', value: 'seven' },
+          { inputId: 'input08', value: 'eight' },
+          { inputId: 'input09', value: 'nine' },
+          { inputId: 'input10', value: 'ten' },
+          { inputId: 'input11', value: 'eleven' },
+          { inputId: 'input12', value: 'twelve' },
+          { inputId: 'input13', value: 'thirteen' },
+          { inputId: 'input14', value: 'fourteen' },
+          { inputId: 'input15', value: 'fifteen' },
+          { inputId: 'input16', value: 'sixteen' },
+          { inputId: 'input17', value: 'seventeen' },
+          { inputId: 'input18', value: 'eighteen' },
+          { inputId: 'input19', value: 'nineteen' },
+          { inputId: 'input20', value: 'twenty' },
+        ],
+        unset: ['input21'],
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposeRunInputChangesInputSchema.safeParse({
+        sourceRunId: 'sentris-run-source',
+        changes: [{ operation: 'set', inputId: 'target', value: 'legacy' }],
+      }).success,
+    ).toBe(false);
     expect(
       OperatorRunWorkflowInputSchema.parse({
         workflowId: '22222222-2222-4222-8222-222222222222',
         versionId: '33333333-3333-4333-8333-333333333333',
         sourceRunId: 'sentris-run-original',
-        inputChanges: [{ operation: 'set', inputId: 'packageSpec', value: 'minimist@1.2.9' }],
+        inputChanges,
       }).inputChanges,
-    ).toEqual([{ operation: 'set', inputId: 'packageSpec', value: 'minimist@1.2.9' }]);
+    ).toEqual(inputChanges);
     expect(
       OperatorRunWorkflowInputSchema.safeParse({
         workflowId: '22222222-2222-4222-8222-222222222222',
         versionId: '33333333-3333-4333-8333-333333333333',
-        inputChanges: [{ operation: 'unset', inputId: 'packageSpec' }],
+        inputChanges: { set: [], unset: ['packageSpec'] },
       }).success,
     ).toBe(false);
-    expect(() =>
-      z.toJSONSchema(OPERATOR_COMMAND_DEFINITIONS.propose_run_input_changes.inputSchema),
-    ).not.toThrow();
+    const toolSchema = z.toJSONSchema(
+      OPERATOR_COMMAND_DEFINITIONS.propose_run_input_changes.inputSchema,
+    );
+    expect(JSON.stringify(toolSchema)).not.toContain('"oneOf"');
+    expect(toolSchema).toMatchObject({
+      properties: {
+        inputChanges: {
+          type: 'object',
+          properties: {
+            set: { type: 'array' },
+            unset: { type: 'array' },
+          },
+          required: ['set', 'unset'],
+        },
+      },
+    });
   });
 
   it('keeps retry explicit and accepts only bounded direct run commands', () => {

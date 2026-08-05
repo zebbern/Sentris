@@ -28,7 +28,7 @@ import {
   type OperatorRunComparisonAssessment,
   type OperatorRunComparisonEvidence,
   type OperatorRunAgentActivityEvidence,
-  type OperatorRunInputChange,
+  type OperatorRunInputChanges,
   type TraceEventPayload,
   type WorkflowRuntimeInputDefinition,
   type WorkflowSuccessCriterion,
@@ -123,11 +123,11 @@ function optionalJsonValue(value: unknown): JsonValue | undefined {
 function materializeRunInputChanges(input: {
   definitions: WorkflowRuntimeInputDefinition[];
   sourceInputs: Record<string, unknown>;
-  changes: OperatorRunInputChange[];
+  inputChanges: OperatorRunInputChanges;
 }): {
   inputs: Record<string, unknown>;
   diffs: {
-    operation: OperatorRunInputChange['operation'];
+    operation: 'set' | 'unset';
     inputId: string;
     label: string;
     type: Exclude<WorkflowRuntimeInputDefinition['type'], 'secret'>;
@@ -139,36 +139,50 @@ function materializeRunInputChanges(input: {
     input.definitions.map((definition) => [definition.id, definition]),
   );
   const inputs = { ...input.sourceInputs };
-  const diffs = [];
+  const diffs: {
+    operation: 'set' | 'unset';
+    inputId: string;
+    label: string;
+    type: Exclude<WorkflowRuntimeInputDefinition['type'], 'secret'>;
+    before?: JsonValue;
+    after?: JsonValue;
+  }[] = [];
 
-  for (const change of input.changes) {
-    const definition = definitionsById.get(change.inputId);
+  const applyChange = (operation: 'set' | 'unset', inputId: string, value?: unknown) => {
+    const definition = definitionsById.get(inputId);
     if (!definition) {
-      throw new BadRequestException(`Unknown workflow runtime input "${change.inputId}"`);
+      throw new BadRequestException(`Unknown workflow runtime input "${inputId}"`);
     }
     if (definition.type === 'secret') {
       throw new BadRequestException(
-        `Secret workflow runtime input "${change.inputId}" is preserved and cannot be changed by Operator`,
+        `Secret workflow runtime input "${inputId}" is preserved and cannot be changed by Operator`,
       );
     }
 
     const before = optionalJsonValue(effectiveRuntimeInputValue(definition, inputs));
-    if (change.operation === 'set') {
-      inputs[change.inputId] = JsonValueSchema.parse(change.value);
+    if (operation === 'set') {
+      inputs[inputId] = JsonValueSchema.parse(value);
     } else {
-      Reflect.deleteProperty(inputs, change.inputId);
+      Reflect.deleteProperty(inputs, inputId);
     }
     const after = optionalJsonValue(effectiveRuntimeInputValue(definition, inputs));
-    if (isDeepStrictEqual(before, after)) continue;
+    if (isDeepStrictEqual(before, after)) return;
 
     diffs.push({
-      operation: change.operation,
-      inputId: change.inputId,
+      operation,
+      inputId,
       label: definition.label,
       type: definition.type,
       ...(before !== undefined ? { before } : {}),
       ...(after !== undefined ? { after } : {}),
     });
+  };
+
+  for (const change of input.inputChanges.set) {
+    applyChange('set', change.inputId, change.value);
+  }
+  for (const inputId of input.inputChanges.unset) {
+    applyChange('unset', inputId);
   }
 
   const validation = validateWorkflowRuntimeInputs(input.definitions, inputs);
@@ -931,7 +945,7 @@ export class OperatorCommandService {
     const proposal = materializeRunInputChanges({
       definitions,
       sourceInputs: config.inputs,
-      changes: input.changes,
+      inputChanges: input.inputChanges,
     });
     return {
       result: OperatorRunInputProposalResultSchema.parse({
@@ -941,7 +955,7 @@ export class OperatorCommandService {
         versionId: config.workflowVersionId,
         sourceScopePreserved: true,
         changes: proposal.diffs,
-        inputChanges: input.changes,
+        inputChanges: input.inputChanges,
       }),
     };
   }
@@ -1238,7 +1252,7 @@ export class OperatorCommandService {
         inputs = materializeRunInputChanges({
           definitions: extractWorkflowRuntimeInputDefinitions(definition),
           sourceInputs: sourceConfig.inputs,
-          changes: input.inputChanges,
+          inputChanges: input.inputChanges,
         }).inputs;
       } else {
         inputs = sourceConfig.inputs;

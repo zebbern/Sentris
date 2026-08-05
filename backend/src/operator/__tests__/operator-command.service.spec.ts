@@ -324,7 +324,11 @@ describe('OperatorCommandService', () => {
       workflowId: WORKFLOW_ID,
       workflowVersionId: WORKFLOW_VERSION_ID,
       workflowVersion: 1,
-      inputs: { target: 'old.example.com', apiKey: 'stored-secret' },
+      inputs: {
+        target: 'old.example.com',
+        apiKey: 'stored-secret',
+        scanIntensity: 'aggressive',
+      },
     });
     workflows.getCompiledWorkflowContext = vi.fn().mockResolvedValue({
       workflow: { id: WORKFLOW_ID },
@@ -339,19 +343,27 @@ describe('OperatorCommandService', () => {
               runtimeInputs: [
                 { id: 'target', label: 'Target', type: 'text', required: true },
                 { id: 'apiKey', label: 'API key', type: 'secret', required: true },
+                {
+                  id: 'scanIntensity',
+                  label: 'Scan intensity',
+                  type: 'text',
+                  required: false,
+                  defaultValue: 'balanced',
+                },
               ],
             },
           },
         ],
       },
     });
-    const inputChanges = [
-      { operation: 'set' as const, inputId: 'target', value: 'new.example.com' },
-    ];
+    const inputChanges = {
+      set: [{ inputId: 'target', value: 'new.example.com' }],
+      unset: [],
+    };
 
     const proposal = await service.execute({
       commandName: 'propose_run_input_changes',
-      arguments: { sourceRunId, changes: inputChanges },
+      arguments: { sourceRunId, inputChanges },
       auth,
       sessionId: SESSION_ID,
       turnId: TURN_ID,
@@ -365,6 +377,7 @@ describe('OperatorCommandService', () => {
         sourceRunId,
         workflowId: WORKFLOW_ID,
         versionId: WORKFLOW_VERSION_ID,
+        inputChanges,
         changes: [
           expect.objectContaining({
             inputId: 'target',
@@ -395,7 +408,63 @@ describe('OperatorCommandService', () => {
     expect(workflows.run).toHaveBeenCalledWith(
       WORKFLOW_ID,
       {
-        inputs: { target: 'new.example.com', apiKey: 'stored-secret' },
+        inputs: {
+          target: 'new.example.com',
+          apiKey: 'stored-secret',
+          scanIntensity: 'aggressive',
+        },
+        versionId: WORKFLOW_VERSION_ID,
+        scopeId,
+      },
+      auth,
+      expect.any(Object),
+    );
+
+    const unsetInputChanges = { set: [], unset: ['scanIntensity'] };
+    const unsetProposal = await service.execute({
+      commandName: 'propose_run_input_changes',
+      arguments: { sourceRunId, inputChanges: unsetInputChanges },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:04:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:05:00.000Z',
+    });
+    expect(unsetProposal.result).toEqual(
+      expect.objectContaining({
+        changes: [
+          expect.objectContaining({
+            operation: 'unset',
+            inputId: 'scanIntensity',
+            before: 'aggressive',
+            after: 'balanced',
+          }),
+        ],
+        inputChanges: unsetInputChanges,
+      }),
+    );
+
+    await service.execute({
+      commandName: 'run_workflow',
+      arguments: {
+        workflowId: WORKFLOW_ID,
+        versionId: WORKFLOW_VERSION_ID,
+        inputs: {},
+        sourceRunId,
+        inputChanges: unsetInputChanges,
+      },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:06:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:07:00.000Z',
+    });
+    expect(workflows.run).toHaveBeenLastCalledWith(
+      WORKFLOW_ID,
+      {
+        inputs: { target: 'old.example.com', apiKey: 'stored-secret' },
         versionId: WORKFLOW_VERSION_ID,
         scopeId,
       },
@@ -441,7 +510,10 @@ describe('OperatorCommandService', () => {
         commandName: 'propose_run_input_changes',
         arguments: {
           sourceRunId,
-          changes: [{ operation: 'set', inputId: 'apiKey', value: 'replacement' }],
+          inputChanges: {
+            set: [{ inputId: 'apiKey', value: 'replacement' }],
+            unset: [],
+          },
         },
         auth,
         sessionId: SESSION_ID,
