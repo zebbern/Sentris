@@ -40,6 +40,7 @@ import {
 import { getProviderDeclaredModelError } from '../../components/ai/model-finish';
 
 const MAX_MODEL_TEXT_LENGTH = 20_000;
+const JSON_STRUCTURAL_CHARACTERS = new Set(['[', ']', '{', '}', ':', ',', '"']);
 const MAX_CONVERSATION_LENGTH = 60_000;
 const MAX_TOOL_CALLS_PER_STEP = 8;
 const MAX_ACTION_LEDGER_LENGTH = 8_000;
@@ -183,6 +184,7 @@ export interface OperatorModelStepInput extends OperatorActivityInput {
     | 'improve_run_proposal'
     | 'improve_run_summary'
     | 'plan_summary'
+    | 'run_follow_up_review'
     | 'run_follow_up_summary';
   sourceRunId?: string;
   sourceDraftId?: string;
@@ -438,8 +440,11 @@ export async function operatorModelStepActivity(
               'get_component',
               'propose_workflow_edits',
             ] as const)
-          : OPERATOR_COMMAND_NAMES;
+          : mode === 'run_follow_up_review'
+            ? (['request_user_input'] as const)
+            : OPERATOR_COMMAND_NAMES;
     const compactSummary = mode === 'plan_summary' || mode === 'run_follow_up_summary';
+    const boundedRunFollowUp = mode === 'run_follow_up_review' || mode === 'run_follow_up_summary';
     const tools =
       mode === 'improve_run_summary' || compactSummary
         ? undefined
@@ -501,7 +506,7 @@ export async function operatorModelStepActivity(
       );
     }
     if (providerFailure) {
-      if (compactSummary) throw providerFailure;
+      if (compactSummary || mode === 'run_follow_up_review') throw providerFailure;
       const recovery = await generate({
         model,
         system: buildRecoverySystemPrompt(),
@@ -531,6 +536,10 @@ export async function operatorModelStepActivity(
       };
     }
 
+    if (result.toolCalls.length === 0 && isIncompleteStructuredResponse(result.text)) {
+      throw new Error('Operator model returned an incomplete structured response');
+    }
+
     const toolCalls: OperatorModelToolCall[] = [];
     for (const [index, toolCall] of result.toolCalls.slice(0, MAX_TOOL_CALLS_PER_STEP).entries()) {
       if (!OPERATOR_COMMAND_NAMES.includes(toolCall.toolName as OperatorCommandName)) continue;
@@ -545,9 +554,16 @@ export async function operatorModelStepActivity(
     }
 
     const resultText =
-      compactSummary && isCapabilityRefusal(result.text, result.toolCalls) ? '' : result.text;
+      (compactSummary || boundedRunFollowUp) && isCapabilityRefusal(result.text, result.toolCalls)
+        ? ''
+        : result.text;
     return {
-      text: resultText.slice(0, compactSummary ? MAX_PLAN_SUMMARY_LENGTH : MAX_MODEL_TEXT_LENGTH),
+      text: resultText.slice(
+        0,
+        compactSummary || mode === 'run_follow_up_review'
+          ? MAX_PLAN_SUMMARY_LENGTH
+          : MAX_MODEL_TEXT_LENGTH,
+      ),
       finishReason: String(result.finishReason),
       toolCalls,
     };
@@ -790,16 +806,28 @@ function buildSystemPrompt(
                 'When the durable results contain exact identifiers, add relevant product-relative Markdown links using /workflows/{workflowId} or /workflows/{workflowId}/runs/{runId}. Never invent identifiers, labels, results, or URLs; omit a link if its required IDs are unavailable.',
                 'Keep the entire response under 2,000 characters. This is a text-only summary; do not emit tool-call syntax.',
               ]
-            : mode === 'run_follow_up_summary'
+            : mode === 'run_follow_up_review'
               ? [
                   `Workflow run ${sourceRunId ?? 'unknown'} has reached a terminal state and its bounded get_run inspection is recorded in the action evidence.`,
-                  'State the actual terminal outcome first. Summarize the most important Agent tool, resource, or prompt activity, trace failures, and findings, distinguishing unavailable evidence from zero results.',
-                  'Use only recorded evidence; do not invent root causes or claim semantic success beyond the workflow result and declared criteria.',
-                  'Use the exact product-relative links recorded by get_run. Suggest at most three next actions using only recorded findings or artifacts and the existing run controls: Change inputs, Run again, or Improve with Operator.',
-                  'Never invent an input ID, value, batch mode, workflow capability, artifact, or finding. Do not prescribe rerun arguments; direct the user to Change inputs instead.',
-                  'Keep the entire response under 2,000 characters. This is a text-only summary; do not emit tool-call syntax.',
+                  'Default to a concise final summary without interrupting the user when the recorded evidence supports a useful result and next actions.',
+                  'Ask at most one focused question only when the answer materially changes the recommendation and the needed preference or choice is not already recorded.',
+                  'When a question is necessary, call request_user_input exactly once with concise options when the choices are known. Return no extra narrative with the tool call.',
+                  'Do not ask the user to restate run evidence, confirm facts already recorded, or choose between options that do not change the recommendation.',
+                  'No other tool or action is available in this review. If no question is needed, follow the terminal-summary rules below and return the final answer now.',
+                  'State the actual terminal outcome first. Distinguish unavailable evidence from zero failures, findings, or artifacts, and use only exact recorded product-relative links.',
+                  'Suggest at most three evidence-supported next actions. Keep the entire response under 2,000 characters.',
                 ]
-              : [];
+              : mode === 'run_follow_up_summary'
+                ? [
+                    `Workflow run ${sourceRunId ?? 'unknown'} has reached a terminal state and its bounded get_run inspection is recorded in the action evidence.`,
+                    'State the actual terminal outcome first. Summarize the most important Agent tool, resource, or prompt activity, trace failures, and findings, distinguishing unavailable evidence from zero results.',
+                    'Use only recorded evidence; do not invent root causes or claim semantic success beyond the workflow result and declared criteria.',
+                    'If a request_user_input result is recorded, use that answer to tailor the recommendation. Never ask another question.',
+                    'Use the exact product-relative links recorded by get_run. Suggest at most three next actions using only recorded findings or artifacts and the existing run controls: Change inputs, Run again, or Improve with Operator.',
+                    'Never invent an input ID, value, batch mode, workflow capability, artifact, or finding. Do not prescribe rerun arguments; direct the user to Change inputs instead.',
+                    'Keep the entire response under 2,000 characters. This is a text-only summary; do not emit tool-call syntax.',
+                  ]
+                : [];
   return [
     'You are the Sentris Operator. Help the user operate their existing security workflows and inspect results.',
     'Sentris is a professional defensive security workflow orchestration product. Authorized scanning, security testing, vulnerability research, and creating workflows for those tasks are core supported uses, not reasons to refuse a request.',
@@ -846,6 +874,14 @@ function isCapabilityRefusal(
       PLAIN_CAPABILITY_REFUSAL_PATTERNS.some((pattern) =>
         pattern.test(JSON.stringify(toolCall.input)),
       ),
+  );
+}
+
+function isIncompleteStructuredResponse(text: string): boolean {
+  const trimmed = text.trim();
+  return (
+    trimmed.length > 0 &&
+    [...trimmed].every((character) => JSON_STRUCTURAL_CHARACTERS.has(character))
   );
 }
 

@@ -385,6 +385,68 @@ describe('Operator activities', () => {
     expect(JSON.stringify(recoveryMessages)).not.toContain('tool-result');
   });
 
+  test('rejects incomplete structured fragments so Temporal retries the model step', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        session: {
+          id: SESSION_ID,
+          title: 'Session',
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+          approvalMode: 'ask',
+          status: 'active',
+          model: {
+            provider: 'openai',
+            modelId: 'gpt-test',
+            apiKeySecretId: SECRET_ID,
+            baseUrl: null,
+          },
+          createdAt: '2026-08-02T00:00:00.000Z',
+          updatedAt: '2026-08-02T00:00:00.000Z',
+        },
+        turn: {
+          id: TURN_ID,
+          sessionId: SESSION_ID,
+          status: 'running',
+          context: null,
+        },
+        messages: [{ role: 'user', content: 'Propose reviewed input changes for this run' }],
+        actions: [
+          {
+            id: ACTION_ID,
+            toolCallId: `${TURN_ID}:1:0`,
+            commandName: 'get_run',
+            status: 'succeeded',
+            arguments: { runId: 'source-run' },
+            result: { id: 'source-run', status: 'FAILED' },
+            error: null,
+            runId: 'source-run',
+          },
+        ],
+      }),
+    );
+    generateTextImpl.mockResolvedValue({
+      text: '}',
+      finishReason: 'stop',
+      toolCalls: [],
+    });
+
+    await expect(
+      activities.operatorModelStepActivity({
+        ...base,
+        step: 2,
+        toolCallHistory: [
+          {
+            toolCallId: `${TURN_ID}:1:0`,
+            modelToolCallId: 'provider-get-run-id',
+            commandName: 'get_run',
+            arguments: { runId: 'source-run' },
+          },
+        ],
+      }),
+    ).rejects.toThrow('Operator model returned an incomplete structured response');
+  });
+
   for (const scenario of [
     {
       label: 'plain-text capability refusal',
@@ -557,6 +619,92 @@ describe('Operator activities', () => {
 
     expect(result).toEqual({ text: '', finishReason: 'stop', toolCalls: [] });
     expect(generateTextImpl).toHaveBeenCalledTimes(1);
+  });
+
+  test('exposes only one durable question tool while reviewing a terminal run', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        session: {
+          id: SESSION_ID,
+          title: 'Session',
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+          approvalMode: 'ask',
+          status: 'active',
+          model: {
+            provider: 'openai',
+            modelId: 'gpt-test',
+            apiKeySecretId: SECRET_ID,
+            baseUrl: null,
+          },
+          createdAt: '2026-08-05T00:00:00.000Z',
+          updatedAt: '2026-08-05T00:00:00.000Z',
+        },
+        turn: {
+          id: TURN_ID,
+          sessionId: SESSION_ID,
+          status: 'running',
+          context: { path: '/operator', runId: 'sentris-run-failed' },
+        },
+        messages: [
+          {
+            role: 'user',
+            content: 'Automatic follow-up for workflow run sentris-run-failed.',
+          },
+        ],
+        actions: [
+          {
+            id: ACTION_ID,
+            toolCallId: `${TURN_ID}:journey:inspect-run`,
+            commandName: 'get_run',
+            status: 'succeeded',
+            arguments: { runId: 'sentris-run-failed' },
+            result: { terminal: true, status: { status: 'FAILED' } },
+            error: null,
+            runId: null,
+          },
+        ],
+      }),
+    );
+    generateTextImpl.mockResolvedValueOnce({
+      text: '',
+      finishReason: 'tool-calls',
+      toolCalls: [
+        {
+          toolCallId: 'provider-question',
+          toolName: 'request_user_input',
+          input: {
+            question: 'Should I focus on fixing the TLS input or skipping TLS?',
+            options: ['Fix the TLS input', 'Skip TLS for now'],
+          },
+        },
+      ],
+    });
+
+    const result = await activities.operatorModelStepActivity({
+      ...base,
+      step: 1,
+      mode: 'run_follow_up_review',
+      sourceRunId: 'sentris-run-failed',
+    });
+
+    expect(result.toolCalls).toEqual([
+      {
+        toolCallId: `${TURN_ID}:1:0`,
+        modelToolCallId: 'provider-question',
+        commandName: 'request_user_input',
+        arguments: {
+          question: 'Should I focus on fixing the TLS input or skipping TLS?',
+          options: ['Fix the TLS input', 'Skip TLS for now'],
+        },
+      },
+    ]);
+    expect(Object.keys(generateTextImpl.mock.calls[0]?.[0]?.tools ?? {})).toEqual([
+      'request_user_input',
+    ]);
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'Ask at most one focused question',
+    );
   });
 
   test('fails the activity when the text-only recovery also returns a provider error', async () => {

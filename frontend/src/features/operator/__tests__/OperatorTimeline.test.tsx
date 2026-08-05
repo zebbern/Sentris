@@ -225,6 +225,7 @@ describe('OperatorTimeline', () => {
     const planId = '11111111-1111-4111-8111-111111111111';
     const workflowId = '22222222-2222-4222-8222-222222222222';
     const versionId = '33333333-3333-4333-8333-333333333333';
+    const runId = 'sentris-run-plan';
     const planSteps = [
       {
         id: 'draft',
@@ -331,12 +332,36 @@ describe('OperatorTimeline', () => {
           versionId,
           inputs: { liveUrls: ['https://example.com'] },
         },
-        result: { runId: 'sentris-run-plan' },
-        runId: 'sentris-run-plan',
+        result: { runId },
+        runId,
         createdAt: '2026-08-02T10:00:06.000Z',
         completedAt: '2026-08-02T10:00:06.500Z',
       },
     ];
+    const followUpAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'follow-up-action',
+      turnId: 'turn-follow-up',
+      toolCallId: 'follow-up:get-run',
+      commandName: 'get_run',
+      effect: 'read',
+      approvalRequired: false,
+      status: 'succeeded',
+      arguments: { runId },
+      result: {
+        run: { id: runId, workflowId, status: 'COMPLETED' },
+        status: { status: 'COMPLETED' },
+        terminal: true,
+        diagnostics: {
+          trace: { availability: 'available', totalEvents: 10, failedEventCount: 1 },
+          findings: { availability: 'available', total: 0, items: [] },
+          artifacts: { availability: 'available', total: 0, items: [] },
+        },
+      },
+      runId: null,
+      createdAt: '2026-08-02T10:00:08.000Z',
+      completedAt: '2026-08-02T10:00:08.500Z',
+    };
     const planMessages: OperatorMessageView[] = [
       {
         id: 'plan-request',
@@ -374,6 +399,24 @@ describe('OperatorTimeline', () => {
         content: 'Created the workflow and completed its first run.',
         createdAt: '2026-08-02T10:00:07.000Z',
       },
+      {
+        id: 'follow-up-control-message',
+        sessionId: 'session-1',
+        turnId: 'turn-follow-up',
+        sequence: 1,
+        role: 'user',
+        content: `Automatic follow-up for workflow run ${runId}: inspect the terminal outcome.`,
+        createdAt: '2026-08-02T10:00:08.000Z',
+      },
+      {
+        id: 'follow-up-result',
+        sessionId: 'session-1',
+        turnId: 'turn-follow-up',
+        sequence: 2,
+        role: 'assistant',
+        content: 'The workflow completed with one trace failure and no findings.',
+        createdAt: '2026-08-02T10:00:09.000Z',
+      },
     ];
     const turns: OperatorTurnView[] = [
       {
@@ -402,12 +445,25 @@ describe('OperatorTimeline', () => {
         startedAt: '2026-08-02T10:00:03.000Z',
         completedAt: '2026-08-02T10:00:07.000Z',
       },
+      {
+        id: 'turn-follow-up',
+        sessionId: 'session-1',
+        status: 'completed',
+        temporalWorkflowId: null,
+        temporalRunId: null,
+        context: { path: `/runs/${runId}`, runId },
+        journey: { kind: 'run_follow_up', runId },
+        error: null,
+        createdAt: '2026-08-02T10:00:08.000Z',
+        startedAt: '2026-08-02T10:00:08.000Z',
+        completedAt: '2026-08-02T10:00:09.000Z',
+      },
     ];
 
     const { container } = renderWithProviders(
       <OperatorTimeline
         messages={planMessages}
-        actions={[planAction, ...executionActions]}
+        actions={[planAction, ...executionActions, followUpAction]}
         turns={turns}
         isActive={false}
         onDecision={mock(() => {})}
@@ -420,15 +476,23 @@ describe('OperatorTimeline', () => {
       screen.queryByText('Plan ready for review. Select Run plan or Revise.'),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/^Run Operator plan /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Automatic follow-up for workflow run /)).not.toBeInTheDocument();
     expect(screen.getByText('Create and run website scan')).toBeInTheDocument();
-    expect(screen.getByText('Completed')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Create and run website scan Completed/ }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /workflow run/i })).toHaveAttribute(
       'href',
-      '/runs/sentris-run-plan',
+      `/runs/${runId}`,
     );
+    expect(screen.getAllByRole('link', { name: /workflow run/i })).toHaveLength(1);
     expect(
       screen.getByText('Created the workflow and completed its first run.'),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('The workflow completed with one trace failure and no findings.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Recorded run results' })).toBeInTheDocument();
   });
 
   it('opens configure-and-run without repeating a structured saved workflow list', () => {

@@ -241,91 +241,97 @@ export async function runComponentActivity(
       agentTracePublisher: svc.agentTracePublisher,
     });
 
-    // Record node I/O start (using raw inputs/params from workflow)
-    await recordNodeIoWithoutChangingExecution(() =>
-      svc.nodeIO?.recordStart({
-        runId: input.runId,
-        nodeRef: action.ref,
-        workflowId: input.workflowId,
-        organizationId: input.organizationId,
-        componentId: action.componentId,
-        inputs: maskSecretInputs(component, { ...inputs, ...params }) as Record<string, unknown>,
-      }),
-    );
-
-    context.trace?.record({
-      type: 'NODE_STARTED',
-      timestamp: new Date().toISOString(),
-      level: 'info',
-    });
-
-    const warningsToReport = [...warnings];
-
-    // Resolve spilled inputs and params if necessary
-    const spilledObjectsCache = new Map<string, any>();
-    const resolvedParams = { ...params };
-    const resolvedInputs = { ...inputs };
-
-    await unspill(
-      resolvedParams,
-      'Parameter',
-      storage,
-      spilledObjectsCache,
-      warningsToReport,
-      organizationId,
-    );
-    await unspill(
-      resolvedInputs,
-      'Input',
-      storage,
-      spilledObjectsCache,
-      warningsToReport,
-      organizationId,
-    );
-    ctx.heartbeat('inputs-resolved');
-
-    // Resolve secret references for input overrides
-    await resolveSecretInputOverrides(resolvedInputs, input.inputOverrides ?? {}, {
-      secrets,
-      component,
-      resolvedParams,
-      organizationId,
-    });
-
-    await resolveLlmProviderModelOverrides(resolvedInputs, {
-      secrets,
-      component,
-      resolvedParams,
-      organizationId,
-    });
-
-    // Also resolve secret references in params (for params with editor: 'secret')
-    await resolveSecretParams(resolvedParams, input.rawParams ?? {}, {
-      secrets,
-      component,
-      organizationId,
-    });
-    ctx.heartbeat('secrets-resolved');
-
-    // Validate required inputs and log warnings
-    validateRequiredInputs(warningsToReport, component, resolvedParams, context.trace, action.ref);
-
-    // For components with dynamic ports (resolvePorts), resolve the actual input schemas
-    let inputsSchema = component.inputs;
-    if (typeof component.resolvePorts === 'function') {
-      const resolved = component.resolvePorts(params);
-      if (resolved?.inputs) {
-        inputsSchema = resolved.inputs;
-      }
-    }
-
-    const parsedInputs = inputsSchema.parse(resolvedInputs);
-    const parsedParams = component.parameters
-      ? component.parameters.parse(resolvedParams)
-      : resolvedParams;
-    ctx.heartbeat('validated');
-
     try {
+      // Record node I/O start (using raw inputs/params from workflow)
+      await recordNodeIoWithoutChangingExecution(() =>
+        svc.nodeIO?.recordStart({
+          runId: input.runId,
+          nodeRef: action.ref,
+          workflowId: input.workflowId,
+          organizationId: input.organizationId,
+          componentId: action.componentId,
+          inputs: maskSecretInputs(component, { ...inputs, ...params }) as Record<string, unknown>,
+        }),
+      );
+
+      context.trace?.record({
+        type: 'NODE_STARTED',
+        timestamp: new Date().toISOString(),
+        level: 'info',
+      });
+
+      const warningsToReport = [...warnings];
+
+      // Resolve spilled inputs and params if necessary
+      const spilledObjectsCache = new Map<string, any>();
+      const resolvedParams = { ...params };
+      const resolvedInputs = { ...inputs };
+
+      await unspill(
+        resolvedParams,
+        'Parameter',
+        storage,
+        spilledObjectsCache,
+        warningsToReport,
+        organizationId,
+      );
+      await unspill(
+        resolvedInputs,
+        'Input',
+        storage,
+        spilledObjectsCache,
+        warningsToReport,
+        organizationId,
+      );
+      ctx.heartbeat('inputs-resolved');
+
+      // Resolve secret references for input overrides
+      await resolveSecretInputOverrides(resolvedInputs, input.inputOverrides ?? {}, {
+        secrets,
+        component,
+        resolvedParams,
+        organizationId,
+      });
+
+      await resolveLlmProviderModelOverrides(resolvedInputs, {
+        secrets,
+        component,
+        resolvedParams,
+        organizationId,
+      });
+
+      // Also resolve secret references in params (for params with editor: 'secret')
+      await resolveSecretParams(resolvedParams, input.rawParams ?? {}, {
+        secrets,
+        component,
+        organizationId,
+      });
+      ctx.heartbeat('secrets-resolved');
+
+      // Validate required inputs and log warnings
+      validateRequiredInputs(
+        warningsToReport,
+        component,
+        resolvedParams,
+        context.trace,
+        action.ref,
+      );
+
+      // For components with dynamic ports (resolvePorts), resolve the actual input schemas
+      let inputsSchema = component.inputs;
+      if (typeof component.resolvePorts === 'function') {
+        const resolved = component.resolvePorts(params);
+        if (resolved?.inputs) {
+          inputsSchema = resolved.inputs;
+        }
+      }
+
+      const parsedInputs = inputsSchema.parse(resolvedInputs);
+      const parsedParams = component.parameters
+        ? component.parameters.parse(resolvedParams)
+        : resolvedParams;
+      ctx.heartbeat('validated');
+
       // Execute the component logic directly so that any
       // normalisation/parsing inside `execute` runs.
       // Docker/remote execution should be invoked from within

@@ -336,7 +336,10 @@ release the turn after launching a workflow and follow its run and Agent childre
 the canonical run trace/Agent SSE pipeline; a patch-gated blocking observer exists only for
 old-history replay. A terminal outbox event for an ordinary Operator-launched run starts one
 idempotent durable coordinator, which waits for session availability and creates a fresh bounded
-`get_run` summary turn; it does not reopen or block the launch turn. Terminal inspections include
+`get_run` follow-up turn; it does not reopen or block the launch turn. New follow-up histories may
+ask at most one focused question through the existing durable `request_user_input` action when the
+answer materially changes the recommendation, then finish through a text-only summary step that
+cannot ask again; otherwise they summarize without interrupting the user. Terminal inspections include
 bounded trace, finding, and artifact evidence. The frontend renders that typed evidence as a
 deterministic result panel with run-scoped finding links, artifact downloads, and the existing
 typed run controls rather than relying on model-generated actions. The explicit `improve_run`

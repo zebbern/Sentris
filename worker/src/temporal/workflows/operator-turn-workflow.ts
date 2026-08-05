@@ -790,6 +790,7 @@ async function runRunFollowUpJourney(input: {
   journey: Extract<OperatorJourney, { kind: 'run_follow_up' }>;
   decisions: OperatorDecisionMap;
   interpretActionStatus: boolean;
+  allowQuestion: boolean;
 }): Promise<void> {
   const inspection = await prepareAndExecuteOperatorAction({
     base: input.base,
@@ -806,11 +807,64 @@ async function runRunFollowUpJourney(input: {
     throw new Error('The run follow-up could not inspect its terminal run');
   }
 
-  const summary = await operatorModelStepActivity({
+  if (!input.allowQuestion) {
+    const summary = await operatorModelStepActivity({
+      ...input.base,
+      step: 1,
+      mode: 'run_follow_up_summary',
+      sourceRunId: input.journey.runId,
+    });
+    await shortActivities.operatorCompleteTurnActivity({
+      ...input.base,
+      message:
+        summary.text.trim() ||
+        `Workflow run ${input.journey.runId} is terminal. Its durable inspection is recorded above.`,
+    });
+    return;
+  }
+
+  const review = await operatorModelStepActivity({
     ...input.base,
     step: 1,
+    mode: 'run_follow_up_review',
+    sourceRunId: input.journey.runId,
+  });
+  const question = review.toolCalls.find(
+    (toolCall) => toolCall.commandName === 'request_user_input',
+  );
+  if (!question) {
+    await shortActivities.operatorCompleteTurnActivity({
+      ...input.base,
+      message:
+        review.text.trim() ||
+        `Workflow run ${input.journey.runId} is terminal. Its durable inspection is recorded above.`,
+    });
+    return;
+  }
+
+  const questionOutcome = await prepareAndExecuteOperatorAction({
+    base: input.base,
+    toolCall: question,
+    decisions: input.decisions,
+    interpretActionStatus: input.interpretActionStatus,
+  });
+  if (questionOutcome.disposition === 'rejected') {
+    await shortActivities.operatorCompleteTurnActivity({
+      ...input.base,
+      message:
+        questionOutcome.reason === 'action_failed'
+          ? 'The terminal run inspection is recorded above, but the follow-up answer could not be recorded.'
+          : 'The terminal run inspection is recorded above. The follow-up question was cancelled, so no tailored recommendation was added.',
+    });
+    return;
+  }
+
+  const summary = await operatorModelStepActivity({
+    ...input.base,
+    step: 2,
     mode: 'run_follow_up_summary',
     sourceRunId: input.journey.runId,
+    toolCallHistory: [question],
   });
   await shortActivities.operatorCompleteTurnActivity({
     ...input.base,
@@ -826,6 +880,7 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
   const compactStructuredCompletions = patched('operator-compact-structured-completions-v1');
   const compactControlCompletions = patched('operator-compact-control-completions-v1');
   const automaticDraftRepair = patched(AUTOMATIC_DRAFT_REPAIR_PATCH_ID);
+  const runFollowUpQuestions = patched('operator-run-follow-up-question-v1');
   const decisions = new Map<string, OperatorActionDecisionUpdate>();
 
   // Updates can arrive before the workflow reaches its approval wait. Retain the latest
@@ -878,6 +933,7 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
         journey: input.journey,
         decisions,
         interpretActionStatus: actionStatusOutcomes,
+        allowQuestion: runFollowUpQuestions,
       });
       await condition(allHandlersFinished);
       return;

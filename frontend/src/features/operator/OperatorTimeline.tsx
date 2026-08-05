@@ -124,7 +124,7 @@ function groupEventsByTurn(
   return [...groups.values()];
 }
 
-function planExecutionDisplayTurnIds(
+function operatorJourneyDisplayTurnIds(
   turns: OperatorTurnView[],
   actions: OperatorActionView[],
 ): ReadonlyMap<string, string> {
@@ -139,6 +139,23 @@ function planExecutionDisplayTurnIds(
     if (turn.journey?.kind !== 'execute_plan') continue;
     const proposalTurnId = proposalTurnIds.get(turn.journey.planActionId);
     if (proposalTurnId) displayTurnIds.set(turn.id, proposalTurnId);
+  }
+
+  const runDisplayTurnIds = new Map<string, string>();
+  for (const action of actions) {
+    if (
+      action.status !== 'succeeded' ||
+      !action.runId ||
+      (action.commandName !== 'run_workflow' && action.commandName !== 'retry_run')
+    ) {
+      continue;
+    }
+    runDisplayTurnIds.set(action.runId, displayTurnIds.get(action.turnId) ?? action.turnId);
+  }
+  for (const turn of turns) {
+    if (turn.journey?.kind !== 'run_follow_up') continue;
+    const runDisplayTurnId = runDisplayTurnIds.get(turn.journey.runId);
+    if (runDisplayTurnId) displayTurnIds.set(turn.id, runDisplayTurnId);
   }
   return displayTurnIds;
 }
@@ -262,11 +279,13 @@ function InvestigationFollowUps({
   action,
   actions,
   disabled,
+  showRunActivity,
   onCommand,
 }: {
   action: OperatorActionView;
   actions: OperatorActionView[];
   disabled: boolean;
+  showRunActivity: boolean;
   onCommand: (request: OperatorRunCommandRequest) => void;
 }) {
   const runInput =
@@ -289,11 +308,13 @@ function InvestigationFollowUps({
           disabled={disabled}
           onCommand={onCommand}
         />
-        <OperatorRunActivity
-          runId={runInput.data.runId}
-          disabled={disabled}
-          onCommand={onCommand}
-        />
+        {showRunActivity ? (
+          <OperatorRunActivity
+            runId={runInput.data.runId}
+            disabled={disabled}
+            onCommand={onCommand}
+          />
+        ) : null}
       </div>
     );
   }
@@ -788,8 +809,14 @@ export function OperatorTimeline({
   onCancelTurn = () => {},
   elevatedDecisionActionId,
 }: OperatorTimelineProps) {
-  const displayTurnIds = planExecutionDisplayTurnIds(turns, actions);
-  const executedProposalTurnIds = new Set(displayTurnIds.values());
+  const displayTurnIds = operatorJourneyDisplayTurnIds(turns, actions);
+  const executedProposalTurnIds = new Set(
+    turns.flatMap((turn) => {
+      if (turn.journey?.kind !== 'execute_plan') return [];
+      const proposalTurnId = displayTurnIds.get(turn.id);
+      return proposalTurnId ? [proposalTurnId] : [];
+    }),
+  );
   const planIds = actions.flatMap((action) => {
     const plan = OperatorPlanProposalResultSchema.safeParse(action.result);
     return plan.success ? [plan.data.planId] : [];
@@ -829,6 +856,22 @@ export function OperatorTimeline({
           message.turnId === latestInvestigationAction.turnId && message.role === 'assistant',
       )
     : false;
+  const latestInvestigationDisplayTurnId = latestInvestigationAction
+    ? (displayTurnIds.get(latestInvestigationAction.turnId) ?? latestInvestigationAction.turnId)
+    : null;
+  const inspectedRunId = latestInvestigationAction
+    ? OperatorGetRunInputSchema.safeParse(latestInvestigationAction.arguments)
+    : null;
+  const investigationSourceRunVisible = Boolean(
+    inspectedRunId?.success &&
+    actions.some(
+      (action) =>
+        action.status === 'succeeded' &&
+        action.runId === inspectedRunId.data.runId &&
+        (action.commandName === 'run_workflow' || action.commandName === 'retry_run') &&
+        (displayTurnIds.get(action.turnId) ?? action.turnId) === latestInvestigationDisplayTurnId,
+    ),
+  );
   const appliedDraftIds = new Set(
     actions.flatMap((action) => {
       if (action.status !== 'succeeded') return [];
@@ -896,18 +939,20 @@ export function OperatorTimeline({
                 />
               ),
             )}
+            {latestInvestigationAction &&
+            investigationAnswered &&
+            latestInvestigationDisplayTurnId === group.turnId ? (
+              <InvestigationFollowUps
+                action={latestInvestigationAction}
+                actions={actions}
+                disabled={runCommandDisabled}
+                showRunActivity={!investigationSourceRunVisible}
+                onCommand={onRunCommand}
+              />
+            ) : null}
           </section>
         );
       })}
-
-      {latestInvestigationAction && investigationAnswered ? (
-        <InvestigationFollowUps
-          action={latestInvestigationAction}
-          actions={actions}
-          disabled={runCommandDisabled}
-          onCommand={onRunCommand}
-        />
-      ) : null}
 
       {events.length === 0 && !isActive ? (
         <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-center text-muted-foreground">

@@ -40,6 +40,7 @@ let earlyDecision:
   | undefined;
 let detachedRunFollowing = true;
 let automaticDraftRepair = true;
+let runFollowUpQuestions = true;
 const allHandlersFinished = vi.fn(() => true);
 const condition = vi.fn(async (predicate: () => boolean, timeout?: string) => {
   if (predicate()) return true;
@@ -63,9 +64,11 @@ mock.module('@temporalio/workflow', () => ({
   currentUpdateInfo: vi.fn(() => undefined),
   defineUpdate: vi.fn((name: string) => name),
   isCancellation: vi.fn(() => false),
-  patched: vi.fn((patchId: string) =>
-    patchId === 'operator-automatic-draft-repair-v1' ? automaticDraftRepair : detachedRunFollowing,
-  ),
+  patched: vi.fn((patchId: string) => {
+    if (patchId === 'operator-automatic-draft-repair-v1') return automaticDraftRepair;
+    if (patchId === 'operator-run-follow-up-question-v1') return runFollowUpQuestions;
+    return detachedRunFollowing;
+  }),
   proxyActivities: vi.fn(
     () =>
       new Proxy(
@@ -143,6 +146,7 @@ beforeEach(() => {
   earlyDecision = undefined;
   detachedRunFollowing = true;
   automaticDraftRepair = true;
+  runFollowUpQuestions = true;
   operatorSetTurnStatusActivity.mockImplementation(async () => {
     events.push('status');
   });
@@ -341,7 +345,7 @@ describe('operatorTurnWorkflow', () => {
     });
   });
 
-  test('inspects and summarizes an automatic terminal-run follow-up without extra actions', async () => {
+  test('inspects and summarizes an automatic terminal-run follow-up without asking unnecessarily', async () => {
     const runId = 'sentris-run-finished';
     const actionId = '44444444-4444-4444-8444-444444444444';
     operatorPrepareActionActivity.mockResolvedValue({
@@ -376,12 +380,125 @@ describe('operatorTurnWorkflow', () => {
     expect(operatorModelStepActivity).toHaveBeenCalledWith({
       ...input,
       step: 1,
-      mode: 'run_follow_up_summary',
+      mode: 'run_follow_up_review',
       sourceRunId: runId,
     });
     expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
       ...input,
       message: 'The workflow completed successfully with no trace failures.',
+    });
+  });
+
+  test('asks at most one durable terminal follow-up question and resumes with the answer', async () => {
+    const runId = 'sentris-run-needs-input';
+    const inspectionActionId = '44444444-4444-4444-8444-444444444444';
+    const questionActionId = '55555555-5555-4555-8555-555555555555';
+    const questionCall = {
+      toolCallId: `${input.turnId}:1:0`,
+      modelToolCallId: 'provider-question',
+      providerOptions: { google: { thoughtSignature: 'question-signature' } },
+      commandName: 'request_user_input' as const,
+      arguments: {
+        question: 'Should I focus the recommendation on fixing the TLS input or skipping TLS?',
+        options: ['Fix the TLS input', 'Skip TLS for now'],
+      },
+    };
+    earlyDecision = {
+      actionId: questionActionId,
+      decision: 'approved',
+      expectedVersion: 0,
+    };
+    operatorPrepareActionActivity
+      .mockResolvedValueOnce({
+        actionId: inspectionActionId,
+        actionVersion: 0,
+        disposition: 'execute',
+      })
+      .mockResolvedValueOnce({
+        actionId: questionActionId,
+        actionVersion: 0,
+        disposition: 'wait_for_approval',
+      });
+    operatorExecuteActionActivity
+      .mockResolvedValueOnce({
+        actionId: inspectionActionId,
+        actionStatus: 'succeeded',
+        result: { terminal: true, status: { status: 'FAILED' } },
+      })
+      .mockResolvedValueOnce({
+        actionId: questionActionId,
+        actionStatus: 'succeeded',
+        result: {
+          kind: 'operator-user-input',
+          response: 'Fix the TLS input',
+          selectedOption: 'Fix the TLS input',
+        },
+      });
+    operatorModelStepActivity
+      .mockResolvedValueOnce({
+        text: '',
+        finishReason: 'tool-calls',
+        toolCalls: [questionCall],
+      })
+      .mockResolvedValueOnce({
+        text: 'The run failed at TLS setup. Update the TLS input, then use Run again.',
+        finishReason: 'stop',
+        toolCalls: [],
+      });
+
+    await operatorTurnWorkflow({
+      ...input,
+      journey: { kind: 'run_follow_up', runId },
+    });
+
+    expect(operatorPrepareActionActivity).toHaveBeenNthCalledWith(2, {
+      ...input,
+      ...questionCall,
+    });
+    expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(2);
+    expect(operatorModelStepActivity).toHaveBeenNthCalledWith(2, {
+      ...input,
+      step: 2,
+      mode: 'run_follow_up_summary',
+      sourceRunId: runId,
+      toolCallHistory: [questionCall],
+    });
+    expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
+      ...input,
+      message: 'The run failed at TLS setup. Update the TLS input, then use Run again.',
+    });
+  });
+
+  test('keeps pre-patch terminal follow-ups on the original text-only summary path', async () => {
+    runFollowUpQuestions = false;
+    const runId = 'sentris-run-pre-patch';
+    operatorPrepareActionActivity.mockResolvedValue({
+      actionId: '44444444-4444-4444-8444-444444444444',
+      actionVersion: 0,
+      disposition: 'execute',
+    });
+    operatorExecuteActionActivity.mockResolvedValue({
+      actionId: '44444444-4444-4444-8444-444444444444',
+      actionStatus: 'succeeded',
+      result: { terminal: true, status: { status: 'COMPLETED' } },
+    });
+    operatorModelStepActivity.mockResolvedValue({
+      text: 'The workflow completed.',
+      finishReason: 'stop',
+      toolCalls: [],
+    });
+
+    await operatorTurnWorkflow({
+      ...input,
+      journey: { kind: 'run_follow_up', runId },
+    });
+
+    expect(operatorModelStepActivity).toHaveBeenCalledTimes(1);
+    expect(operatorModelStepActivity).toHaveBeenCalledWith({
+      ...input,
+      step: 1,
+      mode: 'run_follow_up_summary',
+      sourceRunId: runId,
     });
   });
 

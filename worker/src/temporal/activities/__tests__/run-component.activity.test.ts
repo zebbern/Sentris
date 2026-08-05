@@ -468,6 +468,30 @@ describe('runComponentActivity', () => {
     await expect(activity).rejects.toThrow();
   });
 
+  it('records input validation as the failed node before rejecting the activity', async () => {
+    const activity = runComponentActivity(
+      createBaseActivityInput({ inputs: { value: 42 as unknown as string } }),
+    );
+
+    await expect(activity).rejects.toThrow();
+
+    expect(trace.events).toContainEqual(
+      expect.objectContaining({
+        type: 'NODE_FAILED',
+        level: 'error',
+        error: expect.objectContaining({ type: 'ZodError' }),
+      }),
+    );
+    expect(nodeIO.recordCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: 'test-run-1',
+        nodeRef: 'node-1',
+        componentId: 'test.run-component-activity',
+        status: 'failed',
+      }),
+    );
+  });
+
   it('drains failed trace publication without replacing a component failure', async () => {
     const tracePublication = deferred<undefined>();
     const failedTraceObserved = deferred<undefined>();

@@ -140,8 +140,11 @@ attempt per retrying Activity attempt rather than a long in-Activity polling loo
 When an ordinary Operator-launched run becomes terminal, its transactional outbox event starts
 one idempotently named follow-up coordinator. The coordinator retries durably while that Operator
 session has another active turn, then creates a fresh turn through the canonical turn service. The
-turn performs one bounded `get_run` inspection and a text-only result summary with product links
-and suggested next actions. Terminal inspection now records separately bounded trace, finding,
+turn performs one bounded `get_run` inspection. New histories then run a question-capable review
+that exposes only the existing durable `request_user_input` action. It summarizes immediately by
+default; when one missing preference materially changes the recommendation, it may ask exactly one
+focused question and then resumes through a text-only final summary that cannot ask again. A patch
+keeps older histories on the original text-only path. Terminal inspection records separately bounded trace, finding,
 and artifact evidence. The frontend projects that typed evidence into a compact result panel with
 run-scoped finding navigation, direct artifact downloads, and the existing typed run controls;
 older turn histories without recorded artifact evidence use the canonical terminal-run artifact
